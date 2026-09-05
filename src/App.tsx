@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useAuth, useSession, useClerk } from '@clerk/clerk-react';
 import { TaskChooseOrganization, TaskResetPassword, TaskSetupMFA } from '@clerk/clerk-react';
+import { seedDatabaseIfEmpty } from './db/seed';
 import { CustomAuth } from './pages/Auth/CustomAuth';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
@@ -26,6 +27,9 @@ import { Booking } from './pages/Finance/Booking';
 import { Inventory } from './pages/Inventory/Inventory';
 import { Reports } from './pages/Reports/Reports';
 
+import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
+
 // Admin
 import { Users } from './pages/Admin/Users';
 import { Messaging } from './pages/Admin/Messaging';
@@ -45,7 +49,7 @@ function AuthGate() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
           <p className="text-slate-500 text-sm font-medium">جاري التحقق من الجلسة...</p>
         </div>
       </div>
@@ -69,7 +73,7 @@ function AuthGate() {
   if (currentTask && !bypassPendingTask) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" dir="rtl">
-        <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
+        <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 p-8">
           <div className="text-center mb-6">
             <h2 className="text-xl font-bold text-slate-900">مرحباً بك! خطوة تأكيد الحساب</h2>
             <p className="text-slate-500 text-sm mt-1">يرجى استكمال الإجراء أو المتابعة للوحة التحكم مباشرة</p>
@@ -88,11 +92,11 @@ function AuthGate() {
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
             <button
               type="button"
               onClick={() => setBypassPendingTask(true)}
-              className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors"
+              className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
             >
               المتابعة إلى لوحة التحكم
             </button>
@@ -142,9 +146,17 @@ function AuthGate() {
 }
 
 export default function App() {
+  useEffect(() => {
+    seedDatabaseIfEmpty();
+  }, []);
+
   return (
-    <BrowserRouter>
-      <AuthGate />
-    </BrowserRouter>
+    <ThemeProvider>
+      <ToastProvider>
+        <BrowserRouter>
+          <AuthGate />
+        </BrowserRouter>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }

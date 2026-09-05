@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Cairo", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-brand: "Readex Pro", "Cairo", ui-sans-serif, system-ui, sans-serif;
@@ -7,5 +9,19 @@
 
 body {
   font-family: var(--font-sans);
-  @apply bg-slate-50 text-slate-900;
+  @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+}
+
+.dark {
+  --color-slate-50: #f0f6fc;
+  --color-slate-100: #c9d1d9;
+  --color-slate-200: #b1bac4;
+  --color-slate-300: #8b949e;
+  --color-slate-400: #8b949e;
+  --color-slate-500: #6e7681;
+  --color-slate-600: #484f58;
+  --color-slate-700: #30363d;
+  --color-slate-800: #21262d;
+  --color-slate-900: #161b22;
+  --color-slate-950: #0d1117;
 }

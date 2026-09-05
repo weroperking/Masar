@@ -29,7 +29,7 @@ export class AppDatabase extends Dexie {
   syncMeta!: Table<SyncMeta>;
 
   constructor() {
-    super('EduSaaSDB');
+    super('MasarDB');
     
     // Version 1
     this.version(1).stores({

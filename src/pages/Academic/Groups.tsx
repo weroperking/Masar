@@ -15,25 +15,25 @@ export function Groups() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-slate-900">المجموعات</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">المجموعات</h1>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           <Plus className="w-4 h-4 ml-2" />
           إضافة مجموعة
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
-        <div className="flex border-b border-slate-200">
-          <button onClick={() => setActiveTab('in_progress')} className={`px-6 py-3 text-sm font-medium border-b-2 ${activeTab === 'in_progress' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <div className="flex border-b border-slate-200 dark:border-slate-700">
+          <button onClick={() => setActiveTab('in_progress')} className={`px-6 py-3 text-sm font-medium border-b-2 ${activeTab === 'in_progress' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
             قيد التنفيذ
           </button>
-          <button onClick={() => setActiveTab('scheduled')} className={`px-6 py-3 text-sm font-medium border-b-2 ${activeTab === 'scheduled' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+          <button onClick={() => setActiveTab('scheduled')} className={`px-6 py-3 text-sm font-medium border-b-2 ${activeTab === 'scheduled' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
             مجدول
           </button>
-          <button onClick={() => setActiveTab('finished')} className={`px-6 py-3 text-sm font-medium border-b-2 ${activeTab === 'finished' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+          <button onClick={() => setActiveTab('finished')} className={`px-6 py-3 text-sm font-medium border-b-2 ${activeTab === 'finished' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
             منتهي
           </button>
         </div>
@@ -46,14 +46,14 @@ export function Groups() {
               {groups?.map(group => {
                 const course = courses?.find(c => c.id === group.courseId);
                 return (
-                  <div key={group.id} className="border border-slate-200 rounded-xl p-5 hover:border-indigo-500 transition-colors cursor-pointer">
+                  <div key={group.id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:border-blue-500 transition-colors cursor-pointer">
                     <div className="flex justify-between items-start mb-3">
-                      <h3 className="font-bold text-lg text-slate-900">{group.name}</h3>
-                      <span className="inline-flex px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-800">
+                      <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">{group.name}</h3>
+                      <span className="inline-flex px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
                         {group.type === 'in_person' ? 'حضوري' : 'أونلاين'}
                       </span>
                     </div>
-                    <p className="text-sm text-indigo-600 mb-4">{course?.name}</p>
+                    <p className="text-sm text-blue-600 mb-4">{course?.name}</p>
                     
                     <div className="space-y-2 text-sm text-slate-600">
                       <div className="flex items-center">
@@ -118,9 +118,9 @@ function GroupFormModal({ onClose, courses }: { onClose: () => void, courses: an
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col my-8">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
-          <h2 className="text-lg font-bold text-slate-900">إضافة مجموعة جديدة</h2>
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col my-8">
+        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">إضافة مجموعة جديدة</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X className="w-5 h-5" />
           </button>
@@ -129,40 +129,40 @@ function GroupFormModal({ onClose, courses }: { onClose: () => void, courses: an
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">اسم المجموعة *</label>
-              <input required type="text" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">اسم المجموعة *</label>
+              <input required type="text" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">الكورس *</label>
-              <select required className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">الكورس *</label>
+              <select required className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.courseId} onChange={e => setFormData({...formData, courseId: e.target.value})}>
                 <option value="">اختر الكورس...</option>
                 {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">نوع المجموعة</label>
-              <select className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">نوع المجموعة</label>
+              <select className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as any})}>
                 <option value="in_person">حضوري</option>
                 <option value="online">عبر الإنترنت</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">الحد الأقصى للطلاب</label>
-              <input type="number" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">الحد الأقصى للطلاب</label>
+              <input type="number" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.maxStudents} onChange={e => setFormData({...formData, maxStudents: e.target.value})} />
             </div>
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-2">أيام الأسبوع *</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">أيام الأسبوع *</label>
             <div className="flex flex-wrap gap-2">
               {days.map(day => (
                 <button type="button" key={day} onClick={() => toggleDay(day)}
                   className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-                    formData.daysOfWeek.includes(day) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    formData.daysOfWeek.includes(day) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 dark:text-slate-300 border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'
                   }`}>
                   {day}
                 </button>
@@ -172,38 +172,38 @@ function GroupFormModal({ onClose, courses }: { onClose: () => void, courses: an
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">وقت البدء *</label>
-              <input required type="time" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">وقت البدء *</label>
+              <input required type="time" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">وقت الانتهاء *</label>
-              <input required type="time" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">وقت الانتهاء *</label>
+              <input required type="time" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">تاريخ البدء *</label>
-              <input required type="date" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">تاريخ البدء *</label>
+              <input required type="date" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">عدد الحصص</label>
-              <input type="number" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">عدد الحصص</label>
+              <input type="number" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.sessionCount} onChange={e => setFormData({...formData, sessionCount: e.target.value})} placeholder="يحسب تاريخ الانتهاء تلقائياً" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">تاريخ الانتهاء</label>
-              <input type="date" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">تاريخ الانتهاء</label>
+              <input type="date" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
             </div>
           </div>
           
           <div className="mt-8 flex justify-end gap-3 shrink-0">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200">إلغاء</button>
-            <button type="submit" className="px-4 py-2 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">حفظ المجموعة</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200">إلغاء</button>
+            <button type="submit" className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">حفظ المجموعة</button>
           </div>
         </form>
       </div>

@@ -42,14 +42,12 @@ export function CustomAuth() {
                       'المستخدم الحالي';
 
     return (
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 p-8 text-center" dir="rtl">
-        <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-emerald-600 shadow-sm">
-          <CheckCircle2 className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">أنت مسجل الدخول بالفعل</h2>
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 p-8 text-center" dir="rtl">
+        <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">أنت مسجل الدخول بالفعل</h2>
         <p className="text-slate-500 text-sm mb-6">
           جلسة تسجيل الدخول نشطة ومؤكدة للحساب: <br />
-          <span className="font-semibold text-slate-700 dir-ltr inline-block mt-1">{userEmail}</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300 dir-ltr inline-block mt-1">{userEmail}</span>
         </p>
 
         <div className="space-y-3">
@@ -61,7 +59,7 @@ export function CustomAuth() {
                 await clerk.setActive({ session: targetSession });
               }
             }}
-            className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors shadow-sm"
+            className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors shadow-sm"
           >
             الانتقال مباشرة إلى لوحة التحكم
           </button>
@@ -69,7 +67,7 @@ export function CustomAuth() {
           <button
             type="button"
             onClick={() => clerk.signOut()}
-            className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-700 font-medium text-sm transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-red-50 hover:text-red-600 text-slate-700 dark:text-slate-300 font-medium text-sm transition-colors flex items-center justify-center gap-2"
           >
             <LogOut className="w-4 h-4" />
             <span>تسجيل الخروج والتبديل لحساب آخر</span>
@@ -210,23 +208,21 @@ export function CustomAuth() {
   if (!isSignInLoaded || !isSignUpLoaded) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden" dir="rtl">
+    <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden" dir="rtl">
       <div className="p-8">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-200">
-            <ShieldCheck className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <ShieldCheck className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             {view === 'signin' ? 'تسجيل الدخول' : view === 'signup' ? 'إنشاء حساب جديد' : 'تحقق من البريد'}
           </h1>
           <p className="text-slate-500 mt-2 text-sm">
-            {view === 'signin' ? 'مرحباً بك مجدداً في مسار' : view === 'signup' ? 'انضم إلينا وابدأ في إدارة منصتك' : 'أدخل الكود المرسل إلى بريدك الإلكتروني'}
+            {view === 'signin' ? 'مرحباً بك مجدداً في مسار' : view === 'signup' ? 'انضم إلينا وابدأ في إدارة منصة مسار' : 'أدخل الكود المرسل إلى بريدك الإلكتروني'}
           </p>
         </div>
 
@@ -246,7 +242,7 @@ export function CustomAuth() {
         {(view === 'signin' || view === 'signup') && (
           <form onSubmit={view === 'signin' ? handleSignIn : handleSignUp} className="space-y-5">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">البريد الإلكتروني</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">البريد الإلكتروني</label>
               <div className="relative">
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-slate-400" />
@@ -256,7 +252,7 @@ export function CustomAuth() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-all sm:text-sm"
+                  className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all sm:text-sm"
                   placeholder="name@example.com"
                   dir="ltr"
                 />
@@ -264,7 +260,7 @@ export function CustomAuth() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">كلمة المرور</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">كلمة المرور</label>
               <div className="relative">
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-slate-400" />
@@ -274,7 +270,7 @@ export function CustomAuth() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-all sm:text-sm"
+                  className="block w-full pr-10 pl-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all sm:text-sm"
                   placeholder="••••••••"
                   dir="ltr"
                 />
@@ -284,7 +280,7 @@ export function CustomAuth() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (view === 'signin' ? 'دخول' : 'إنشاء حساب')}
             </button>
@@ -294,13 +290,13 @@ export function CustomAuth() {
         {view === 'verify' && (
           <form onSubmit={handleVerify} className="space-y-5">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">كود التحقق (OTP)</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">كود التحقق (OTP)</label>
               <input
                 type="text"
                 required
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="block w-full px-3 py-3 text-center tracking-widest text-lg border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-all sm:text-sm"
+                className="block w-full px-3 py-3 text-center tracking-widest text-lg border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all sm:text-sm"
                 placeholder="123456"
                 dir="ltr"
               />
@@ -309,14 +305,14 @@ export function CustomAuth() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تحقق من الرمز'}
             </button>
           </form>
         )}
 
-        <div className="mt-6 pt-4 border-t border-slate-100 text-center">
+        <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
           <button
             type="button"
             onClick={() => clerk.signOut()}
@@ -328,24 +324,24 @@ export function CustomAuth() {
         </div>
       </div>
 
-      <div className="bg-slate-50 px-8 py-5 border-t border-slate-100 flex justify-center">
+      <div className="bg-slate-50 dark:bg-slate-900 px-8 py-5 border-t border-slate-100 dark:border-slate-800 flex justify-center">
         {view === 'signin' ? (
           <p className="text-sm text-slate-600">
             ليس لديك حساب؟{' '}
-            <button type="button" onClick={() => { setView('signup'); setError(''); }} className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
+            <button type="button" onClick={() => { setView('signup'); setError(''); }} className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
               سجل الآن
             </button>
           </p>
         ) : view === 'signup' ? (
           <p className="text-sm text-slate-600">
             لديك حساب بالفعل؟{' '}
-            <button type="button" onClick={() => { setView('signin'); setError(''); }} className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
+            <button type="button" onClick={() => { setView('signin'); setError(''); }} className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
               تسجيل الدخول
             </button>
           </p>
         ) : (
           <p className="text-sm text-slate-600">
-            <button type="button" onClick={() => { setView('signup'); setError(''); }} className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors flex items-center gap-1">
+            <button type="button" onClick={() => { setView('signup'); setError(''); }} className="font-medium text-blue-600 hover:text-blue-500 transition-colors flex items-center gap-1">
               <ArrowRight className="w-4 h-4" />
               العودة للتسجيل
             </button>
