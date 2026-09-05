@@ -1,0 +1,6 @@
+{
+  "name": "مسار",
+  "description": "منصة مسار لإدارة المراكز التعليمية",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
