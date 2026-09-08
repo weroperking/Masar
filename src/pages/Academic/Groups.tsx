@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
 import { v4 as uuidv4 } from 'uuid';
+import { Link } from 'react-router-dom';
 import { Plus, X, Calendar, Clock, Users } from 'lucide-react';
 import { Group } from '../../types';
 
@@ -48,7 +49,7 @@ export function Groups() {
                 return (
                   <div key={group.id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:border-blue-500 transition-colors cursor-pointer">
                     <div className="flex justify-between items-start mb-3">
-                      <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">{group.name}</h3>
+                      <Link to={`/groups/${group.id}`} className="hover:text-blue-600 hover:underline"><h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">{group.name}</h3></Link>
                       <span className="inline-flex px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
                         {group.type === 'in_person' ? 'حضوري' : 'أونلاين'}
                       </span>
@@ -65,6 +66,12 @@ export function Groups() {
                         <span>{group.startTime} - {group.endTime}</span>
                       </div>
                       <div className="flex items-center">
+                      {group.room && (
+                        <div className="flex items-center mb-1">
+                          <svg className="w-4 h-4 ml-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                          <span>القاعة: {group.room}</span>
+                        </div>
+                      )}
                         <Users className="w-4 h-4 ml-2 text-slate-400" />
                         <span>الحد الأقصى: {group.maxStudents || 'مفتوح'} طالب</span>
                       </div>
@@ -85,7 +92,7 @@ export function Groups() {
 function GroupFormModal({ onClose, courses }: { onClose: () => void, courses: any[] }) {
   const [formData, setFormData] = useState({
     courseId: '', name: '', type: 'in_person' as const, daysOfWeek: [] as string[],
-    startTime: '', endTime: '', startDate: '', endDate: '', sessionCount: '', maxStudents: '',
+    startTime: '', endTime: '', startDate: '', endDate: '', sessionCount: '', maxStudents: '', room: '',
     status: 'scheduled' as const, notes: ''
   });
 
@@ -107,7 +114,7 @@ function GroupFormModal({ onClose, courses }: { onClose: () => void, courses: an
     await db.groups.add({
       id: uuidv4(),
       ...formData,
-      sessionCount: formData.sessionCount ? Number(formData.sessionCount) : undefined,
+      sessionCount: formData.sessionCount ? Number(formData.sessionCount) : undefined, room: formData.room,
       maxStudents: formData.maxStudents ? Number(formData.maxStudents) : undefined,
       created_at: now,
       updated_at: now,
@@ -127,7 +134,7 @@ function GroupFormModal({ onClose, courses }: { onClose: () => void, courses: an
         </div>
         
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">اسم المجموعة *</label>
               <input required type="text" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -148,6 +155,10 @@ function GroupFormModal({ onClose, courses }: { onClose: () => void, courses: an
                 <option value="in_person">حضوري</option>
                 <option value="online">عبر الإنترنت</option>
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">القاعة / الغرفة</label>
+              <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" value={formData.room} onChange={e => setFormData({...formData, room: e.target.value})} placeholder="مثال: قاعة أ، Room 101" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">الحد الأقصى للطلاب</label>

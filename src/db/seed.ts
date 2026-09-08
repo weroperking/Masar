@@ -1,7 +1,7 @@
 import Dexie from 'dexie';
 import { db } from './db';
 import { v4 as uuidv4 } from 'uuid';
-import { Course, Student, Group, Product, User, MessageTemplate, Settings, QrCard, Payment } from '../types';
+import { Course, Student, Group, Product, User, MessageTemplate, Settings, QrCard, MonthlySubscription } from '../types';
 
 export async function seedDatabaseIfEmpty() {
   const studentCount = await db.students.count();
@@ -36,7 +36,7 @@ export async function seedDatabaseIfEmpty() {
   const course1: Course = {
     id: 'course-1',
     name: 'رياضيات الثانوية العامة',
-    price: 450,
+    price: 45000,
     paymentType: 'monthly',
     isActive: true,
     created_at: now,
@@ -47,7 +47,7 @@ export async function seedDatabaseIfEmpty() {
   const course2: Course = {
     id: 'course-2',
     name: 'لغة إنجليزية متقدمة',
-    price: 380,
+    price: 38000,
     paymentType: 'monthly',
     isActive: true,
     created_at: now,
@@ -58,7 +58,7 @@ export async function seedDatabaseIfEmpty() {
   const course3: Course = {
     id: 'course-3',
     name: 'فيزياء تطبيقية',
-    price: 420,
+    price: 42000,
     paymentType: 'monthly',
     isActive: true,
     created_at: now,
@@ -170,8 +170,8 @@ export async function seedDatabaseIfEmpty() {
   const p1: Product = {
     id: 'prod-1',
     name: 'مذكرة الشرح الشاملة في الرياضيات 2026',
-    salePrice: 120,
-    costPrice: 65,
+    salePrice: 12000,
+    costPrice: 6500,
     stockQty: 45,
     soldQty: 15,
     type: 'book',
@@ -183,8 +183,8 @@ export async function seedDatabaseIfEmpty() {
   const p2: Product = {
     id: 'prod-2',
     name: 'ملزمة مراجعة ليلة الامتحان في الإنجليزية',
-    salePrice: 90,
-    costPrice: 45,
+    salePrice: 9000,
+    costPrice: 4500,
     stockQty: 30,
     soldQty: 10,
     type: 'book',
@@ -195,18 +195,18 @@ export async function seedDatabaseIfEmpty() {
 
   await db.products.bulkAdd([p1, p2]);
 
-  // 5. Seed Payments
+  // 5. Seed MonthlySubscriptions
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
-  const pay1: Payment = {
+  const pay1: MonthlySubscription = {
     id: uuidv4(),
     studentId: s1.id,
     courseId: course1.id,
     month: currentMonth,
     year: currentYear,
-    amountTotal: 450,
-    amountPaid: 450,
+    amountTotal: 45000,
+    amountPaid: 45000,
     status: 'paid',
     notes: 'تم الدفع نقداً بالسنتر',
     created_at: now,
@@ -214,14 +214,14 @@ export async function seedDatabaseIfEmpty() {
     sync_status: 'pending'
   };
 
-  const pay2: Payment = {
+  const pay2: MonthlySubscription = {
     id: uuidv4(),
     studentId: s2.id,
     courseId: course2.id,
     month: currentMonth,
     year: currentYear,
-    amountTotal: 380,
-    amountPaid: 200,
+    amountTotal: 38000,
+    amountPaid: 20000,
     status: 'partial',
     notes: 'متبقي 180 ج.م الأسبوع القادم',
     created_at: now,
@@ -229,13 +229,13 @@ export async function seedDatabaseIfEmpty() {
     sync_status: 'pending'
   };
 
-  const pay3: Payment = {
+  const pay3: MonthlySubscription = {
     id: uuidv4(),
     studentId: s3.id,
     courseId: course1.id,
     month: currentMonth,
     year: currentYear,
-    amountTotal: 450,
+    amountTotal: 45000,
     amountPaid: 0,
     status: 'overdue',
     notes: 'مستحق الدفع',
@@ -244,7 +244,7 @@ export async function seedDatabaseIfEmpty() {
     sync_status: 'pending'
   };
 
-  await db.payments.bulkAdd([pay1, pay2, pay3]);
+  await db.monthlySubscriptions.bulkAdd([pay1, pay2, pay3]);
 
   // 6. Seed Ledger Entries
   await db.ledgerEntries.bulkAdd([
@@ -252,7 +252,7 @@ export async function seedDatabaseIfEmpty() {
       id: uuidv4(),
       type: 'revenue',
       category: 'اشتراكات شهرية',
-      amount: 650,
+      amount: 65000,
       date: new Date().toISOString().split('T')[0],
       description: 'تحصيل اشتراكات طلاب الرياضيات والإنجليزية',
       relatedType: 'subscription',
@@ -264,7 +264,7 @@ export async function seedDatabaseIfEmpty() {
       id: uuidv4(),
       type: 'expense',
       category: 'أدوات ومطبوعات',
-      amount: 350,
+      amount: 35000,
       date: new Date().toISOString().split('T')[0],
       description: 'طباعة وتجليد مذكرات وملازم للسنتر',
       relatedType: 'manual',

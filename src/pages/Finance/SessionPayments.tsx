@@ -1,28 +1,53 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
-import { Wallet, Search, Plus, X, Trash2, CheckCircle2 } from 'lucide-react';
+import { Wallet, Search, Plus, X, Trash2, CheckCircle2, Edit2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { SessionPayment } from '../../types';
+import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 
 export function SessionPayments() {
   const [activeTab, setActiveTab] = useState<'all' | 'fee' | 'package'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<SessionPayment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
   const payments = useLiveQuery(() => {
-    if (activeTab === 'all') return db.sessionPayments.toArray();
-    return db.sessionPayments.where('type').equals(activeTab).toArray();
+    return db.sessionPayments.filter(p => {
+      if (p.deleted_at) return false;
+      if (activeTab !== 'all' && p.type !== activeTab) return false;
+      return true;
+    }).toArray();
   }, [activeTab]);
 
+  const sessions = useLiveQuery(() => db.attendanceSessions.toArray(), []);
   const students = useLiveQuery(() => db.students.toArray(), []);
   const courses = useLiveQuery(() => db.courses.toArray(), []);
 
   const studentMap = new Map(students?.map(s => [s.id, s.name]));
   const courseMap = new Map(courses?.map(c => [c.id, c.name]));
+  const sessionMap = new Map(sessions?.map(s => [s.id, s]));
 
   // Financial calculations
-  const totalEarned = payments?.reduce((acc, p) => acc + (p.amount || 0), 0) || 0;
+  const totalEarned = payments?.reduce((acc, p) => {
+    // Earned Revenue: sum of amount where the linked session is completed.
+    // If it's a package (no sessionId), we can count it as earned or prorate it, 
+    // but based on instructions we check if linked session is completed.
+    // For packages without a sessionId, we'll count the amount paid as earned or just the amount.
+    // Let's count packages as earned if they are paid, and fees as earned if session is completed.
+    let isEarned = false;
+    if (p.type === 'package') {
+       isEarned = true; // Package revenue is recognized upon purchase in this simple model
+    } else if (p.sessionId) {
+       const session = sessionMap.get(p.sessionId);
+       if (session?.status === 'completed') {
+         isEarned = true;
+       }
+    }
+    
+    return isEarned ? acc + (p.amount || 0) : acc;
+  }, 0) || 0;
+
   const totalCollected = payments?.reduce((acc, p) => acc + (p.paidAmount || 0), 0) || 0;
 
   const filteredPayments = payments?.map(p => ({
@@ -35,7 +60,11 @@ export function SessionPayments() {
 
   const handleDelete = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذه الدفعة؟')) {
-      await db.sessionPayments.delete(id);
+      await db.sessionPayments.update(id, {
+        deleted_at: Date.now(),
+        updated_at: Date.now(),
+        sync_status: 'pending'
+      });
     }
   };
 
@@ -73,7 +102,10 @@ export function SessionPayments() {
           <p className="text-sm text-slate-500 mt-0.5">متابعة رسوم الحصص الفردية، الباقات، وسداد الطلاب</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingPayment(null);
+            setIsModalOpen(true);
+          }}
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm"
         >
           <Plus className="w-4 h-4 ml-2" />
@@ -86,14 +118,14 @@ export function SessionPayments() {
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6">
           <p className="text-sm font-medium text-slate-500 mb-1">الإيراد المكتسب (الحصص والباقات المقررة)</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totalEarned.toLocaleString()}</span>
+            <span className="text-3xl font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(totalEarned).toLocaleString()}</span>
             <span className="text-slate-500 font-medium">ج.م</span>
           </div>
         </div>
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6">
           <p className="text-sm font-medium text-slate-500 mb-1">النقد المحصّل فعلياً في الخزينة</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-blue-600">{totalCollected.toLocaleString()}</span>
+            <span className="text-3xl font-bold text-blue-600">{toMajorUnits(totalCollected).toLocaleString()}</span>
             <span className="text-slate-500 font-medium">ج.م</span>
           </div>
         </div>
@@ -159,15 +191,15 @@ export function SessionPayments() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-slate-500 text-xs">{p.date}</td>
-                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{p.amount} ج.م</td>
-                        <td className="px-4 py-3 font-bold text-blue-700">{p.paidAmount} ج.م</td>
+                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(p.amount)} ج.م</td>
+                        <td className="px-4 py-3 font-bold text-blue-700">{toMajorUnits(p.paidAmount)} ج.م</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
                             p.status === 'paid' ? 'bg-green-100 text-green-800' : 
                             p.status === 'partial' ? 'bg-amber-100 text-amber-800' : 
                             'bg-red-100 text-red-800'
                           }`}>
-                            {p.status === 'paid' ? 'مدفوع بالكامل' : p.status === 'partial' ? `متبقي ${remaining} ج.م` : 'غير مدفوع'}
+                            {p.status === 'paid' ? 'مدفوع بالكامل' : p.status === 'partial' ? `متبقي ${toMajorUnits(remaining)} ج.م` : 'غير مدفوع'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -182,6 +214,16 @@ export function SessionPayments() {
                                 تسديد
                               </button>
                             )}
+                            <button
+                              onClick={() => {
+                                setEditingPayment(p);
+                                setIsModalOpen(true);
+                              }}
+                              className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors"
+                              title="تعديل"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => handleDelete(p.id)}
                               className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors"
@@ -203,9 +245,13 @@ export function SessionPayments() {
 
       {isModalOpen && (
         <CreateSessionPaymentModal 
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingPayment(null);
+          }}
           students={students || []}
           courses={courses || []}
+          initialData={editingPayment}
         />
       )}
     </div>
@@ -215,19 +261,21 @@ export function SessionPayments() {
 function CreateSessionPaymentModal({ 
   onClose, 
   students, 
-  courses 
+  courses,
+  initialData
 }: { 
   onClose: () => void; 
   students: any[]; 
-  courses: any[]; 
+  courses: any[];
+  initialData?: SessionPayment | null;
 }) {
   const [formData, setFormData] = useState({
-    studentId: students[0]?.id || '',
-    courseId: courses[0]?.id || '',
-    type: 'fee' as 'fee' | 'package',
-    amount: '60',
-    paidAmount: '60',
-    date: new Date().toISOString().split('T')[0]
+    studentId: initialData?.studentId || students[0]?.id || '',
+    courseId: initialData?.courseId || courses[0]?.id || '',
+    type: initialData?.type || ('fee' as 'fee' | 'package'),
+    amount: initialData ? toMajorUnits(initialData.amount).toString() : '60',
+    paidAmount: initialData ? toMajorUnits(initialData.paidAmount).toString() : '60',
+    date: initialData?.date || new Date().toISOString().split('T')[0]
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -240,39 +288,54 @@ function CreateSessionPaymentModal({
     else status = 'unpaid';
 
     const now = Date.now();
-    const newPaymentId = uuidv4();
-    const newPayment: SessionPayment = {
-      id: newPaymentId,
-      studentId: formData.studentId,
-      courseId: formData.courseId,
-      sessionId: null,
-      type: formData.type,
-      amount: amountNum,
-      paidAmount: paidNum,
-      date: formData.date,
-      status,
-      created_at: now,
-      updated_at: now,
-      sync_status: 'pending'
-    };
-
-    await db.sessionPayments.add(newPayment);
-
-    // If paid > 0, record in ledgerEntries as revenue
-    if (paidNum > 0) {
-      await db.ledgerEntries.add({
-        id: uuidv4(),
-        type: 'revenue',
-        category: formData.type === 'fee' ? 'رسوم حصص' : 'اشتراكات باقات',
-        amount: paidNum,
+    
+    if (initialData) {
+      await db.sessionPayments.update(initialData.id, {
+        studentId: formData.studentId,
+        courseId: formData.courseId,
+        type: formData.type,
+        amount: toMinorUnits(amountNum),
+        paidAmount: toMinorUnits(paidNum),
         date: formData.date,
-        description: `تحصيل رسوم للطالب`,
-        relatedType: 'session',
-        relatedId: newPaymentId,
-        created_at: now,
+        status,
         updated_at: now,
         sync_status: 'pending'
       });
+    } else {
+      const newPaymentId = uuidv4();
+      const newPayment: SessionPayment = {
+        id: newPaymentId,
+        studentId: formData.studentId,
+        courseId: formData.courseId,
+        sessionId: null,
+        type: formData.type,
+        amount: toMinorUnits(amountNum),
+        paidAmount: toMinorUnits(paidNum),
+        date: formData.date,
+        status,
+        created_at: now,
+        updated_at: now,
+        sync_status: 'pending'
+      };
+
+      await db.sessionPayments.add(newPayment);
+
+      // If paid > 0, record in ledgerEntries as revenue
+      if (paidNum > 0) {
+        await db.ledgerEntries.add({
+          id: uuidv4(),
+          type: 'revenue',
+          category: formData.type === 'fee' ? 'رسوم حصص' : 'اشتراكات باقات',
+          amount: toMinorUnits(paidNum),
+          date: formData.date,
+          description: `تحصيل رسوم للطالب`,
+          relatedType: 'session',
+          relatedId: newPaymentId,
+          created_at: now,
+          updated_at: now,
+          sync_status: 'pending'
+        });
+      }
     }
 
     onClose();
@@ -282,7 +345,9 @@ function CreateSessionPaymentModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
         <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">تحصيل رسوم حصة أو باقة</h2>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+            {initialData ? 'تعديل بيانات الدفعة' : 'تحصيل رسوم حصة أو باقة'}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X className="w-5 h-5" />
           </button>

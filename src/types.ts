@@ -1,24 +1,20 @@
-export type SyncStatus = 'pending' | 'synced';
-
-export interface SyncMeta {
-  id: string; // usually 'lastSynced'
-  timestamp: number;
-}
-
 export interface BaseRecord {
   id: string;
   created_at: number;
   updated_at: number;
-  sync_status: SyncStatus;
+  deleted_at?: number | null;
+  sync_status: 'synced' | 'pending' | 'error';
 }
 
 export interface Student extends BaseRecord {
   name: string;
   phone: string;
-  parentName: string;
-  parentPhone: string;
-  school: string;
-  leadSource: string;
+  school?: string;
+  gradeLevel?: string;
+  parentName?: string;
+  parentPhone?: string;
+  leadSource?: string;
+  notes?: string;
   isActive: boolean;
 }
 
@@ -26,10 +22,13 @@ export interface Course extends BaseRecord {
   name: string;
   price: number; // Stored in piastres/cents (integer)
   paymentType: 'monthly' | 'package';
+  subject?: string;
+  description?: string;
   isActive: boolean;
 }
 
 export interface Group extends BaseRecord {
+  room?: string;
   courseId: string;
   name: string;
   type: 'in_person' | 'online';
@@ -44,18 +43,28 @@ export interface Group extends BaseRecord {
   status: 'scheduled' | 'in_progress' | 'finished';
 }
 
-export interface Payment extends BaseRecord {
-  studentId: string;
+export interface MonthlySubscription extends BaseRecord {
+  studentId?: string;
   courseId: string;
   month: number;
   year: number;
-  amountTotal: number; // Stored in piastres/cents (integer)
-  amountPaid: number; // Stored in piastres/cents (integer)
-  status: 'paid' | 'partial' | 'overdue';
+  amountTotal: number;
+  amountPaid: number;
+  dueDate?: string; // ADDED THIS
+  status: 'paid' | 'partial' | 'overdue' | 'no_record' | 'rejected' | 'pending';
   notes: string;
 }
 
+export interface Enrollment extends BaseRecord {
+  studentId?: string;
+  groupId: string;
+  courseId: string;
+  enrolledAt: string;
+  status: 'active' | 'withdrawn' | 'completed';
+}
+
 export interface AttendanceSession extends BaseRecord {
+  isTrial?: boolean;
   groupId: string;
   courseId: string;
   startedAt: number;
@@ -66,7 +75,8 @@ export interface AttendanceSession extends BaseRecord {
 
 export interface AttendanceRecord extends BaseRecord {
   sessionId: string;
-  studentId: string;
+  studentId?: string;
+  groupId: string; // ADDED THIS
   status: 'present' | 'absent';
   markedAt: number;
 }
@@ -84,15 +94,15 @@ export interface Assessment extends BaseRecord {
 
 export interface AssessmentGrade extends BaseRecord {
   assessmentId: string;
-  studentId: string;
+  studentId?: string;
   grade: number | string;
   gradedAt: number;
 }
 
 export interface Product extends BaseRecord {
   name: string;
-  salePrice: number; // Stored in piastres/cents (integer)
-  costPrice: number; // Stored in piastres/cents (integer)
+  salePrice: number;
+  costPrice: number;
   stockQty: number;
   soldQty: number;
   type: 'book' | 'other';
@@ -107,86 +117,98 @@ export interface CourseProduct extends BaseRecord {
 }
 
 export interface SessionPayment extends BaseRecord {
-  studentId: string;
+  studentId?: string;
   courseId: string;
   sessionId: string | null;
   type: 'fee' | 'package';
-  amount: number; // Stored in piastres/cents (integer)
-  paidAmount: number; // Stored in piastres/cents (integer)
+  amount: number;
+  paidAmount: number;
   date: string;
   status: 'unpaid' | 'partial' | 'paid' | 'overdue' | 'held' | 'refunded';
 }
 
 export interface LedgerEntry extends BaseRecord {
-  type: 'revenue' | 'expense' | 'refund';
   category?: string;
-  amount: number; // Stored in piastres/cents (integer)
-  date: string;
-  description: string;
-  relatedType: 'subscription' | 'session' | 'product' | 'manual';
+  type: 'income' | 'expense' | 'revenue' | 'refund';
+  relatedType: 'subscription' | 'session' | 'book' | 'salary' | 'rent' | 'other' | 'manual' | 'product';
   relatedId?: string;
+  amount: number;
+  description: string;
+  date: string;
+  paymentMethod?: string;
 }
 
 export interface BookingRequest extends BaseRecord {
   name: string;
   phone: string;
+  declaredAmount?: number;
+  studentId?: string;
   courseId: string;
-  declaredAmount: number; // Stored in piastres/cents (integer)
+  groupId?: string;
   requestDate: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'accepted';
 }
 
 export interface ProductSale extends BaseRecord {
-  productId: string;
-  quantity: number;
+  subtotal?: number;
+  discountValue?: number;
+  discountType?: string;
   customerName?: string;
-  customerPhone?: string;
+  total?: number;
+  receiptNumber?: string;
+  productId: string;
   studentId?: string;
-  discountType: 'none' | 'percentage' | 'fixed';
-  discountValue: number;
-  subtotal: number; // Stored in piastres/cents (integer)
-  total: number; // Stored in piastres/cents (integer)
-  paymentMethod: string;
+  quantity: number;
+  totalPrice?: number;
   saleDate: string;
-  receiptNumber: string;
-  linkedEventId?: string;
-  notes?: string;
+  paymentMethod?: string;
 }
 
 export interface Event extends BaseRecord {
-  name: string;
+  title: string;
   date: string;
-  notes?: string;
+  description?: string;
+  type: 'holiday' | 'exam' | 'reminder';
 }
 
 export interface User extends BaseRecord {
+  status?: string;
+  branch?: string;
+  clerkUserId?: string;
+  role: 'admin' | 'manager' | 'teacher' | 'assistant' | 'staff';
   name: string;
   email: string;
-  role: 'admin' | 'staff' | 'teacher';
-  branch: string;
-  linkedEmployeeName?: string;
-  status: 'active' | 'inactive';
 }
 
 export interface MessageTemplate extends BaseRecord {
-  channel: 'whatsapp' | 'telegram' | 'sms';
-  templateKey: string;
-  body: string;
-  isDefault: boolean;
+  title: string;
+  content: string; // Contains variables like {{StudentName}}, {{CourseName}}
+  type: 'payment_reminder' | 'absence_alert' | 'general';
 }
 
 export interface Settings extends BaseRecord {
-  autoStartEndSessions: boolean;
+  numericMaxGrade?: number;
+  assignmentGradingMethod?: string;
+  freeSessionLimitPerStudent?: number;
+  autoCreateAssignmentPerSession?: boolean;
+  autoStartEndSessions?: boolean;
+  academyName?: string;
+  whatsappNumber?: string;
+  currency?: string;
   autoConfirmPaymentOnAttendance: boolean;
-  autoCreateAssignmentPerSession: boolean;
-  freeSessionLimitPerStudent: number;
-  assignmentGradingMethod: 'numeric' | 'rating';
-  numericMaxGrade: number;
+  theme?: 'light' | 'dark' | 'system';
 }
 
 export interface QrCard extends BaseRecord {
-  cardNumber: string;
-  studentId: string | null;
-  printStatus: 'available' | 'queued' | 'printed';
-  linkedAt: number | null;
+  linkedAt?: number;
+  printStatus?: string;
+  cardNumber?: string;
+  studentId?: string;
+  qrCodeData?: string;
+  status?: 'active' | 'revoked' | string;
+}
+
+export interface SyncMeta {
+  id: string; // e.g. 'last_sync'
+  timestamp: number;
 }

@@ -1,7 +1,7 @@
 import { db } from '../db/db';
 
-const TABLES = [
-  'students', 'courses', 'groups', 'payments', 'attendanceSessions',
+export const TABLES = [
+  'students', 'courses', 'groups', 'enrollments', 'monthlySubscriptions', 'attendanceSessions',
   'attendanceRecords', 'assessments', 'assessmentGrades', 'products',
   'courseProducts', 'sessionPayments', 'ledgerEntries', 'bookingRequests',
   'productSales', 'events', 'users', 'messageTemplates', 'settings', 'qrCards'
@@ -40,9 +40,10 @@ export const syncService = {
 
       let hasPushed = false;
       if (pendingData.length > 0) {
+        console.log('SYNC PUSH PAYLOAD:', JSON.stringify(pendingData, null, 2));
         console.log(`Sync Service: Pushing ${pendingData.reduce((acc, curr) => acc + curr.records.length, 0)} pending records...`);
         try {
-          const pushRes = await fetch('/api/sync/push', {
+          const pushRes = await fetch('https://masar-api.weroperking.workers.dev/api/sync/push', {
             method: 'POST',
             headers,
             body: JSON.stringify(pendingData)
@@ -74,7 +75,7 @@ export const syncService = {
       console.log(`Sync Service: Pulling changes since ${sinceIso}...`);
       
       try {
-        const pullRes = await fetch(`/api/sync/pull?since=${encodeURIComponent(sinceIso)}`, {
+        const pullRes = await fetch(`https://masar-api.weroperking.workers.dev/api/sync/pull?since=${encodeURIComponent(sinceIso)}`, {
           headers
         });
 

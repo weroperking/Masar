@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+#!/bin/bash
+cat << 'INNER_EOF' > src/pages/Academic/Attendance.tsx
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
-import { Play, CheckCircle, Clock, X, Users, MessageCircle, StopCircle, Calendar, AlertTriangle, QrCode } from 'lucide-react';
+import { Play, CheckCircle, Clock, X, Users, MessageCircle, StopCircle, Calendar } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { AttendanceSession, Student } from '../../types';
 import { useToast } from '../../context/ToastContext';
@@ -24,13 +26,12 @@ export function Attendance() {
   const courseMap = new Map(courses?.map(c => [c.id, c.name]));
   const groupMap = new Map(groups?.map(g => [g.id, g]));
 
-  const handleStartSession = async (groupId: string, courseId: string, isTrial: boolean = false) => {
+  const handleStartSession = async (groupId: string, courseId: string) => {
     const now = Date.now();
     await db.attendanceSessions.add({
       id: uuidv4(),
       groupId,
       courseId,
-      isTrial,
       startedAt: now,
       endedAt: null,
       status: 'live',
@@ -38,7 +39,7 @@ export function Attendance() {
       updated_at: now,
       sync_status: 'pending'
     });
-    toast.success(isTrial ? 'تم بدء حصة تجريبية بنجاح!' : 'تم بدء الحصة بنجاح!');
+    toast.success('تم بدء الحصة بنجاح!');
   };
 
   const handleEndSession = async (sessionId: string) => {
@@ -56,6 +57,7 @@ export function Attendance() {
     }
   };
 
+  // Determine Arabic day of week today
   const arabicDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
   const todayName = arabicDays[new Date().getDay()];
   const todayScheduledGroups = groups?.filter(g => 
@@ -107,16 +109,15 @@ export function Attendance() {
                   ) : (
                     <div className="flex gap-2">
                       <button 
-                        onClick={() => handleStartSession(group.id, group.courseId, false)}
+                        onClick={() => handleStartSession(group.id, group.courseId)}
                         className="flex-1 flex items-center justify-center py-2 bg-emerald-100 text-emerald-700 rounded-md hover:bg-emerald-200 transition-colors text-sm font-medium"
                       >
                         <Play className="w-3.5 h-3.5 ml-1.5" />
                         بدء حصة
                       </button>
                       <button 
-                        onClick={() => handleStartSession(group.id, group.courseId, true)}
+                        onClick={() => handleStartSession(group.id, group.courseId)}
                         className="flex-1 flex items-center justify-center py-2 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors text-sm font-medium"
-                        title="بدء حصة تجريبية (تطبق حدود حصص التجربة)"
                       >
                         <Play className="w-3.5 h-3.5 ml-1.5" />
                         ترايل
@@ -169,14 +170,7 @@ export function Attendance() {
                     <div key={session.id} className="border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl p-5">
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">
-                            {groupMap.get(session.groupId)?.name}
-                            {session.isTrial && (
-                              <span className="inline-block mr-2 px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs">
-                                حصة تجريبية
-                              </span>
-                            )}
-                          </h3>
+                          <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">{groupMap.get(session.groupId)?.name}</h3>
                           <p className="text-sm text-slate-600">{courseMap.get(session.courseId)}</p>
                         </div>
                         <span className="flex items-center px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold animate-pulse">
@@ -247,7 +241,6 @@ export function Attendance() {
                     <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
                       <tr>
                         <th className="px-4 py-3 font-medium rounded-r-lg">المجموعة</th>
-                        <th className="px-4 py-3 font-medium">النوع</th>
                         <th className="px-4 py-3 font-medium">التاريخ</th>
                         <th className="px-4 py-3 font-medium">وقت البدء</th>
                         <th className="px-4 py-3 font-medium rounded-l-lg">وقت الانتهاء</th>
@@ -257,13 +250,6 @@ export function Attendance() {
                       {completedSessions?.sort((a,b) => b.startedAt - a.startedAt).map(session => (
                         <tr key={session.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                           <td className="px-4 py-3 font-bold">{groupMap.get(session.groupId)?.name}</td>
-                          <td className="px-4 py-3">
-                            {session.isTrial ? (
-                              <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-semibold">تجريبية</span>
-                            ) : (
-                              <span className="text-slate-500 text-xs">عادية</span>
-                            )}
-                          </td>
                           <td className="px-4 py-3 text-slate-500">{format(new Date(session.startedAt), 'dd MMM yyyy', { locale: ar })}</td>
                           <td className="px-4 py-3 text-slate-500" dir="ltr">{format(new Date(session.startedAt), 'hh:mm a')}</td>
                           <td className="px-4 py-3 text-slate-500" dir="ltr">{session.endedAt ? format(new Date(session.endedAt), 'hh:mm a') : '-'}</td>
@@ -354,108 +340,30 @@ function AttendanceModal({
 }) {
   const toast = useToast();
   
+  // 1. Fetch real roster for this group via enrollments
   const groupEnrollments = useLiveQuery(
     () => db.enrollments.where('groupId').equals(session.groupId).toArray(),
     [session.groupId]
   );
   
+  // Filter for active students
   const activeStudentIds = groupEnrollments?.filter(e => e.status === 'active').map(e => e.studentId) || [];
   
+  // Load actual student records
   const allStudents = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
   const rosterStudents = allStudents?.filter(s => activeStudentIds.includes(s.id)) || [];
 
+  // Load existing attendance records for this session
   const existingRecords = useLiveQuery(
     () => db.attendanceRecords.where('sessionId').equals(session.id).toArray(),
     [session.id]
   );
-
-  // Settings for trial session limit
-  const settingsArray = useLiveQuery(() => db.settings.toArray(), []);
-  const settings = settingsArray?.[0];
-  const freeSessionLimit = settings?.freeSessionLimitPerStudent || 1;
-
-  // Trial limits verification (if session is trial)
-  const allTrialSessions = useLiveQuery(() => 
-    db.attendanceSessions.filter(s => s.isTrial === true).toArray(),
-  []);
-  const trialSessionIds = allTrialSessions?.map(s => s.id) || [];
-  const allTrialRecords = useLiveQuery(() => 
-    db.attendanceRecords.toArray()
-  );
-  
-  // Previous Session Verification
-  const groupCompletedSessions = useLiveQuery(() => 
-    db.attendanceSessions.where('status').equals('completed').toArray()
-  );
-  const prevSession = groupCompletedSessions?.filter(s => s.groupId === session.groupId)
-                                            .sort((a,b) => b.endedAt! - a.endedAt!)[0];
-  const prevSessionRecords = useLiveQuery(() => 
-    prevSession ? db.attendanceRecords.where('sessionId').equals(prevSession.id).toArray() : []
-  );
   
   const [recordMap, setRecordMap] = useState<Record<string, 'present' | 'absent'>>({});
   const [isSaved, setIsSaved] = useState(false);
-  
-  // QR Code Scanner State
-  const qrCards = useLiveQuery(() => db.qrCards.filter(c => !c.deleted_at).toArray(), []);
-  const [qrInput, setQrInput] = useState('');
-  const [isQrMode, setIsQrMode] = useState(false);
-  const qrInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (isQrMode && qrInputRef.current) {
-      qrInputRef.current.focus();
-    }
-  }, [isQrMode]);
-
-  const handleQrScan = (e: any) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const code = qrInput.trim();
-      setQrInput('');
-      
-      if (!code) return;
-
-      const card = qrCards?.find(c => c.cardNumber === code || c.qrCodeData === code);
-      if (!card) {
-        toast.error('بطاقة غير مسجلة في النظام');
-        return;
-      }
-      if (!card.studentId) {
-        toast.error('هذه البطاقة غير مرتبطة بأي طالب');
-        return;
-      }
-      if (card.status !== 'active') {
-        toast.error('هذه البطاقة موقوفة');
-        return;
-      }
-
-      const studentInRoster = rosterStudents.find(s => s.id === card.studentId);
-      if (!studentInRoster) {
-        toast.error('الطالب غير مقيد في هذه المجموعة');
-        return;
-      }
-
-      if (session.isTrial) {
-        const pastTrialsCount = allTrialRecords?.filter(r => 
-          r.studentId === card.studentId && 
-          r.status === 'present' && 
-          trialSessionIds.includes(r.sessionId) &&
-          r.sessionId !== session.id
-        ).length || 0;
-        
-        if (pastTrialsCount >= freeSessionLimit) {
-          toast.error('استنفد الطالب الحد الأقصى لحصص التجربة');
-          return;
-        }
-      }
-
-      setRecordMap(prev => ({ ...prev, [card.studentId!]: 'present' }));
-      toast.success(`تم تحضير الطالب: ${studentInRoster.name}`);
-    }
-  };
-
-  useEffect(() => {
+  // Sync loaded records to local state
+  useState(() => {
     if (existingRecords) {
       const map: Record<string, 'present' | 'absent'> = {};
       existingRecords.forEach(r => {
@@ -463,7 +371,7 @@ function AttendanceModal({
       });
       setRecordMap(map);
     }
-  }, [existingRecords]);
+  });
 
   const toggleStudentStatus = (studentId: string, status: 'present' | 'absent') => {
     setRecordMap(prev => ({
@@ -481,32 +389,11 @@ function AttendanceModal({
   };
 
   const handleSave = async () => {
-    // If it's a trial session, prevent saving if limit exceeded for any present student
-    if (session.isTrial) {
-      const overLimitStudents = rosterStudents.filter(student => {
-        if (recordMap[student.id] === 'present') {
-          const pastTrials = allTrialRecords?.filter(r => 
-            r.studentId === student.id && 
-            r.status === 'present' && 
-            trialSessionIds.includes(r.sessionId) &&
-            r.sessionId !== session.id // exclude current
-          ).length || 0;
-          
-          if (pastTrials >= freeSessionLimit) return true;
-        }
-        return false;
-      });
-
-      if (overLimitStudents.length > 0) {
-        toast.error(`يوجد ${overLimitStudents.length} طلاب استنفدوا حد حصص التجربة المسموح (${freeSessionLimit}). يرجى تغييبهم أو تعديل الإعدادات.`);
-        return;
-      }
-    }
-
     const now = Date.now();
     let updates = 0;
     
     for (const student of rosterStudents) {
+      // By default if unselected, they are absent
       const status = recordMap[student.id] || 'absent';
       const existing = existingRecords?.find(r => r.studentId === student.id);
       
@@ -525,7 +412,7 @@ function AttendanceModal({
           id: uuidv4(),
           sessionId: session.id,
           studentId: student.id,
-          groupId: session.groupId,
+          groupId: session.groupId, // Note: GroupId added for simpler absent queries
           status,
           markedAt: now,
           created_at: now,
@@ -547,14 +434,11 @@ function AttendanceModal({
   const absentCount = Object.values(recordMap).filter(s => s === 'absent').length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-              تسجيل كشف الحضور: {groupName} 
-              {session.isTrial && <span className="mr-2 px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-semibold">ترايل</span>}
-            </h2>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">تسجيل كشف الحضور: {groupName}</h2>
             <p className="text-xs text-slate-500 mt-1">
               إجمالي المقيدين: <span className="font-bold">{rosterStudents.length}</span> |
               الحاضرين: <span className="text-emerald-600 font-bold">{presentCount}</span> | 
@@ -566,38 +450,11 @@ function AttendanceModal({
           </button>
         </div>
         
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 dark:border-slate-800 text-xs gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-600 dark:text-slate-300 font-medium">إجراء سريع:</span>
+        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 text-xs">
+          <span className="text-slate-600 dark:text-slate-300 font-medium">إجراء سريع:</span>
+          <div className="flex gap-2">
             <button onClick={() => markAll('present')} className="px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-md hover:bg-emerald-200 font-semibold transition-colors">تحضير الجميع</button>
             <button onClick={() => markAll('absent')} className="px-3 py-1.5 bg-red-100 text-red-800 rounded-md hover:bg-red-200 font-semibold transition-colors">تغييب الجميع</button>
-          </div>
-          
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button 
-              onClick={() => setIsQrMode(!isQrMode)} 
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-semibold transition-colors ${isQrMode ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'}`}
-            >
-              <QrCode className="w-4 h-4" />
-              مسح بطاقة QR
-            </button>
-            {isQrMode && (
-              <input
-                ref={qrInputRef}
-                type="text"
-                placeholder="انتظار القارئ..."
-                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-md text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none w-full sm:w-48 text-left"
-                dir="ltr"
-                value={qrInput}
-                onChange={e => setQrInput(e.target.value)}
-                onKeyDown={handleQrScan}
-                onBlur={() => {
-                  if (isQrMode) {
-                     setTimeout(() => qrInputRef.current?.focus(), 100);
-                  }
-                }}
-              />
-            )}
           </div>
         </div>
         
@@ -610,49 +467,17 @@ function AttendanceModal({
           ) : (
             rosterStudents.map(student => {
               const currentStatus = recordMap[student.id];
-              
-              // 1. Check if absent previously
-              const wasAbsentPreviously = prevSessionRecords?.some(r => r.studentId === student.id && r.status === 'absent');
-              
-              // 2. Check if exceeds free trial limit
-              let pastTrialsCount = 0;
-              let trialLimitExceeded = false;
-              if (session.isTrial) {
-                pastTrialsCount = allTrialRecords?.filter(r => 
-                  r.studentId === student.id && 
-                  r.status === 'present' && 
-                  trialSessionIds.includes(r.sessionId) &&
-                  r.sessionId !== session.id // Do not count the current one if somehow marked already
-                ).length || 0;
-                
-                trialLimitExceeded = pastTrialsCount >= freeSessionLimit;
-              }
-
               return (
-                <div key={student.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div key={student.id} className="py-3 flex items-center justify-between gap-4">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">{student.name}</p>
-                      {wasAbsentPreviously && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-800 rounded text-[10px] font-semibold" title="تغيب الطالب عن الحصة الماضية">
-                          <AlertTriangle className="w-3 h-3" />
-                          غائب الحصة السابقة
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">{student.phone} - {student.school || '-'}</p>
-                    {session.isTrial && trialLimitExceeded && (
-                      <p className="text-xs text-red-600 mt-1 font-semibold">
-                        🚫 استنفد الحد الأقصى لحصص التجربة ({freeSessionLimit})
-                      </p>
-                    )}
+                    <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">{student.name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{student.phone} - {student.school || '-'}</p>
                   </div>
-                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      disabled={session.isTrial && trialLimitExceeded && currentStatus !== 'present'}
                       onClick={() => toggleStudentStatus(student.id, 'present')}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                         currentStatus === 'present'
                           ? 'bg-emerald-600 text-white shadow-md scale-105'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -693,3 +518,4 @@ function AttendanceModal({
     </div>
   );
 }
+INNER_EOF

@@ -1,16 +1,17 @@
 import Dexie, { Table } from 'dexie';
 import { 
-  Student, Course, Group, Payment, AttendanceSession, AttendanceRecord, 
+  Student, Course, Group, MonthlySubscription, AttendanceSession, AttendanceRecord, 
   Assessment, AssessmentGrade, Product, CourseProduct, SessionPayment, 
   LedgerEntry, BookingRequest, ProductSale, Event, User, MessageTemplate, 
-  Settings, QrCard, SyncMeta 
+  Settings, QrCard, SyncMeta, Enrollment
 } from '../types';
 
 export class AppDatabase extends Dexie {
   students!: Table<Student>;
   courses!: Table<Course>;
   groups!: Table<Group>;
-  payments!: Table<Payment>;
+  enrollments!: Table<Enrollment>;
+  monthlySubscriptions!: Table<MonthlySubscription>;
   attendanceSessions!: Table<AttendanceSession>;
   attendanceRecords!: Table<AttendanceRecord>;
   assessments!: Table<Assessment>;
@@ -62,6 +63,17 @@ export class AppDatabase extends Dexie {
     // Version 3 - Sync meta
     this.version(3).stores({
       syncMeta: 'id'
+    });
+
+    // Version 4 - Rename payments to monthlySubscriptions, add enrollments
+    this.version(5).stores({
+      attendanceRecords: 'id, sessionId, studentId, groupId, status, sync_status'
+    });
+
+    this.version(4).stores({
+      payments: null, // Drop old table
+      monthlySubscriptions: 'id, studentId, courseId, [month+year], status, sync_status',
+      enrollments: 'id, studentId, groupId, courseId, status, sync_status'
     });
   }
 }

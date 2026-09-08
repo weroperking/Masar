@@ -2,29 +2,60 @@ import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Search, Plus, X, Trash2, Phone, School, User } from 'lucide-react';
+import { Search, Plus, X, Trash2, Edit2, ShieldAlert } from 'lucide-react';
 import { Student } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { Link } from 'react-router-dom';
 
 export function Students() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const toast = useToast();
   
   const students = useLiveQuery(
-    () => db.students.filter(s => s.name.includes(searchTerm) || s.phone.includes(searchTerm)).toArray(),
+    () => db.students
+      .filter(s => !s.deleted_at && (s.name.includes(searchTerm) || s.phone.includes(searchTerm)))
+      .reverse()
+      .toArray(),
     [searchTerm]
   );
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`هل أنت متأكد من حذف الطالب (${name})؟`)) {
+    if (confirm(`هل أنت متأكد من حذف الطالب (${name})؟\nهذا الإجراء سيقوم بأرشفة الطالب ولن يظهر في القوائم.`)) {
       try {
-        await db.students.delete(id);
+        await db.students.update(id, { 
+          deleted_at: Date.now(), 
+          sync_status: 'pending' 
+        });
         toast.success(`تم حذف الطالب (${name}) بنجاح`);
       } catch (err) {
         toast.error('فشل حذف الطالب، يرجى المحاولة لاحقاً');
       }
     }
+  };
+
+  const handleToggleStatus = async (student: Student) => {
+    try {
+      await db.students.update(student.id, { 
+        isActive: !student.isActive, 
+        updated_at: Date.now(),
+        sync_status: 'pending'
+      });
+      toast.success(`تم تحديث حالة الطالب بنجاح`);
+    } catch (err) {
+      toast.error('فشل تحديث الحالة');
+    }
+  };
+
+  const handleEdit = (student: Student) => {
+    setEditingStudent(student);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingStudent(null);
   };
 
   return (
@@ -35,7 +66,7 @@ export function Students() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">تسجيل بيانات الطلاب، متابعة أولياء الأمور، وإدارة الحالات</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { setEditingStudent(null); setIsModalOpen(true); }}
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm font-semibold"
         >
           <Plus className="w-4 h-4 ml-2" />
@@ -63,7 +94,6 @@ export function Students() {
                 <th className="px-4 py-3 font-medium">الهاتف</th>
                 <th className="px-4 py-3 font-medium">المدرسة</th>
                 <th className="px-4 py-3 font-medium">ولي الأمر</th>
-                <th className="px-4 py-3 font-medium">مصدر التعارف</th>
                 <th className="px-4 py-3 font-medium">الحالة</th>
                 <th className="px-4 py-3 font-medium rounded-l-lg">الإجراءات</th>
               </tr>
@@ -71,40 +101,54 @@ export function Students() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {students?.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
                     لا يوجد طلاب مسجلين
                   </td>
                 </tr>
               ) : (
                 students?.map(student => (
                   <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{student.name}</td>
+                    <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">
+                      <Link to={`/students/${student.id}`} className="hover:text-blue-600 hover:underline">
+                        {student.name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300" dir="ltr">{student.phone}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{student.school || '-'}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                       <div>{student.parentName || '-'}</div>
                       <div className="text-xs text-slate-400 dark:text-slate-500" dir="ltr">{student.parentPhone}</div>
                     </td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                      <span className="inline-flex px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-xs">
-                        {student.leadSource}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
-                        student.isActive ? 'bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 dark:text-slate-300'
-                      }`}>
-                        {student.isActive ? 'نشط' : 'غير نشط'}
-                      </span>
-                    </td>
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => handleDelete(student.id, student.name)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-800 transition-colors"
-                        title="حذف الطالب"
+                        onClick={() => handleToggleStatus(student)}
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold cursor-pointer transition-colors ${
+                          student.isActive 
+                            ? 'bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300 hover:bg-green-200' 
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-200'
+                        }`}
+                        title="انقر لتغيير الحالة"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {student.isActive ? 'نشط' : 'غير نشط'}
                       </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleEdit(student)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          title="تعديل بيانات الطالب"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(student.id, student.name)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          title="حذف الطالب"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -115,32 +159,51 @@ export function Students() {
       </div>
 
       {isModalOpen && (
-        <StudentFormModal onClose={() => setIsModalOpen(false)} />
+        <StudentFormModal 
+          onClose={handleCloseModal} 
+          existingStudent={editingStudent} 
+        />
       )}
     </div>
   );
 }
 
-function StudentFormModal({ onClose }: { onClose: () => void }) {
+function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, existingStudent: Student | null }) {
   const toast = useToast();
   const [formData, setFormData] = useState({
-    name: '', phone: '', parentName: '', parentPhone: '', school: '', leadSource: 'فيسبوك', isActive: true
+    name: existingStudent?.name || '', 
+    phone: existingStudent?.phone || '', 
+    parentName: existingStudent?.parentName || '', 
+    parentPhone: existingStudent?.parentPhone || '', 
+    school: existingStudent?.school || '', 
+    leadSource: existingStudent?.leadSource || 'فيسبوك', 
+    isActive: existingStudent ? existingStudent.isActive : true
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const now = Date.now();
-      const newStudent: Student = {
-        id: uuidv4(),
-        ...formData,
-        created_at: now,
-        updated_at: now,
-        sync_status: 'pending'
-      };
       
-      await db.students.add(newStudent);
-      toast.success(`تم تسجيل الطالب (${formData.name}) بنجاح!`);
+      if (existingStudent) {
+        await db.students.update(existingStudent.id, {
+          ...formData,
+          updated_at: now,
+          sync_status: 'pending'
+        });
+        toast.success(`تم تحديث بيانات الطالب (${formData.name}) بنجاح!`);
+      } else {
+        const newStudent: Student = {
+          id: uuidv4(),
+          ...formData,
+          created_at: now,
+          updated_at: now,
+          sync_status: 'pending'
+        };
+        await db.students.add(newStudent);
+        toast.success(`تم تسجيل الطالب (${formData.name}) بنجاح!`);
+      }
+      
       onClose();
     } catch (err) {
       toast.error('حدث خطأ أثناء حفظ بيانات الطالب');
@@ -151,7 +214,9 @@ function StudentFormModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" dir="rtl">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
         <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">إضافة طالب جديد</h2>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+            {existingStudent ? 'تعديل بيانات طالب' : 'إضافة طالب جديد'}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
             <X className="w-5 h-5" />
           </button>
@@ -260,7 +325,7 @@ function StudentFormModal({ onClose }: { onClose: () => void }) {
               type="submit" 
               className="px-5 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 text-sm font-semibold shadow-sm"
             >
-              حفظ الطالب
+              {existingStudent ? 'حفظ التعديلات' : 'حفظ الطالب'}
             </button>
           </div>
         </form>

@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { useAuth, useSession, useClerk } from '@clerk/clerk-react';
-import { TaskChooseOrganization, TaskResetPassword, TaskSetupMFA } from '@clerk/clerk-react';
+import { SignIn, OrganizationList, useAuth, useOrganization } from '@clerk/clerk-react';
 import { seedDatabaseIfEmpty } from './db/seed';
-import { CustomAuth } from './pages/Auth/CustomAuth';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Students } from './pages/Students/Students';
+import { StudentDetails } from './pages/Students/StudentDetails';
 import { Courses } from './pages/Courses/Courses';
-import { Payments } from './pages/Payments/Payments';
+import { MonthlySubscriptions } from './pages/Payments/MonthlySubscriptions';
 
 // Academic
 import { Groups } from './pages/Academic/Groups';
+import { GroupDetails } from './pages/Academic/GroupDetails';
 import { Attendance } from './pages/Academic/Attendance';
 import { Schedule } from './pages/Academic/Schedule';
 import { Assessments } from './pages/Academic/Assessments';
@@ -36,16 +36,14 @@ import { Messaging } from './pages/Admin/Messaging';
 import { Settings } from './pages/Admin/Settings';
 import { QrCards } from './pages/Admin/QrCards';
 
+import { PublicBooking } from './pages/PublicBooking';
+
 function AuthGate() {
-  // CRITICAL: Set treatPendingAsSignedOut: false so that users with active or pending sessions
-  // are recognized as authenticated, rather than falsely displayed the login screen!
-  const { isLoaded: isAuthLoaded, isSignedIn, userId } = useAuth({ treatPendingAsSignedOut: false });
-  const { session, isLoaded: isSessionLoaded } = useSession();
-  const clerk = useClerk();
-  const [bypassPendingTask, setBypassPendingTask] = useState(false);
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const { isLoaded: isOrgLoaded, organization } = useOrganization();
 
   // 1. Loading State
-  if (!isAuthLoaded || !isSessionLoaded) {
+  if (!isAuthLoaded || (isSignedIn && !isOrgLoaded)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
@@ -56,58 +54,29 @@ function AuthGate() {
     );
   }
 
-  // Check if any session exists (active or pending)
-  const hasSession = !!session || !!userId || isSignedIn || (clerk.client?.sessions && clerk.client.sessions.length > 0);
-
-  // 2. Not authenticated at all -> Show Custom Auth screen
-  if (!hasSession) {
+  // 2. Not authenticated at all -> Show Clerk SignIn
+  if (!isSignedIn) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" dir="rtl">
-        <CustomAuth />
+        <SignIn routing="hash" />
       </div>
     );
   }
 
-  // 3. Authenticated, but session has pending tasks that haven't been bypassed yet
-  const currentTask = session?.currentTask;
-  if (currentTask && !bypassPendingTask) {
+  // 3. Authenticated, but no active organization
+  if (!organization) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" dir="rtl">
-        <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 p-8">
+        <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 p-8 flex flex-col items-center">
           <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-slate-900">مرحباً بك! خطوة تأكيد الحساب</h2>
-            <p className="text-slate-500 text-sm mt-1">يرجى استكمال الإجراء أو المتابعة للوحة التحكم مباشرة</p>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">مرحباً بك!</h2>
+            <p className="text-slate-500 text-sm mt-1">يرجى اختيار أو إنشاء أكاديميتك للمتابعة</p>
           </div>
-
-          <div className="my-6">
-            {currentTask.key === 'choose-organization' && <TaskChooseOrganization redirectUrlComplete="/" />}
-            {currentTask.key === 'reset-password' && <TaskResetPassword redirectUrlComplete="/" />}
-            {currentTask.key === 'setup-mfa' && <TaskSetupMFA redirectUrlComplete="/" />}
-            {currentTask.key !== 'choose-organization' && 
-             currentTask.key !== 'reset-password' && 
-             currentTask.key !== 'setup-mfa' && (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
-                مهمة الجلسة المعلقة: {currentTask.key}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => setBypassPendingTask(true)}
-              className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
-            >
-              المتابعة إلى لوحة التحكم
-            </button>
-            <button
-              type="button"
-              onClick={() => clerk.signOut()}
-              className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-sm font-medium rounded-xl transition-colors"
-            >
-              تسجيل الخروج
-            </button>
-          </div>
+          <OrganizationList 
+            hidePersonal={true}
+            afterSelectOrganizationUrl="/"
+            afterCreateOrganizationUrl="/"
+          />
         </div>
       </div>
     );
@@ -119,10 +88,12 @@ function AuthGate() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="students" element={<Students />} />
+        <Route path="students/:id" element={<StudentDetails />} />
         <Route path="courses" element={<Courses />} />
-        <Route path="payments" element={<Payments />} />
+        <Route path="payments" element={<MonthlySubscriptions />} />
         
         <Route path="groups" element={<Groups />} />
+        <Route path="groups/:id" element={<GroupDetails />} />
         <Route path="attendance" element={<Attendance />} />
         <Route path="schedule" element={<Schedule />} />
         <Route path="assessments" element={<Assessments />} />
@@ -154,7 +125,10 @@ export default function App() {
     <ThemeProvider>
       <ToastProvider>
         <BrowserRouter>
-          <AuthGate />
+          <Routes>
+            <Route path="/book" element={<PublicBooking />} />
+            <Route path="*" element={<AuthGate />} />
+          </Routes>
         </BrowserRouter>
       </ToastProvider>
     </ThemeProvider>

@@ -3,32 +3,43 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
 import { Download, Users, BookOpen, Package, DollarSign, ArrowUpRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { toMajorUnits } from '../../utils/currency';
 
 export function Reports() {
   const [activeTab, setActiveTab] = useState<'financials' | 'students' | 'courses' | 'products'>('financials');
 
-  const students = useLiveQuery(() => db.students.toArray(), []);
-  const courses = useLiveQuery(() => db.courses.toArray(), []);
-  const payments = useLiveQuery(() => db.payments.toArray(), []);
-  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.toArray(), []);
-  const products = useLiveQuery(() => db.products.toArray(), []);
+  const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
+  const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at).toArray(), []);
+  const payments = useLiveQuery(() => db.monthlySubscriptions.filter(p => !p.deleted_at).toArray(), []);
+  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.filter(e => !e.deleted_at).toArray(), []);
+  const products = useLiveQuery(() => db.products.filter(p => !p.deleted_at).toArray(), []);
 
   // Compute total financials
   const totalRevenue = ledgerEntries?.filter(e => e.type === 'revenue').reduce((acc, e) => acc + (e.amount || 0), 0) || 0;
   const totalExpense = ledgerEntries?.filter(e => e.type === 'expense').reduce((acc, e) => acc + (e.amount || 0), 0) || 0;
 
   // Chart data
+  const currentYear = new Date().getFullYear();
   const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-  const currentMonthIdx = new Date().getMonth();
-  const dynamicChartData = months.slice(0, currentMonthIdx + 1).map((m, idx) => {
-    // Generate realistic progression culminating in current totals
-    const factor = (idx + 1) / (currentMonthIdx + 1);
-    return {
-      name: m,
-      revenue: Math.round(totalRevenue * factor * (0.8 + 0.4 * (idx % 2))),
-      expenses: Math.round(totalExpense * factor * (0.8 + 0.3 * ((idx + 1) % 2)))
-    };
+  
+  const monthlyData = months.map(m => ({ name: m, revenue: 0, expenses: 0 }));
+  
+  ledgerEntries?.forEach(e => {
+    if (!e.deleted_at && e.date) {
+      const d = new Date(e.date);
+      if (d.getFullYear() === currentYear) {
+        const monthIdx = d.getMonth();
+        if (e.type === 'revenue') {
+          monthlyData[monthIdx].revenue += Math.round(toMajorUnits(e.amount || 0));
+        } else if (e.type === 'expense') {
+          monthlyData[monthIdx].expenses += Math.round(toMajorUnits(e.amount || 0));
+        }
+      }
+    }
   });
+
+  const currentMonthIdx = new Date().getMonth();
+  const dynamicChartData = monthlyData.slice(0, currentMonthIdx + 1);
 
   // Students Lead Source Analytics
   const leadSourceCounts: Record<string, number> = {};
@@ -48,7 +59,7 @@ export function Reports() {
     if (activeTab === 'financials') {
       csvContent += 'ID,Type,Category,Description,Amount,Date\n';
       ledgerEntries?.forEach(e => {
-        csvContent += `"${e.id}","${e.type}","${e.category || ''}","${e.description}","${e.amount}","${e.date}"\n`;
+        csvContent += `"${e.id}","${e.type}","${e.category || ''}","${e.description}","${toMajorUnits(e.amount)}","${e.date}"\n`;
       });
     } else if (activeTab === 'students') {
       csvContent += 'ID,Name,Phone,ParentName,ParentPhone,School,LeadSource,Status\n';
@@ -58,12 +69,12 @@ export function Reports() {
     } else if (activeTab === 'courses') {
       csvContent += 'ID,Name,Price,PaymentType,Status\n';
       courses?.forEach(c => {
-        csvContent += `"${c.id}","${c.name}","${c.price}","${c.paymentType}","${c.isActive ? 'Active' : 'Inactive'}"\n`;
+        csvContent += `"${c.id}","${c.name}","${toMajorUnits(c.price)}","${c.paymentType}","${c.isActive ? 'Active' : 'Inactive'}"\n`;
       });
     } else {
       csvContent += 'ID,Name,SalePrice,CostPrice,StockQty,SoldQty,Type\n';
       products?.forEach(p => {
-        csvContent += `"${p.id}","${p.name}","${p.salePrice}","${p.costPrice}","${p.stockQty}","${p.soldQty || 0}","${p.type}"\n`;
+        csvContent += `"${p.id}","${p.name}","${toMajorUnits(p.salePrice)}","${toMajorUnits(p.costPrice)}","${p.stockQty}","${p.soldQty || 0}","${p.type}"\n`;
       });
     }
 
@@ -135,15 +146,15 @@ export function Reports() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
                   <span className="text-xs font-semibold text-emerald-800">إجمالي الإيرادات المسجلة</span>
-                  <p className="text-2xl font-bold text-emerald-700 mt-1">{totalRevenue.toLocaleString()} ج.م</p>
+                  <p className="text-2xl font-bold text-emerald-700 mt-1">{toMajorUnits(totalRevenue).toLocaleString()} ج.م</p>
                 </div>
                 <div className="p-4 bg-red-50 rounded-xl border border-red-100">
                   <span className="text-xs font-semibold text-red-800">إجمالي المصروفات التشغيلية</span>
-                  <p className="text-2xl font-bold text-red-700 mt-1">{totalExpense.toLocaleString()} ج.م</p>
+                  <p className="text-2xl font-bold text-red-700 mt-1">{toMajorUnits(totalExpense).toLocaleString()} ج.م</p>
                 </div>
                 <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
                   <span className="text-xs font-semibold text-blue-800">صافي الأرباح</span>
-                  <p className="text-2xl font-bold text-blue-700 mt-1">{(totalRevenue - totalExpense).toLocaleString()} ج.م</p>
+                  <p className="text-2xl font-bold text-blue-700 mt-1">{toMajorUnits(totalRevenue - totalExpense).toLocaleString()} ج.م</p>
                 </div>
               </div>
 
@@ -227,7 +238,7 @@ export function Reports() {
                   <span className="text-xs font-semibold text-emerald-800">متوسط سعر الكورس</span>
                   <p className="text-2xl font-bold text-emerald-700 mt-1">
                     {courses?.length 
-                      ? Math.round(courses.reduce((acc, c) => acc + c.price, 0) / courses.length) 
+                      ? toMajorUnits(Math.round(courses.reduce((acc, c) => acc + c.price, 0) / courses.length)) 
                       : 0} ج.م
                   </p>
                 </div>
@@ -247,7 +258,7 @@ export function Reports() {
                     {courses?.map(course => (
                       <tr key={course.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900">
                         <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{course.name}</td>
-                        <td className="px-4 py-3 font-bold text-emerald-600">{course.price} ج.م</td>
+                        <td className="px-4 py-3 font-bold text-emerald-600">{toMajorUnits(course.price)} ج.م</td>
                         <td className="px-4 py-3 text-slate-600">{course.paymentType === 'monthly' ? 'شهري' : 'باقة'}</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
@@ -281,7 +292,7 @@ export function Reports() {
                 <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
                   <span className="text-xs font-semibold text-blue-800">قيمة المخزون الحالي</span>
                   <p className="text-2xl font-bold text-blue-700 mt-1">
-                    {(products?.reduce((acc, p) => acc + (p.stockQty * p.salePrice), 0) || 0).toLocaleString()} ج.م
+                    {toMajorUnits((products?.reduce((acc, p) => acc + (p.stockQty * p.salePrice), 0) || 0)).toLocaleString()} ج.م
                   </p>
                 </div>
               </div>
@@ -303,9 +314,9 @@ export function Reports() {
                         <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{p.name}</td>
                         <td className="px-4 py-3 font-bold text-slate-800 dark:text-slate-200">{p.stockQty} نسخة</td>
                         <td className="px-4 py-3 text-slate-600">{p.soldQty || 0} نسخة</td>
-                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{p.salePrice} ج.م</td>
+                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(p.salePrice)} ج.م</td>
                         <td className="px-4 py-3 font-bold text-emerald-600">
-                          {((p.soldQty || 0) * p.salePrice).toLocaleString()} ج.م
+                          {toMajorUnits(((p.soldQty || 0) * p.salePrice)).toLocaleString()} ج.م
                         </td>
                       </tr>
                     ))}

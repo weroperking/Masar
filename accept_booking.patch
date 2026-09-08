@@ -1,0 +1,174 @@
+--- src/pages/Finance/Booking.tsx
++++ src/pages/Finance/Booking.tsx
+@@ -10,6 +10,7 @@
+   const [copied, setCopied] = useState(false);
+   const [isModalOpen, setIsModalOpen] = useState(false);
+   const [activeTab, setActiveTab] = useState<'pending' | 'accepted' | 'rejected' | 'all'>('pending');
++  const [acceptingBooking, setAcceptingBooking] = useState<BookingRequest | null>(null);
+ 
+   const allBookings = useLiveQuery(() => db.bookingRequests.filter(b => !b.deleted_at).reverse().sortBy('requestDate'), []);
+   const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at).toArray(), []);
+@@ -23,37 +24,7 @@
+     setTimeout(() => setCopied(false), 2000);
+   };
+ 
+-  const handleAccept = async (booking: BookingRequest) => {
+-    const now = Date.now();
+-    
+-    // 1. Create a student from the lead
+-    const newStudent: Student = {
+-      id: uuidv4(),
+-      name: booking.name,
+-      phone: booking.phone,
+-      parentName: 'ولي أمر ' + booking.name,
+-      parentPhone: booking.phone,
+-      school: '',
+-      leadSource: 'حجز أونلاين (الموقع)',
+-      isActive: true,
+-      created_at: now,
+-      updated_at: now,
+-      sync_status: 'pending'
+-    };
+-    await db.students.add(newStudent);
+-
+-    // Enroll the student in the course (optional but logical, keeping it simple or just mark accepted)
+-    await db.enrollments.add({
+-      id: uuidv4(),
+-      studentId: newStudent.id,
+-      courseId: booking.courseId,
+-      groupId: '', // Pending group assignment
+-      enrolledAt: new Date().toISOString(),
+-      status: 'active',
+-      created_at: now,
+-      updated_at: now,
+-      sync_status: 'pending'
+-    });
+-
+-    // 2. Mark booking as accepted
+-    await db.bookingRequests.update(booking.id, {
+-      status: 'accepted',
+-      studentId: newStudent.id,
+-      updated_at: now,
+-      sync_status: 'pending'
+-    });
+-  };
++  const handleAcceptClick = (booking: BookingRequest) => {
++    setAcceptingBooking(booking);
++  };
+ 
+   const handleReject = async (bookingId: string) => {
+@@ -194,7 +165,7 @@
+                           {b.status === 'pending' && (
+                             <>
+                               <button
+-                                onClick={() => handleAccept(b)}
++                                onClick={() => handleAcceptClick(b)}
+                                 className="inline-flex items-center px-2.5 py-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 rounded text-xs font-bold transition-colors"
+                                 title="قبول وإضافة لقائمة الطلاب"
+                               >
+@@ -231,6 +202,13 @@
+           courses={courses || []}
+         />
+       )}
++
++      {acceptingBooking && (
++        <AcceptBookingModal
++          booking={acceptingBooking}
++          onClose={() => setAcceptingBooking(null)}
++        />
++      )}
+     </div>
+   );
+ }
+@@ -321,4 +299,85 @@
+   );
+ }
+ 
++function AcceptBookingModal({ booking, onClose }: { booking: BookingRequest; onClose: () => void }) {
++  const groups = useLiveQuery(() => db.groups.filter(g => !g.deleted_at && g.courseId === booking.courseId).toArray(), [booking.courseId]);
++  const [selectedGroupId, setSelectedGroupId] = useState('');
++
++  const handleConfirm = async (e: React.FormEvent) => {
++    e.preventDefault();
++    
++    const now = Date.now();
++    
++    // 1. Create a student from the lead
++    const newStudent: Student = {
++      id: uuidv4(),
++      name: booking.name,
++      phone: booking.phone,
++      parentName: 'ولي أمر ' + booking.name,
++      parentPhone: booking.phone,
++      school: '',
++      leadSource: 'حجز أونلاين (الموقع)',
++      isActive: true,
++      created_at: now,
++      updated_at: now,
++      sync_status: 'pending'
++    };
++    await db.students.add(newStudent);
++
++    // 2. Enroll the student in the course/group
++    await db.enrollments.add({
++      id: uuidv4(),
++      studentId: newStudent.id,
++      courseId: booking.courseId,
++      groupId: selectedGroupId,
++      enrolledAt: new Date().toISOString(),
++      status: 'active',
++      created_at: now,
++      updated_at: now,
++      sync_status: 'pending'
++    });
++
++    // 3. Mark booking as accepted
++    await db.bookingRequests.update(booking.id, {
++      status: 'accepted',
++      studentId: newStudent.id,
++      updated_at: now,
++      sync_status: 'pending'
++    });
++    
++    onClose();
++  };
++
++  return (
++    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
++      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
++        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
++          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">قبول الطالب وتسكينه في مجموعة</h2>
++          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
++            <X className="w-5 h-5" />
++          </button>
++        </div>
++        
++        <form onSubmit={handleConfirm} className="p-6 space-y-4">
++          <div>
++            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">اختر المجموعة *</label>
++            <select
++              required
++              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
++              value={selectedGroupId}
++              onChange={e => setSelectedGroupId(e.target.value)}
++            >
++              <option value="" disabled>-- اختر المجموعة المناسبة --</option>
++              {groups?.map(g => (
++                <option key={g.id} value={g.id}>{g.name}</option>
++              ))}
++            </select>
++          </div>
++
++          <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
++            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 text-sm">
++              إلغاء
++            </button>
++            <button type="submit" className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-semibold" disabled={!selectedGroupId}>
++              تأكيد القبول والتسجيل
++            </button>
++          </div>
++        </form>
++      </div>
++    </div>
++  );
++}

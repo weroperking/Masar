@@ -1,27 +1,53 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
-import { Package, Plus, ShoppingCart, Trash2, X, AlertTriangle, BookOpen } from 'lucide-react';
+import { Package, Plus, ShoppingCart, Trash2, Edit2, X, AlertTriangle, BookOpen, Search, Filter } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Product, ProductSale } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 
 export function Inventory() {
   const [activeTab, setActiveTab] = useState<'products' | 'sales'>('products');
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isSellProductOpen, setIsSellProductOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'book' | 'other'>('all');
+  const [lowStockOnly, setLowStockOnly] = useState(false);
   const toast = useToast();
 
-  const products = useLiveQuery(() => db.products.toArray(), []);
-  const sales = useLiveQuery(() => db.productSales.reverse().sortBy('saleDate'), []);
-  const students = useLiveQuery(() => db.students.toArray(), []);
+  const products = useLiveQuery(() => db.products.filter(p => !p.deleted_at).toArray(), []);
+  const sales = useLiveQuery(() => db.productSales.filter(s => !s.deleted_at).reverse().sortBy('saleDate'), []);
+  const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
 
   const productMap = new Map(products?.map(p => [p.id, p]));
 
+  const filteredProducts = products?.filter(prod => {
+    if (searchTerm && !prod.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (typeFilter !== 'all' && prod.type !== typeFilter) return false;
+    if (lowStockOnly && prod.stockQty >= 5) return false;
+    return true;
+  });
+
+  const totalSalesRevenue = sales?.reduce((sum, s) => sum + s.total, 0) || 0;
+  const totalQuantitySold = sales?.reduce((sum, s) => sum + s.quantity, 0) || 0;
+  const totalProfit = sales?.reduce((sum, s) => {
+    const p = productMap.get(s.productId);
+    if (!p) return sum;
+    const profitPerItem = p.salePrice - p.costPrice;
+    return sum + (profitPerItem * s.quantity);
+  }, 0) || 0;
+
   const handleDeleteProduct = async (id: string, name?: string) => {
-    if (confirm(`هل أنت متأكد من حذف هذا المنتج؟`)) {
+    if (confirm(`هل أنت متأكد من حذف المنتج ${name ? `(${name})` : ''}؟ سيتم نقله لسلة المهملات.`)) {
       try {
-        await db.products.delete(id);
+        const now = Date.now();
+        await db.products.update(id, {
+          deleted_at: now,
+          updated_at: now,
+          sync_status: 'pending'
+        });
         toast.success(`تم حذف المنتج ${name ? `(${name})` : ''} بنجاح`);
       } catch (err) {
         toast.error('فشل حذف المنتج');
@@ -77,33 +103,80 @@ export function Inventory() {
         <div className="p-6">
           {/* Products Tab */}
           {activeTab === 'products' && (
-            <div>
-              {products?.length === 0 ? (
+            <div className="space-y-4">
+              {/* Search and Filters Bar */}
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between pb-2">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="البحث باسم الصنف أو المذكرة..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full pr-9 pl-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={typeFilter}
+                    onChange={e => setTypeFilter(e.target.value as any)}
+                    className="px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 dark:text-slate-300"
+                  >
+                    <option value="all">جميع الأصناف</option>
+                    <option value="book">مذكرات وكتب تعليمية</option>
+                    <option value="other">أدوات ومنتجات أخرى</option>
+                  </select>
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={lowStockOnly}
+                      onChange={e => setLowStockOnly(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 dark:border-slate-700"
+                    />
+                    <span>نقص المخزون (&lt; 5)</span>
+                  </label>
+                </div>
+              </div>
+
+              {filteredProducts?.length === 0 ? (
                 <div className="text-center py-16 flex flex-col items-center">
                   <Package className="w-12 h-12 text-slate-300 mb-4" />
-                  <h2 className="text-lg font-bold text-slate-700 dark:text-slate-300">لا توجد منتجات أو مذكرات في المخزون</h2>
-                  <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 text-sm mt-1">اضغط على "إضافة منتج/مذكرة" لإدخال أول صنف للمخزن.</p>
+                  <h2 className="text-lg font-bold text-slate-700 dark:text-slate-300">
+                    {searchTerm || typeFilter !== 'all' || lowStockOnly ? 'لا توجد نتائج مطابقة للبحث أو الفلتر' : 'لا توجد منتجات أو مذكرات في المخزون'}
+                  </h2>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+                    {searchTerm || typeFilter !== 'all' || lowStockOnly ? 'جرّب تعديل خيارات البحث والفلترة' : 'اضغط على "إضافة منتج/مذكرة" لإدخال أول صنف للمخزن.'}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {products?.map(prod => {
-                    const profitPerUnit = prod.salePrice - prod.costPrice;
+                  {filteredProducts?.map(prod => {
+                    const profitPerUnit = toMajorUnits(prod.salePrice) - toMajorUnits(prod.costPrice);
                     const isLowStock = prod.stockQty < 5;
 
                     return (
-                      <div key={prod.id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:border-blue-400 transition-colors flex flex-col justify-between">
+                      <div key={prod.id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:border-blue-400 transition-colors flex flex-col justify-between bg-white dark:bg-slate-900">
                         <div>
                           <div className="flex justify-between items-start mb-2">
                             <span className="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                               {prod.type === 'book' ? 'مذكرة / كتاب' : 'أخرى'}
                             </span>
-                            <button
-                              onClick={() => handleDeleteProduct(prod.id)}
-                              className="text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 p-1"
-                              title="حذف الصنف"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setEditingProduct(prod)}
+                                className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                title="تعديل الصنف"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                                className="text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                title="حذف الصنف (حذف ناعم)"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
 
                           <div className="flex items-start gap-2.5 mt-2">
@@ -114,11 +187,11 @@ export function Inventory() {
                           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
                             <div className="flex justify-between">
                               <span>سعر البيع:</span>
-                              <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{prod.salePrice} ج.م</span>
+                              <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{toMajorUnits(prod.salePrice)} ج.م</span>
                             </div>
                             <div className="flex justify-between">
                               <span>تكلفة الشراء/الطباعة:</span>
-                              <span>{prod.costPrice} ج.م</span>
+                              <span>{toMajorUnits(prod.costPrice)} ج.م</span>
                             </div>
                             <div className="flex justify-between text-emerald-600 font-medium">
                               <span>هامش الربح للنسخة:</span>
@@ -126,7 +199,7 @@ export function Inventory() {
                             </div>
                             <div className="flex justify-between items-center pt-1">
                               <span>الرصيد المتاح بالمخزن:</span>
-                              <span className={`font-bold text-sm flex items-center ${isLowStock ? 'text-amber-600' : 'text-slate-900 dark:text-slate-100'}`}>
+                              <span className={`font-bold text-sm flex items-center ${isLowStock ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100'}`}>
                                 {isLowStock && <AlertTriangle className="w-3.5 h-3.5 ml-1 text-amber-500" />}
                                 {prod.stockQty} نسخة
                               </span>
@@ -141,7 +214,7 @@ export function Inventory() {
                         <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
                           <button
                             onClick={() => setIsSellProductOpen(true)}
-                            className="w-full py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors"
+                            className="w-full py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 rounded-lg text-xs font-bold transition-colors"
                           >
                             بيع نسخة الآن
                           </button>
@@ -156,7 +229,22 @@ export function Inventory() {
 
           {/* Sales Tab */}
           {activeTab === 'sales' && (
-            <div>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col justify-center items-center">
+                  <span className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">إجمالي الإيرادات</span>
+                  <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(totalSalesRevenue)} ج.م</span>
+                </div>
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex flex-col justify-center items-center">
+                  <span className="text-emerald-600 dark:text-emerald-400 text-sm font-medium mb-1">صافي الأرباح</span>
+                  <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{toMajorUnits(totalProfit)} ج.م</span>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex flex-col justify-center items-center">
+                  <span className="text-blue-600 dark:text-blue-400 text-sm font-medium mb-1">الكمية المباعة</span>
+                  <span className="text-2xl font-bold text-blue-700 dark:text-blue-300">{totalQuantitySold} وحدة</span>
+                </div>
+              </div>
+
               {sales?.length === 0 ? (
                 <div className="text-center py-16 flex flex-col items-center">
                   <ShoppingCart className="w-12 h-12 text-slate-300 mb-4" />
@@ -185,7 +273,7 @@ export function Inventory() {
                             <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{product?.name || 'منتج غير معروف'}</td>
                             <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{sale.customerName || 'عميل نقدي'}</td>
                             <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{sale.quantity}</td>
-                            <td className="px-4 py-3 font-bold text-emerald-600 text-base">{sale.total} ج.م</td>
+                            <td className="px-4 py-3 font-bold text-emerald-600 text-base">{toMajorUnits(sale.total)} ج.م</td>
                             <td className="px-4 py-3 text-slate-500 dark:text-slate-400 dark:text-slate-500 text-xs">{sale.paymentMethod}</td>
                             <td className="px-4 py-3 text-slate-500 dark:text-slate-400 dark:text-slate-500 text-xs">{sale.saleDate}</td>
                             <td className="px-4 py-3 font-mono text-xs text-blue-600">{sale.receiptNumber}</td>
@@ -201,8 +289,14 @@ export function Inventory() {
         </div>
       </div>
 
-      {isAddProductOpen && (
-        <AddProductModal onClose={() => setIsAddProductOpen(false)} />
+      {(isAddProductOpen || editingProduct) && (
+        <ProductModal 
+          product={editingProduct}
+          onClose={() => {
+            setIsAddProductOpen(false);
+            setEditingProduct(null);
+          }} 
+        />
       )}
 
       {isSellProductOpen && (
@@ -216,35 +310,56 @@ export function Inventory() {
   );
 }
 
-function AddProductModal({ onClose }: { onClose: () => void }) {
+function ProductModal({ 
+  onClose, 
+  product 
+}: { 
+  onClose: () => void; 
+  product?: Product | null;
+}) {
   const toast = useToast();
   const [formData, setFormData] = useState({
-    name: '',
-    type: 'book' as 'book' | 'other',
-    salePrice: '',
-    costPrice: '',
-    stockQty: '25'
+    name: product?.name || '',
+    type: (product?.type || 'book') as 'book' | 'other',
+    salePrice: product ? toMajorUnits(product.salePrice).toString() : '',
+    costPrice: product ? toMajorUnits(product.costPrice).toString() : '',
+    stockQty: product ? product.stockQty.toString() : '25'
   });
+
+  const isEdit = !!product;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const now = Date.now();
-      const newProduct: Product = {
-        id: uuidv4(),
-        name: formData.name,
-        type: formData.type,
-        salePrice: Number(formData.salePrice),
-        costPrice: Number(formData.costPrice),
-        stockQty: Number(formData.stockQty),
-        soldQty: 0,
-        created_at: now,
-        updated_at: now,
-        sync_status: 'pending'
-      };
+      if (isEdit) {
+        await db.products.update(product.id, {
+          name: formData.name,
+          type: formData.type,
+          salePrice: toMinorUnits(Number(formData.salePrice)),
+          costPrice: toMinorUnits(Number(formData.costPrice)),
+          stockQty: Number(formData.stockQty),
+          updated_at: now,
+          sync_status: 'pending'
+        });
+        toast.success(`تم تحديث بيانات الصنف (${formData.name}) بنجاح`);
+      } else {
+        const newProduct: Product = {
+          id: uuidv4(),
+          name: formData.name,
+          type: formData.type,
+          salePrice: toMinorUnits(Number(formData.salePrice)),
+          costPrice: toMinorUnits(Number(formData.costPrice)),
+          stockQty: Number(formData.stockQty),
+          soldQty: 0,
+          created_at: now,
+          updated_at: now,
+          sync_status: 'pending'
+        };
 
-      await db.products.add(newProduct);
-      toast.success(`تمت إضافة الصنف (${formData.name}) بنجاح`);
+        await db.products.add(newProduct);
+        toast.success(`تمت إضافة الصنف (${formData.name}) للمخزن بنجاح`);
+      }
       onClose();
     } catch (err) {
       toast.error('حدث خطأ أثناء حفظ الصنف');
@@ -255,7 +370,9 @@ function AddProductModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
         <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">إضافة صنف للمخزون</h2>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+            {isEdit ? 'تعديل بيانات الصنف / المذكرة' : 'إضافة صنف للمخزون'}
+          </h2>
           <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300">
             <X className="w-5 h-5" />
           </button>
@@ -268,7 +385,7 @@ function AddProductModal({ onClose }: { onClose: () => void }) {
               required
               type="text"
               placeholder="مثال: مذكرة مراجعة الكيمياء للصف الثالث"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
             />
@@ -277,7 +394,7 @@ function AddProductModal({ onClose }: { onClose: () => void }) {
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">النوع</label>
             <select
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 dark:text-slate-300"
               value={formData.type}
               onChange={e => setFormData({ ...formData, type: e.target.value as any })}
             >
@@ -294,7 +411,7 @@ function AddProductModal({ onClose }: { onClose: () => void }) {
                 type="number"
                 min="0"
                 placeholder="0"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
                 value={formData.salePrice}
                 onChange={e => setFormData({ ...formData, salePrice: e.target.value })}
               />
@@ -305,7 +422,7 @@ function AddProductModal({ onClose }: { onClose: () => void }) {
                 type="number"
                 min="0"
                 placeholder="0"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.costPrice}
                 onChange={e => setFormData({ ...formData, costPrice: e.target.value })}
               />
@@ -313,23 +430,23 @@ function AddProductModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">الرصيد المتاح حالياً (الكمية)</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">الرصيد المتاح حالياً (الكمية) *</label>
             <input 
               required
               type="number"
               min="0"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={formData.stockQty}
               onChange={e => setFormData({ ...formData, stockQty: e.target.value })}
             />
           </div>
 
           <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 text-sm">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-sm">
               إلغاء
             </button>
             <button type="submit" className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">
-              إضافة للمخزن
+              {isEdit ? 'حفظ التعديلات' : 'إضافة للمخزن'}
             </button>
           </div>
         </form>
@@ -444,7 +561,7 @@ function SellProductModal({
             >
               {products.map(p => (
                 <option key={p.id} value={p.id}>
-                  {p.name} - (السعر: {p.salePrice} ج.م | الرصيد: {p.stockQty})
+                  {p.name} - (السعر: {toMajorUnits(p.salePrice)} ج.م | الرصيد: {p.stockQty})
                 </option>
               ))}
             </select>
@@ -526,7 +643,7 @@ function SellProductModal({
           {/* Price preview */}
           <div className="p-3 bg-emerald-50 rounded-xl flex items-center justify-between border border-emerald-100">
             <span className="text-sm text-emerald-800 font-medium">المبلغ المطلوب تحصيله:</span>
-            <span className="text-xl font-bold text-emerald-700">{totalAmount} ج.م</span>
+            <span className="text-xl font-bold text-emerald-700">{toMajorUnits(totalAmount)} ج.م</span>
           </div>
 
           <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">

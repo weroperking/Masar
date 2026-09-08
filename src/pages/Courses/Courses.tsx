@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Plus, X, Trash2, BookOpen } from 'lucide-react';
 import { Course } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 
 export function Courses() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,7 +69,7 @@ export function Courses() {
                     </div>
                     <div className="flex justify-between text-slate-600 dark:text-slate-400">
                       <span>السعر:</span>
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-sm">{course.price} ج.م</span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-sm">{toMajorUnits(course.price)} ج.م</span>
                     </div>
                   </div>
                 </div>
@@ -108,7 +109,7 @@ function CourseFormModal({ onClose }: { onClose: () => void }) {
       const newCourse: Course = {
         id: uuidv4(),
         name: formData.name,
-        price: Number(formData.price),
+        price: toMinorUnits(Number(formData.price)),
         paymentType: formData.paymentType,
         isActive: formData.isActive,
         created_at: now,

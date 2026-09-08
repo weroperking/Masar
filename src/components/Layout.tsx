@@ -5,16 +5,18 @@ import {
   UserCheck, Calendar, FileText, Library, Wallet, 
   FileSpreadsheet, Globe, Package, 
   BarChart3, UserCog, MessageSquare, QrCode, LogOut,
-  Search, Sun, Moon, Plus, Keyboard
+  Search, Sun, Moon, Plus, Keyboard, RefreshCw, CheckCircle2, WifiOff
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useState, useEffect } from 'react';
-import { syncService } from '../services/syncService';
+import { syncService, TABLES } from '../services/syncService';
 import { useTheme } from '../context/ThemeContext';
 import { CommandPalette } from './CommandPalette';
 import { QuickNewModal } from './QuickNewModal';
 import { ShortcutsHelpModal } from './ShortcutsHelpModal';
 import { useToast } from '../context/ToastContext';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
 
 const navigationGroups = [
   {
@@ -79,16 +81,58 @@ export function Layout() {
   const [isQuickNewOpen, setIsQuickNewOpen] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
 
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Auto-sync when going online
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      performSync();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const performSync = async () => {
+    if (!navigator.onLine) return;
+    setIsSyncing(true);
+    try {
+      await syncService.syncPendingData(getToken);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   useEffect(() => {
     // Attempt sync on load
-    syncService.syncPendingData(getToken).catch(console.error);
+    performSync();
     
-    // Periodic sync every 5 minutes
+    // Periodic sync every 30 seconds
     const interval = setInterval(() => {
-      syncService.syncPendingData(getToken).catch(console.error);
-    }, 5 * 60 * 1000);
+      performSync();
+    }, 30 * 1000);
     return () => clearInterval(interval);
   }, [getToken]);
+
+  const pendingCount = useLiveQuery(async () => {
+    let total = 0;
+    for (const table of TABLES) {
+      const tableInstance = (db as any)[table];
+      if (tableInstance) {
+        total += await tableInstance.where('sync_status').equals('pending').count();
+      }
+    }
+    return total;
+  }, []) ?? 0;
 
   // Global Keyboard Shortcuts
   useEffect(() => {
@@ -201,9 +245,28 @@ export function Layout() {
         </nav>
 
         <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0">
-          <div className="flex items-center space-x-2 space-x-reverse text-xs text-slate-500 dark:text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>متصل</span>
+          <div className="flex flex-col text-xs">
+            {isSyncing ? (
+              <div className="flex items-center space-x-2 space-x-reverse text-blue-500">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>جاري المزامنة...</span>
+              </div>
+            ) : !isOnline ? (
+              <div className="flex items-center space-x-2 space-x-reverse text-rose-500">
+                <WifiOff className="w-3.5 h-3.5" />
+                <span>غير متصل ({pendingCount} معلق)</span>
+              </div>
+            ) : pendingCount > 0 ? (
+               <div className="flex items-center space-x-2 space-x-reverse text-amber-500">
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>{pendingCount} بانتظار المزامنة</span>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2 space-x-reverse text-emerald-500">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>متزامن</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
