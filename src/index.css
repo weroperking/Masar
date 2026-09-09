@@ -12,6 +12,10 @@ body {
   @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
 }
 
+button, a, [role="button"] {
+  cursor: pointer;
+}
+
 .dark {
   --color-slate-50: #f0f6fc;
   --color-slate-100: #c9d1d9;

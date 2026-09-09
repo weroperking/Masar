@@ -179,33 +179,6 @@ export function Layout() {
           <h1 className="text-2xl font-black text-blue-600 dark:text-blue-400 font-brand tracking-tight">
             مسار
           </h1>
-
-          {/* Theme toggle in sidebar */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-800 transition-colors"
-            title={theme === 'dark' ? 'التبديل إلى الوضع الفاتح (Ctrl+J)' : 'التبديل إلى الوضع الداكن (Ctrl+J)'}
-            aria-label="تبديل المظهر"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
-          </button>
-        </div>
-
-        {/* Quick search shortcut box */}
-        <div className="px-4 pt-4 pb-1">
-          <button
-            onClick={() => setIsCommandPaletteOpen(true)}
-            className="w-full flex items-center justify-between px-3 py-2 text-xs text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 dark:border-slate-700/60 rounded-xl transition-colors text-right group"
-          >
-            <span className="flex items-center gap-2 group-hover:text-slate-600 dark:group-hover:text-slate-300">
-              <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500" />
-              بحث سريع...
-            </span>
-            <kbd className="font-mono text-[10px] px-1.5 py-0.5 bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-700 dark:border-slate-600">
-              Ctrl K
-            </kbd>
-          </button>
         </div>
 
         <nav className="flex-1 px-4 py-4 overflow-y-auto space-y-6 scrollbar-thin">
@@ -268,26 +241,6 @@ export function Layout() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsShortcutsHelpOpen(true)}
-              title="اختصارات لوحة المفاتيح (?)"
-              className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
-            >
-              <Keyboard className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => clerk.signOut()}
-              title="تسجيل الخروج"
-              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors flex items-center gap-1 text-xs"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>خروج</span>
-            </button>
-            <UserButton afterSignOutUrl="/" />
-          </div>
         </div>
       </aside>
 
@@ -301,7 +254,7 @@ export function Layout() {
               مسار
             </h1>
 
-            {/* Desktop Quick Search and New Action */}
+            {/* Desktop Quick Search */}
             <div className="hidden md:flex items-center gap-2">
               <button
                 onClick={() => setIsCommandPaletteOpen(true)}
@@ -312,18 +265,6 @@ export function Layout() {
                 <span>بحث في مسار...</span>
                 <kbd className="font-mono text-[10px] px-1 py-0.5 bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-700 dark:border-slate-600 mr-1">
                   Ctrl+K
-                </kbd>
-              </button>
-
-              <button
-                onClick={() => setIsQuickNewOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg text-xs font-bold transition-colors"
-                title="إدخال جديد سريع (Ctrl+N)"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>إدخال جديد</span>
-                <kbd className="font-mono text-[10px] px-1 py-0.5 bg-white dark:bg-slate-700 text-blue-500 dark:text-blue-400 rounded border border-blue-200 dark:border-blue-800 mr-1">
-                  Ctrl+N
                 </kbd>
               </button>
             </div>
@@ -337,36 +278,6 @@ export function Layout() {
               title="بحث سريع"
             >
               <Search className="w-4 h-4" />
-            </button>
-
-            {/* Mobile new action button */}
-            <button
-              onClick={() => setIsQuickNewOpen(true)}
-              className="md:hidden p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 rounded-lg"
-              title="إدخال جديد"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-
-            {/* Theme Toggle Button */}
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              title={theme === 'dark' ? 'التبديل للمظهر الفاتح (Ctrl+J)' : 'التبديل للمظهر الداكن (Ctrl+J)'}
-              aria-label="تبديل المظهر"
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
-            </button>
-
-            {/* Shortcuts Help Button */}
-            <button
-              type="button"
-              onClick={() => setIsShortcutsHelpOpen(true)}
-              className="p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors hidden sm:block"
-              title="اختصارات لوحة المفاتيح (?)"
-            >
-              <Keyboard className="w-4 h-4" />
             </button>
 
             {/* User Profile & Signout */}
