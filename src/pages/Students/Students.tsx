@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Search, Plus, X, Trash2, Edit2, ShieldAlert } from 'lucide-react';
 import { Student } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import { Link } from 'react-router-dom';
 
 export function Students() {
@@ -12,6 +13,7 @@ export function Students() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const toast = useToast();
+  const { confirm } = useConfirm();
   
   const students = useLiveQuery(
     () => db.students
@@ -22,7 +24,16 @@ export function Students() {
   );
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`هل أنت متأكد من حذف الطالب (${name})؟\nهذا الإجراء سيقوم بأرشفة الطالب ولن يظهر في القوائم.`)) {
+    const isConfirmed = await confirm({
+      title: 'أرشفة وحذف الطالب',
+      message: `هل أنت متأكد من حذف الطالب (${name})؟`,
+      description: 'هذا الإجراء سيقوم بأرشفة بيانات الطالب ولن يظهر في القوائم النشطة.',
+      confirmText: 'نعم، احذف الطالب',
+      cancelText: 'تراجع',
+      variant: 'danger',
+    });
+
+    if (isConfirmed) {
       try {
         await db.students.update(id, { 
           deleted_at: Date.now(), 
@@ -62,70 +73,70 @@ export function Students() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">إدارة الطلاب</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">تسجيل بيانات الطلاب، متابعة أولياء الأمور، وإدارة الحالات</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">إدارة الطلاب</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">تسجيل بيانات الطلاب، متابعة أولياء الأمور، وإدارة الحالات</p>
         </div>
         <button 
           onClick={() => { setEditingStudent(null); setIsModalOpen(true); }}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm font-semibold"
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-xs text-xs font-bold"
         >
-          <Plus className="w-4 h-4 ml-2" />
+          <Plus className="w-3.5 h-3.5 ml-1.5" />
           إضافة طالب جديد
         </button>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6">
-        <div className="relative max-w-md mb-6">
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">
+        <div className="relative max-w-sm mb-4">
           <input
             type="text"
             placeholder="بحث بالاسم أو رقم الهاتف..."
-            className="w-full pl-4 pr-10 py-2 bg-slate-50 dark:bg-slate-900 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-slate-400 dark:placeholder-slate-500"
+            className="w-full pl-3 pr-9 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs placeholder-slate-400 dark:placeholder-slate-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Search className="absolute right-3 top-2.5 text-slate-400 dark:text-slate-500 w-5 h-5" />
+          <Search className="absolute right-2.5 top-2 text-slate-400 dark:text-slate-500 w-4 h-4" />
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-right">
-            <thead className="bg-slate-50 dark:bg-slate-900 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
+          <table className="w-full text-xs text-right">
+            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
               <tr>
-                <th className="px-4 py-3 font-medium rounded-r-lg">الاسم</th>
-                <th className="px-4 py-3 font-medium">الهاتف</th>
-                <th className="px-4 py-3 font-medium">المدرسة</th>
-                <th className="px-4 py-3 font-medium">ولي الأمر</th>
-                <th className="px-4 py-3 font-medium">الحالة</th>
-                <th className="px-4 py-3 font-medium rounded-l-lg">الإجراءات</th>
+                <th className="px-4 py-2.5 font-semibold">الاسم</th>
+                <th className="px-4 py-2.5 font-semibold">الهاتف</th>
+                <th className="px-4 py-2.5 font-semibold">المدرسة</th>
+                <th className="px-4 py-2.5 font-semibold">ولي الأمر</th>
+                <th className="px-4 py-2.5 font-semibold">الحالة</th>
+                <th className="px-4 py-2.5 font-semibold">الإجراءات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {students?.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-400 dark:text-slate-500">
                     لا يوجد طلاب مسجلين
                   </td>
                 </tr>
               ) : (
                 students?.map(student => (
-                  <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">
-                      <Link to={`/students/${student.id}`} className="hover:text-blue-600 hover:underline">
+                  <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                      <Link to={`/students/${student.id}`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                         {student.name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300" dir="ltr">{student.phone}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono" dir="ltr">{student.phone}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{student.school || '-'}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                       <div>{student.parentName || '-'}</div>
-                      <div className="text-xs text-slate-400 dark:text-slate-500" dir="ltr">{student.parentPhone}</div>
+                      <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono" dir="ltr">{student.parentPhone}</div>
                     </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => handleToggleStatus(student)}
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold cursor-pointer transition-colors ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold cursor-pointer transition-colors ${
                           student.isActive 
-                            ? 'bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300 hover:bg-green-200' 
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-200'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20' 
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
                         title="انقر لتغيير الحالة"
                       >
@@ -136,17 +147,17 @@ export function Students() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleEdit(student)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           title="تعديل بيانات الطالب"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(student.id, student.name)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           title="حذف الطالب"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -211,74 +222,74 @@ function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, e
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
             {existingStudent ? 'تعديل بيانات طالب' : 'إضافة طالب جديد'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
+            <X className="w-4 h-4" />
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-3.5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">اسم الطالب *</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الطالب *</label>
             <input 
               required 
               type="text" 
               placeholder="الاسم ثلاثي أو رباعي"
-              className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
               value={formData.name} 
               onChange={e => setFormData({...formData, name: e.target.value})} 
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">هاتف الطالب *</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">هاتف الطالب *</label>
               <input 
                 required 
                 type="tel" 
                 dir="ltr" 
                 placeholder="01xxxxxxxxx"
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 text-right focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 text-right focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono"
                 value={formData.phone} 
                 onChange={e => setFormData({...formData, phone: e.target.value})} 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">المدرسة</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">المدرسة</label>
               <input 
                 type="text" 
                 placeholder="المدرسة الحالية"
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
                 value={formData.school} 
                 onChange={e => setFormData({...formData, school: e.target.value})} 
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">اسم ولي الأمر</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم ولي الأمر</label>
               <input 
                 type="text" 
                 placeholder="الأب أو الأم"
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
                 value={formData.parentName} 
                 onChange={e => setFormData({...formData, parentName: e.target.value})} 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">هاتف ولي الأمر *</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">هاتف ولي الأمر *</label>
               <input 
                 required 
                 type="tel" 
                 dir="ltr" 
                 placeholder="01xxxxxxxxx"
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 text-right focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 text-right focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono"
                 value={formData.parentPhone} 
                 onChange={e => setFormData({...formData, parentPhone: e.target.value})} 
               />
@@ -286,9 +297,9 @@ function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, e
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">قناة التعرف علينا</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">قناة التعرف علينا</label>
             <select 
-              className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
               value={formData.leadSource} 
               onChange={e => setFormData({...formData, leadSource: e.target.value})}
             >
@@ -300,30 +311,30 @@ function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, e
             </select>
           </div>
           
-          <div className="flex items-center pt-2">
+          <div className="flex items-center pt-1">
             <input 
               type="checkbox" 
               id="isActive" 
-              className="rounded text-blue-600 focus:ring-blue-500 ml-2.5 w-4 h-4" 
+              className="rounded text-blue-600 focus:ring-blue-500 ml-2 w-3.5 h-3.5" 
               checked={formData.isActive} 
               onChange={e => setFormData({...formData, isActive: e.target.checked})} 
             />
-            <label htmlFor="isActive" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor="isActive" className="text-xs font-medium text-slate-700 dark:text-slate-300">
               حساب نشط
             </label>
           </div>
           
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-sm"
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
             >
               إلغاء
             </button>
             <button 
               type="submit" 
-              className="px-5 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 text-sm font-semibold shadow-sm"
+              className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs"
             >
               {existingStudent ? 'حفظ التعديلات' : 'حفظ الطالب'}
             </button>

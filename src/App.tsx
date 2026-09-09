@@ -29,6 +29,7 @@ import { Reports } from './pages/Reports/Reports';
 
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 
 // Admin
 import { Users } from './pages/Admin/Users';
@@ -124,12 +125,14 @@ export default function App() {
   return (
     <ThemeProvider>
       <ToastProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/book" element={<PublicBooking />} />
-            <Route path="*" element={<AuthGate />} />
-          </Routes>
-        </BrowserRouter>
+        <ConfirmProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/book" element={<PublicBooking />} />
+              <Route path="*" element={<AuthGate />} />
+            </Routes>
+          </BrowserRouter>
+        </ConfirmProvider>
       </ToastProvider>
     </ThemeProvider>
   );

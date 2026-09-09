@@ -5,6 +5,7 @@ import { db } from '../../db/db';
 import { useState } from 'react';
 import { User } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import { v4 as uuidv4 } from 'uuid';
 import { X } from 'lucide-react';
 
@@ -13,9 +14,19 @@ export function Users() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const toast = useToast();
+  const { confirm } = useConfirm();
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`هل أنت متأكد من حذف المستخدم ${name}؟`)) {
+    const isConfirmed = await confirm({
+      title: 'حذف المستخدم والصلاحيات',
+      message: `هل أنت متأكد من حذف المستخدم ${name}؟`,
+      description: 'لن يتمكن هذا المستخدم من الوصول للنظام بعد إتمام الحذف.',
+      confirmText: 'نعم، احذف الحساب',
+      cancelText: 'إلغاء',
+      variant: 'danger',
+    });
+
+    if (isConfirmed) {
       await db.users.update(id, { deleted_at: Date.now(), sync_status: 'pending' });
       toast.success('تم حذف المستخدم بنجاح');
     }

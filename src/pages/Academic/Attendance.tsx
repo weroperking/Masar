@@ -5,14 +5,15 @@ import { Play, CheckCircle, Clock, X, Users, MessageCircle, StopCircle, Calendar
 import { v4 as uuidv4 } from 'uuid';
 import { AttendanceSession, Student } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 export function Attendance() {
   const toast = useToast();
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'live' | 'upcoming' | 'history' | 'absent'>('live');
   const [markingSession, setMarkingSession] = useState<AttendanceSession | null>(null);
-
   const groups = useLiveQuery(() => db.groups.toArray(), []);
   const courses = useLiveQuery(() => db.courses.toArray(), []);
   
@@ -42,7 +43,16 @@ export function Attendance() {
   };
 
   const handleEndSession = async (sessionId: string) => {
-    if (confirm('هل أنت متأكد من إنهاء هذه الحصة؟ لا يمكن التعديل على الحضور بعد الإنهاء.')) {
+    const isConfirmed = await confirm({
+      title: 'إنهاء وتوثيق الحصة',
+      message: 'هل أنت متأكد من إنهاء هذه الحصة الحالية؟',
+      description: 'لا يمكن التعديل على سجل الحضور والغياب لهذه الحصة بعد إتمام الإنهاء.',
+      confirmText: 'نعم، إنهاء الحصة',
+      cancelText: 'تراجع',
+      variant: 'warning',
+    });
+
+    if (isConfirmed) {
       await db.attendanceSessions.update(sessionId, {
         endedAt: Date.now(),
         status: 'completed',
@@ -68,29 +78,29 @@ export function Attendance() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">الحضور والغياب</h1>
-          <p className="text-sm text-slate-500 mt-0.5">اليوم: {todayName}، {format(new Date(), 'dd MMMM yyyy', { locale: ar })}</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">الحضور والغياب</h1>
+          <p className="text-xs text-slate-500 mt-0.5">اليوم: {todayName}، {format(new Date(), 'dd MMMM yyyy', { locale: ar })}</p>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">بدء حصة جديدة</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">
+        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-4">بدء حصة جديدة</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {groups?.filter(g => g.status === 'in_progress').map(group => {
             const isLive = activeSessions?.some(s => s.groupId === group.id);
             return (
-              <div key={group.id} className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 flex flex-col justify-between hover:border-blue-400 transition-colors">
+              <div key={group.id} className="border border-slate-200 dark:border-slate-800 rounded-lg p-3.5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
                 <div>
                   <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-bold text-slate-800 dark:text-slate-200">{group.name}</h3>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs">{group.name}</h3>
                     {isLive && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800 font-medium">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">
                         نشطة الآن
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 mb-3">{courseMap.get(group.courseId)}</p>
-                  <p className="text-xs text-slate-600 mb-4">{group.startTime} - {group.endTime}</p>
+                  <p className="text-xs text-slate-500 mb-2">{courseMap.get(group.courseId)}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">{group.startTime} - {group.endTime}</p>
                 </div>
                 <div>
                   {isLive ? (
@@ -99,27 +109,27 @@ export function Attendance() {
                         const session = activeSessions?.find(s => s.groupId === group.id);
                         if (session) setMarkingSession(session);
                       }}
-                      className="w-full flex items-center justify-center py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors text-sm font-medium"
+                      className="w-full flex items-center justify-center py-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-xs font-semibold border border-blue-200 dark:border-blue-900/50"
                     >
-                      <CheckCircle className="w-4 h-4 ml-1.5" />
+                      <CheckCircle className="w-3.5 h-3.5 ml-1.5" />
                       إدارة الحضور
                     </button>
                   ) : (
                     <div className="flex gap-2">
                       <button 
                         onClick={() => handleStartSession(group.id, group.courseId, false)}
-                        className="flex-1 flex items-center justify-center py-2 bg-emerald-100 text-emerald-700 rounded-md hover:bg-emerald-200 transition-colors text-sm font-medium"
+                        className="flex-1 flex items-center justify-center py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-md transition-colors text-xs font-semibold shadow-xs"
                       >
-                        <Play className="w-3.5 h-3.5 ml-1.5" />
+                        <Play className="w-3 h-3 ml-1" />
                         بدء حصة
                       </button>
                       <button 
                         onClick={() => handleStartSession(group.id, group.courseId, true)}
-                        className="flex-1 flex items-center justify-center py-2 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors text-sm font-medium"
+                        className="flex-1 flex items-center justify-center py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition-colors text-xs font-semibold border border-slate-200 dark:border-slate-700"
                         title="بدء حصة تجريبية (تطبق حدود حصص التجربة)"
                       >
-                        <Play className="w-3.5 h-3.5 ml-1.5" />
-                        ترايل
+                        <Play className="w-3 h-3 ml-1" />
+                        تجربة
                       </button>
                     </div>
                   )}
@@ -128,13 +138,13 @@ export function Attendance() {
             );
           })}
           {groups?.filter(g => g.status === 'in_progress').length === 0 && (
-            <div className="col-span-full text-center text-slate-500 py-6">لا توجد مجموعات قيد التنفيذ حالياً</div>
+            <div className="col-span-full text-center text-slate-500 py-6 text-xs">لا توجد مجموعات قيد التنفيذ حالياً</div>
           )}
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-        <div className="flex border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 overflow-x-auto px-2">
           {[
             { id: 'live', label: `الحصص النشطة (${activeSessions?.length || 0})` },
             { id: 'upcoming', label: `مجدول اليوم (${todayScheduledGroups.length})` },
@@ -144,9 +154,9 @@ export function Attendance() {
             <button 
               key={tab.id} 
               onClick={() => setActiveTab(tab.id as any)} 
-              className={`shrink-0 px-6 py-3.5 text-sm font-medium border-b-2 transition-colors ${
+              className={`shrink-0 px-4 py-3 text-xs font-semibold border-b-2 transition-colors ${
                 activeTab === tab.id 
-                  ? 'border-blue-600 text-blue-600 font-bold' 
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold' 
                   : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
               }`}
             >
@@ -155,50 +165,50 @@ export function Attendance() {
           ))}
         </div>
 
-        <div className="p-6">
+        <div className="p-5">
           {activeTab === 'live' && (
             <div>
               {activeSessions?.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <Play className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                <div className="text-center py-10 text-slate-500 text-xs">
+                  <Play className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-40" />
                   <p>لا توجد حصص نشطة في الوقت الحالي.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {activeSessions?.map(session => (
-                    <div key={session.id} className="border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl p-5">
-                      <div className="flex justify-between items-start mb-4">
+                    <div key={session.id} className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">
-                            {groupMap.get(session.groupId)?.name}
+                          <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                            <span>{groupMap.get(session.groupId)?.name}</span>
                             {session.isTrial && (
-                              <span className="inline-block mr-2 px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs">
+                              <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded text-[10px] border border-slate-200 dark:border-slate-700">
                                 حصة تجريبية
                               </span>
                             )}
                           </h3>
-                          <p className="text-sm text-slate-600">{courseMap.get(session.courseId)}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{courseMap.get(session.courseId)}</p>
                         </div>
-                        <span className="flex items-center px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold animate-pulse">
-                          <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full ml-1.5"></span>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-full text-[11px] font-semibold">
+                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
                           جاري الآن
                         </span>
                       </div>
                       
-                      <div className="text-sm text-slate-500 mb-6 flex gap-4">
-                        <span className="flex items-center"><Clock className="w-4 h-4 ml-1" /> بدأ: {format(new Date(session.startedAt), 'hh:mm a')}</span>
+                      <div className="text-xs text-slate-500 mb-4 flex gap-4 font-mono">
+                        <span className="flex items-center"><Clock className="w-3.5 h-3.5 ml-1 text-slate-400" /> بدأ: {format(new Date(session.startedAt), 'hh:mm a')}</span>
                       </div>
 
                       <div className="flex gap-2">
                         <button 
                           onClick={() => setMarkingSession(session)}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-semibold transition-colors"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-md text-xs font-bold transition-colors shadow-xs"
                         >
                           تسجيل الحضور والغياب
                         </button>
                         <button 
                           onClick={() => handleEndSession(session.id)}
-                          className="px-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 rounded-lg text-sm font-semibold transition-colors"
+                          className="px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-1.5 rounded-md text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
                         >
                           إنهاء الحصة
                         </button>
@@ -244,29 +254,29 @@ export function Attendance() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-right">
-                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
+                    <thead className="bg-slate-50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400 text-xs border-b border-slate-200 dark:border-slate-800">
                       <tr>
-                        <th className="px-4 py-3 font-medium rounded-r-lg">المجموعة</th>
-                        <th className="px-4 py-3 font-medium">النوع</th>
-                        <th className="px-4 py-3 font-medium">التاريخ</th>
-                        <th className="px-4 py-3 font-medium">وقت البدء</th>
-                        <th className="px-4 py-3 font-medium rounded-l-lg">وقت الانتهاء</th>
+                        <th className="px-4 py-2.5 font-semibold">المجموعة</th>
+                        <th className="px-4 py-2.5 font-semibold">النوع</th>
+                        <th className="px-4 py-2.5 font-semibold">التاريخ</th>
+                        <th className="px-4 py-2.5 font-semibold">وقت البدء</th>
+                        <th className="px-4 py-2.5 font-semibold">وقت الانتهاء</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                       {completedSessions?.sort((a,b) => b.startedAt - a.startedAt).map(session => (
-                        <tr key={session.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                          <td className="px-4 py-3 font-bold">{groupMap.get(session.groupId)?.name}</td>
-                          <td className="px-4 py-3">
+                        <tr key={session.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="px-4 py-2.5 font-semibold text-slate-900 dark:text-slate-100">{groupMap.get(session.groupId)?.name}</td>
+                          <td className="px-4 py-2.5">
                             {session.isTrial ? (
-                              <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-semibold">تجريبية</span>
+                              <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[10px] font-semibold border border-slate-200 dark:border-slate-700">تجريبية</span>
                             ) : (
                               <span className="text-slate-500 text-xs">عادية</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-slate-500">{format(new Date(session.startedAt), 'dd MMM yyyy', { locale: ar })}</td>
-                          <td className="px-4 py-3 text-slate-500" dir="ltr">{format(new Date(session.startedAt), 'hh:mm a')}</td>
-                          <td className="px-4 py-3 text-slate-500" dir="ltr">{session.endedAt ? format(new Date(session.endedAt), 'hh:mm a') : '-'}</td>
+                          <td className="px-4 py-2.5 text-slate-500 font-mono">{format(new Date(session.startedAt), 'dd MMM yyyy', { locale: ar })}</td>
+                          <td className="px-4 py-2.5 text-slate-500 font-mono" dir="ltr">{format(new Date(session.startedAt), 'hh:mm a')}</td>
+                          <td className="px-4 py-2.5 text-slate-500 font-mono" dir="ltr">{session.endedAt ? format(new Date(session.endedAt), 'hh:mm a') : '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -279,23 +289,23 @@ export function Attendance() {
           {activeTab === 'absent' && (
             <div>
               {absentRecords.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-20 text-emerald-500" />
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  <CheckCircle className="w-8 h-8 mx-auto mb-2 opacity-40 text-emerald-500" />
                   <p>لا يوجد غياب مسجل!</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-right">
-                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
+                  <table className="w-full text-xs text-right">
+                    <thead className="bg-slate-50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400 text-xs border-b border-slate-200 dark:border-slate-800">
                       <tr>
-                        <th className="px-4 py-3 font-medium rounded-r-lg">الطالب</th>
-                        <th className="px-4 py-3 font-medium">المجموعة</th>
-                        <th className="px-4 py-3 font-medium">ولي الأمر</th>
-                        <th className="px-4 py-3 font-medium">التاريخ</th>
-                        <th className="px-4 py-3 font-medium rounded-l-lg">تواصل</th>
+                        <th className="px-4 py-2.5 font-semibold">الطالب</th>
+                        <th className="px-4 py-2.5 font-semibold">المجموعة</th>
+                        <th className="px-4 py-2.5 font-semibold">ولي الأمر</th>
+                        <th className="px-4 py-2.5 font-semibold">التاريخ</th>
+                        <th className="px-4 py-2.5 font-semibold text-center">تواصل</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                       {absentRecords.map(record => {
                         const student = students?.find(s => s.id === record.studentId);
                         if (!student) return null;
@@ -304,19 +314,19 @@ export function Attendance() {
                         const waLink = `https://wa.me/2${student.parentPhone || student.phone}?text=${encodeURIComponent(msg)}`;
                         
                         return (
-                          <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                            <td className="px-4 py-3 font-bold">{student.name}</td>
-                            <td className="px-4 py-3">{groupMap.get(record.groupId)?.name}</td>
-                            <td className="px-4 py-3 text-slate-600">{student.parentName || '-'} <span dir="ltr">({student.parentPhone})</span></td>
-                            <td className="px-4 py-3 text-slate-500">{format(new Date(record.markedAt), 'dd MMM yyyy', { locale: ar })}</td>
-                            <td className="px-4 py-3">
+                          <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <td className="px-4 py-2.5 font-semibold text-slate-900 dark:text-slate-100">{student.name}</td>
+                            <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">{groupMap.get(record.groupId)?.name}</td>
+                            <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">{student.parentName || '-'} <span className="font-mono text-slate-500" dir="ltr">({student.parentPhone})</span></td>
+                            <td className="px-4 py-2.5 text-slate-500 font-mono">{format(new Date(record.markedAt), 'dd MMM yyyy', { locale: ar })}</td>
+                            <td className="px-4 py-2.5 text-center">
                               <a 
                                 href={waLink} 
                                 target="_blank" 
                                 rel="noreferrer"
-                                className="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-xs font-medium transition-colors"
+                                className="inline-flex items-center px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-semibold transition-colors shadow-xs"
                               >
-                                <MessageCircle className="w-3.5 h-3.5 ml-1" />
+                                <MessageCircle className="w-3 h-3 ml-1" />
                                 واتساب
                               </a>
                             </td>
@@ -547,46 +557,64 @@ function AttendanceModal({
   const absentCount = Object.values(recordMap).filter(s => s === 'absent').length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-              تسجيل كشف الحضور: {groupName} 
-              {session.isTrial && <span className="mr-2 px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-semibold">ترايل</span>}
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <span>تسجيل كشف الحضور: {groupName}</span>
+              {session.isTrial && (
+                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[10px] border border-slate-200 dark:border-slate-700 font-semibold">
+                  حصة تجريبية
+                </span>
+              )}
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              إجمالي المقيدين: <span className="font-bold">{rosterStudents.length}</span> |
-              الحاضرين: <span className="text-emerald-600 font-bold">{presentCount}</span> | 
-              الغائبين: <span className="text-red-600 font-bold">{absentCount}</span>
+              المقيدين: <span className="font-bold text-slate-700 dark:text-slate-300">{rosterStudents.length}</span> |
+              الحاضرين: <span className="text-emerald-600 dark:text-emerald-400 font-bold">{presentCount}</span> | 
+              الغائبين: <span className="text-red-600 dark:text-red-400 font-bold">{absentCount}</span>
             </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <X className="w-4 h-4" />
           </button>
         </div>
         
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 dark:border-slate-800 text-xs gap-3">
+        <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 text-xs gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-slate-600 dark:text-slate-300 font-medium">إجراء سريع:</span>
-            <button onClick={() => markAll('present')} className="px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-md hover:bg-emerald-200 font-semibold transition-colors">تحضير الجميع</button>
-            <button onClick={() => markAll('absent')} className="px-3 py-1.5 bg-red-100 text-red-800 rounded-md hover:bg-red-200 font-semibold transition-colors">تغييب الجميع</button>
+            <span className="text-slate-500 font-medium">إجراء سريع:</span>
+            <button 
+              onClick={() => markAll('present')} 
+              className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-[11px] font-semibold transition-colors"
+            >
+              تحضير الجميع
+            </button>
+            <button 
+              onClick={() => markAll('absent')} 
+              className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30 text-[11px] font-semibold transition-colors"
+            >
+              تغييب الجميع
+            </button>
           </div>
           
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button 
               onClick={() => setIsQrMode(!isQrMode)} 
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-semibold transition-colors ${isQrMode ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                isQrMode 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
             >
-              <QrCode className="w-4 h-4" />
-              مسح بطاقة QR
+              <QrCode className="w-3.5 h-3.5" />
+              <span>مسح بطاقة QR</span>
             </button>
             {isQrMode && (
               <input
                 ref={qrInputRef}
                 type="text"
                 placeholder="انتظار القارئ..."
-                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-md text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none w-full sm:w-48 text-left"
+                className="px-2.5 py-1 border border-slate-300 dark:border-slate-600 rounded-md text-xs text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 focus:ring-1 focus:ring-blue-500 focus:outline-none w-full sm:w-44 text-left font-mono"
                 dir="ltr"
                 value={qrInput}
                 onChange={e => setQrInput(e.target.value)}
@@ -601,10 +629,10 @@ function AttendanceModal({
           </div>
         </div>
         
-        <div className="p-6 overflow-y-auto flex-1 divide-y divide-slate-100 dark:divide-slate-800">
+        <div className="p-5 overflow-y-auto flex-1 divide-y divide-slate-100 dark:divide-slate-800">
           {rosterStudents.length === 0 ? (
-            <div className="text-center py-10 text-slate-500">
-              <Users className="w-10 h-10 mx-auto mb-2 opacity-20" />
+            <div className="text-center py-10 text-slate-500 text-xs">
+              <Users className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-40" />
               <p>لا يوجد طلاب مقيدين نشطين في هذه المجموعة.</p>
             </div>
           ) : (
@@ -622,28 +650,28 @@ function AttendanceModal({
                   r.studentId === student.id && 
                   r.status === 'present' && 
                   trialSessionIds.includes(r.sessionId) &&
-                  r.sessionId !== session.id // Do not count the current one if somehow marked already
+                  r.sessionId !== session.id
                 ).length || 0;
                 
                 trialLimitExceeded = pastTrialsCount >= freeSessionLimit;
               }
 
               return (
-                <div key={student.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div key={student.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">{student.name}</p>
+                      <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs">{student.name}</p>
                       {wasAbsentPreviously && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-800 rounded text-[10px] font-semibold" title="تغيب الطالب عن الحصة الماضية">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded text-[10px] font-medium" title="تغيب الطالب عن الحصة الماضية">
                           <AlertTriangle className="w-3 h-3" />
                           غائب الحصة السابقة
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">{student.phone} - {student.school || '-'}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5 font-mono">{student.phone} - {student.school || '-'}</p>
                     {session.isTrial && trialLimitExceeded && (
-                      <p className="text-xs text-red-600 mt-1 font-semibold">
-                        🚫 استنفد الحد الأقصى لحصص التجربة ({freeSessionLimit})
+                      <p className="text-[11px] text-red-600 dark:text-red-400 mt-1 font-medium">
+                        استنفد الحد الأقصى لحصص التجربة ({freeSessionLimit})
                       </p>
                     )}
                   </div>
@@ -652,10 +680,10 @@ function AttendanceModal({
                       type="button"
                       disabled={session.isTrial && trialLimitExceeded && currentStatus !== 'present'}
                       onClick={() => toggleStudentStatus(student.id, 'present')}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                         currentStatus === 'present'
-                          ? 'bg-emerald-600 text-white shadow-md scale-105'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                       }`}
                     >
                       حاضر
@@ -663,10 +691,10 @@ function AttendanceModal({
                     <button
                       type="button"
                       onClick={() => toggleStudentStatus(student.id, 'absent')}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
                         currentStatus === 'absent'
-                          ? 'bg-red-600 text-white shadow-md scale-105'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                          ? 'bg-red-600 text-white'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                       }`}
                     >
                       غائب
@@ -678,15 +706,25 @@ function AttendanceModal({
           )}
         </div>
         
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
+        <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
           {isSaved ? (
-            <span className="text-emerald-600 font-bold text-sm">✓ تم حفظ كشف الحضور بنجاح!</span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">✓ تم حفظ كشف الحضور بنجاح!</span>
           ) : (
             <span className="text-xs text-slate-500">الطلاب غير المحددين يعتبرون غائبين تلقائياً</span>
           )}
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium transition-colors">إلغاء</button>
-            <button onClick={handleSave} className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-bold shadow-sm transition-colors">حفظ كشف الحضور</button>
+            <button 
+              onClick={onClose} 
+              className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+            >
+              إلغاء
+            </button>
+            <button 
+              onClick={handleSave} 
+              className="px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs"
+            >
+              حفظ كشف الحضور
+            </button>
           </div>
         </div>
       </div>

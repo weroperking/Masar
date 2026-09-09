@@ -103,12 +103,12 @@ export function MonthlySubscriptions() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'paid': return <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded text-xs font-bold">خالص</span>;
-      case 'partial': return <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-bold">جزء</span>;
-      case 'overdue': return <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-bold">متأخر</span>;
-      case 'no_record': return <span className="px-2 py-1 bg-slate-100 text-slate-800 rounded text-xs font-bold">لم يسدد بعد</span>;
-      case 'rejected': return <span className="px-2 py-1 bg-rose-100 text-rose-800 rounded text-xs font-bold">مرفوض</span>;
-      case 'pending': return <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-bold">مستحق</span>;
+      case 'paid': return <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded text-[10px] font-semibold">خالص</span>;
+      case 'partial': return <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded text-[10px] font-semibold">جزء</span>;
+      case 'overdue': return <span className="px-2 py-0.5 bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 rounded text-[10px] font-semibold">متأخر</span>;
+      case 'no_record': return <span className="px-2 py-0.5 bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 rounded text-[10px] font-semibold">لم يسدد بعد</span>;
+      case 'rejected': return <span className="px-2 py-0.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded text-[10px] font-semibold">مرفوض</span>;
+      case 'pending': return <span className="px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded text-[10px] font-semibold">مستحق</span>;
       default: return null;
     }
   };
@@ -127,22 +127,22 @@ export function MonthlySubscriptions() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">الاشتراكات الشهرية</h1>
-          <p className="text-sm text-slate-500 mt-1">متابعة وتسجيل سداد اشتراكات الكورسات الشهرية</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">الاشتراكات الشهرية</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">متابعة وتسجيل سداد اشتراكات الكورسات الشهرية</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap gap-4">
-        <div className="w-full sm:w-auto flex-1">
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-800 flex flex-wrap gap-3 items-center">
+        <div className="w-full sm:w-auto flex-1 min-w-[200px]">
           <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="ابحث باسم الطالب..."
+              placeholder="ابحث باسم الطالب أو الكورس..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-3 pr-9 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent text-sm focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-3 pr-8 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -150,7 +150,7 @@ export function MonthlySubscriptions() {
         <select 
           value={selectedMonth} 
           onChange={(e) => setSelectedMonth(Number(e.target.value))}
-          className="border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-transparent"
+          className="border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           {Array.from({length: 12}).map((_, i) => (
             <option key={i+1} value={i+1}>شهر {i+1}</option>
@@ -160,7 +160,7 @@ export function MonthlySubscriptions() {
         <select 
           value={selectedYear} 
           onChange={(e) => setSelectedYear(Number(e.target.value))}
-          className="border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-transparent"
+          className="border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           {[currentDate.getFullYear()-1, currentDate.getFullYear(), currentDate.getFullYear()+1].map(y => (
             <option key={y} value={y}>سنة {y}</option>
@@ -170,7 +170,7 @@ export function MonthlySubscriptions() {
         <select
           value={selectedCourse}
           onChange={(e) => setSelectedCourse(e.target.value)}
-          className="border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-transparent"
+          className="border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           <option value="all">جميع الكورسات</option>
           {courses?.map(c => (
@@ -180,54 +180,54 @@ export function MonthlySubscriptions() {
       </div>
 
       {/* Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-right text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300">
+          <table className="w-full text-right text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
               <tr>
-                <th className="p-4 font-semibold">الطالب</th>
-                <th className="p-4 font-semibold">الكورس والمجموعة</th>
-                <th className="p-4 font-semibold text-center">المطلوب</th>
-                <th className="p-4 font-semibold text-center">المدفوع</th>
-                <th className="p-4 font-semibold text-center">تاريخ الاستحقاق</th>
-                <th className="p-4 font-semibold text-center">الحالة</th>
-                <th className="p-4 font-semibold text-center">إجراءات</th>
+                <th className="px-4 py-2.5 font-semibold">الطالب</th>
+                <th className="px-4 py-2.5 font-semibold">الكورس والمجموعة</th>
+                <th className="px-4 py-2.5 font-semibold text-center">المطلوب</th>
+                <th className="px-4 py-2.5 font-semibold text-center">المدفوع</th>
+                <th className="px-4 py-2.5 font-semibold text-center">تاريخ الاستحقاق</th>
+                <th className="px-4 py-2.5 font-semibold text-center">الحالة</th>
+                <th className="px-4 py-2.5 font-semibold text-center">إجراءات</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredSubs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                  <td colSpan={7} className="p-8 text-center text-slate-500 text-xs">
                     لا توجد اشتراكات متوقعة لهذه الفترة
                   </td>
                 </tr>
               ) : (
                 filteredSubs.map((sub, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                    <td className="p-4 font-bold text-slate-900 dark:text-slate-100">{sub.studentName}</td>
-                    <td className="p-4">
-                      <div className="text-slate-900 dark:text-slate-100 font-semibold">{sub.courseName}</div>
-                      <div className="text-xs text-slate-500">{sub.groupName}</div>
+                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{sub.studentName}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-slate-900 dark:text-slate-100 font-medium">{sub.courseName}</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{sub.groupName}</div>
                     </td>
-                    <td className="p-4 text-center font-bold text-slate-700 dark:text-slate-300">{toMajorUnits(sub.amountTotal)}</td>
-                    <td className="p-4 text-center font-bold text-emerald-600">{toMajorUnits(sub.amountPaid)}</td>
-                    <td className="p-4 text-center text-slate-600 dark:text-slate-400">{sub.dueDate}</td>
-                    <td className="p-4 text-center">{getStatusBadge(sub.status)}</td>
-                    <td className="p-4 text-center">
-                      <div className="flex justify-center gap-2">
+                    <td className="px-4 py-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">{toMajorUnits(sub.amountTotal)} ج.م</td>
+                    <td className="px-4 py-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">{toMajorUnits(sub.amountPaid)} ج.م</td>
+                    <td className="px-4 py-3 text-center text-slate-500 font-mono text-[11px]">{sub.dueDate}</td>
+                    <td className="px-4 py-3 text-center">{getStatusBadge(sub.status)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex justify-center gap-1.5">
                         <button 
                           onClick={() => handleOpenPayment(sub)}
-                          className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+                          className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded transition-colors"
                           title="تسجيل دفعة / تعديل"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button 
                           onClick={() => handleOpenReminder(sub)}
-                          className="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
+                          className="p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded transition-colors"
                           title="إرسال تذكير عبر واتساب"
                         >
-                          <MessageCircle className="w-4 h-4" />
+                          <MessageCircle className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -252,7 +252,7 @@ export function MonthlySubscriptions() {
         <ReminderModal 
           sub={reminderSub} 
           month={selectedMonth} 
-          year={selectedYear}
+          year={selectedYear} 
           onClose={() => setIsReminderModalOpen(false)} 
         />
       )}
@@ -327,73 +327,84 @@ function PaymentModal({ sub, month, year, onClose }: { sub: any, month: number, 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">تسجيل دفعة اشتراك</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">تسجيل دفعة اشتراك</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="text-sm bg-slate-50 dark:bg-slate-800 p-3 rounded-lg text-slate-700 dark:text-slate-300 mb-4">
-            <p><strong>الطالب:</strong> {sub.studentName}</p>
-            <p><strong>الكورس:</strong> {sub.courseName} ({month}/{year})</p>
+        <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
+          <div className="text-xs bg-slate-50 dark:bg-slate-800/60 p-3 rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 space-y-1">
+            <p><span className="font-semibold text-slate-500 dark:text-slate-400">الطالب:</span> {sub.studentName}</p>
+            <p><span className="font-semibold text-slate-500 dark:text-slate-400">الكورس:</span> {sub.courseName} ({month}/{year})</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">المبلغ المطلوب (ج.م)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">المبلغ المطلوب (ج.م)</label>
               <input 
                 type="number"
                 required min="0"
                 value={amountTotal} onChange={e => setAmountTotal(e.target.value)}
-                className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded bg-transparent"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">المبلغ المدفوع (ج.م)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">المبلغ المدفوع (ج.م)</label>
               <input 
                 type="number"
                 required min="0"
                 value={paidAmount} onChange={e => setPaidAmount(e.target.value)}
-                className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded bg-transparent font-bold text-blue-600"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">تاريخ الاستحقاق</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">تاريخ الاستحقاق</label>
             <input 
               type="date"
               required
               value={dueDate} onChange={e => setDueDate(e.target.value)}
-              className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded bg-transparent"
+              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ملاحظات</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">ملاحظات</label>
             <textarea 
               value={notes} onChange={e => setNotes(e.target.value)}
-              className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded bg-transparent"
+              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
               rows={2}
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-1">
             <input 
               type="checkbox" 
               id="rejected"
               checked={isRejected} onChange={e => setIsRejected(e.target.checked)}
-              className="rounded border-slate-300"
+              className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor="rejected" className="text-sm text-slate-700 dark:text-slate-300">تعليم كـ "مرفوض / ملغى"</label>
+            <label htmlFor="rejected" className="text-xs text-slate-700 dark:text-slate-300">تعليم كـ "مرفوض / ملغى"</label>
           </div>
 
-          <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm text-slate-700">إلغاء</button>
-            <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold">حفظ الدفعة</button>
+          <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+            >
+              إلغاء
+            </button>
+            <button 
+              type="submit" 
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold transition-colors shadow-xs"
+            >
+              حفظ الدفعة
+            </button>
           </div>
         </form>
       </div>
@@ -402,6 +413,7 @@ function PaymentModal({ sub, month, year, onClose }: { sub: any, month: number, 
 }
 
 function ReminderModal({ sub, month, year, onClose }: { sub: any, month: number, year: number, onClose: () => void }) {
+  const toast = useToast();
   const [template, setTemplate] = useState(`مرحباً {{StudentName}}،\nنود تذكيركم بموعد سداد اشتراك كورس {{CourseName}} لشهر ${month}/${year}.\nالمبلغ المطلوب: {{AmountTotal}} ج.م.\nتاريخ الاستحقاق: {{DueDate}}.\n\nمركز مسار التعليمي`);
 
   const preview = template
@@ -411,43 +423,53 @@ function ReminderModal({ sub, month, year, onClose }: { sub: any, month: number,
     .replace('{{DueDate}}', sub.dueDate);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-green-500" />
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">تذكير عبر واتساب</h2>
+            <MessageCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">تذكير عبر واتساب</h2>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-5 space-y-3.5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">رقم هاتف الطالب</label>
-            <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-slate-700 dark:text-slate-300 font-mono text-left" dir="ltr">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">رقم هاتف الطالب</label>
+            <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 font-mono text-xs text-left" dir="ltr">
               {sub.studentPhone || 'لا يوجد رقم مسجل'}
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">معاينة الرسالة</label>
-            <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 rounded-lg text-sm whitespace-pre-wrap text-slate-800 dark:text-slate-200">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">معاينة الرسالة</label>
+            <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-md text-xs whitespace-pre-wrap text-slate-800 dark:text-slate-200 leading-relaxed font-sans">
               {preview}
             </div>
           </div>
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+            >
+              إلغاء
+            </button>
             <button 
               onClick={() => {
-                if (!sub.studentPhone) return alert('لا يوجد رقم هاتف');
+                if (!sub.studentPhone) {
+                  toast.error('لا يوجد رقم هاتف مسجل لهذا الطالب');
+                  return;
+                }
                 const text = encodeURIComponent(preview);
                 window.open(`https://wa.me/${sub.studentPhone}?text=${text}`, '_blank');
                 onClose();
               }}
               disabled={!sub.studentPhone}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold flex items-center gap-1.5 disabled:opacity-50 transition-colors shadow-xs"
             >
-              <MessageCircle className="w-4 h-4" />
-              إرسال الرسالة
+              <MessageCircle className="w-3.5 h-3.5" />
+              إرسال عبر واتساب
             </button>
           </div>
         </div>

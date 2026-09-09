@@ -150,22 +150,17 @@ export function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">لوحة التحكم</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">مؤشرات الأداء المالي والأكاديمي لسنتر مسار</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">لوحة التحكم</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">مؤشرات الأداء المالي والأكاديمي لسنتر مسار</p>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
-            <Sparkles className="w-4 h-4 text-blue-500" />
-            <span>البيانات حية من Dexie</span>
-          </div>
-
-          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-            <Filter className="w-4 h-4 text-slate-400 ml-2" />
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value as any)}
-              className="text-sm font-medium bg-transparent border-none focus:ring-0 text-slate-700 dark:text-slate-300 pr-8"
+              className="text-xs font-semibold bg-transparent border-none focus:ring-0 text-slate-700 dark:text-slate-300 pr-6 cursor-pointer"
             >
               <option value="today">اليوم</option>
               <option value="month">هذا الشهر</option>
@@ -178,14 +173,14 @@ export function Dashboard() {
       </div>
 
       {dateRange === 'custom' && (
-        <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+        <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-slate-500">من تاريخ</label>
             <input 
               type="date" 
               value={customStart}
               onChange={e => setCustomStart(e.target.value)}
-              className="text-sm border-slate-300 dark:border-slate-700 rounded bg-transparent text-slate-900 dark:text-slate-100" 
+              className="text-xs border-slate-300 dark:border-slate-700 rounded bg-transparent text-slate-900 dark:text-slate-100 px-2.5 py-1.5" 
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -194,70 +189,87 @@ export function Dashboard() {
               type="date" 
               value={customEnd}
               onChange={e => setCustomEnd(e.target.value)}
-              className="text-sm border-slate-300 dark:border-slate-700 rounded bg-transparent text-slate-900 dark:text-slate-100" 
+              className="text-xs border-slate-300 dark:border-slate-700 rounded bg-transparent text-slate-900 dark:text-slate-100 px-2.5 py-1.5" 
             />
           </div>
         </div>
       )}
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {statCards.map((stat) => (
           <Link
             key={stat.name}
             to={stat.href}
-            className="bg-white dark:bg-slate-900 rounded-xl shadow-sm p-6 border border-slate-200 dark:border-slate-700 flex flex-col justify-between hover:border-blue-300 dark:hover:border-blue-700 transition-all group gap-4 relative overflow-hidden"
+            className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800 flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors group gap-3 relative"
           >
-            <div className="flex justify-between items-start w-full">
-              <div className="flex items-center gap-2.5">
-                <stat.icon className={`w-5 h-5 ${stat.color}`} aria-hidden="true" />
-                <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">{stat.name}</p>
-              </div>
-              <ArrowUpRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
+            <div className="flex justify-between items-center w-full">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{stat.name}</span>
+              <stat.icon className={`w-4 h-4 ${stat.color}`} aria-hidden="true" />
             </div>
             
-            <div>
-              <p className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">{stat.value}</p>
+            <div className="flex justify-between items-baseline">
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{stat.value}</p>
+              <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
             </div>
           </Link>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-xs border border-slate-100 dark:border-slate-800 p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">التدفقات النقدية (إيرادات ومصروفات)</h2>
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">
+          <div className="flex items-center gap-2 mb-5">
+            <BarChart3 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">التدفقات النقدية (إيرادات ومصروفات)</h2>
           </div>
           
           <div className="h-72 w-full" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value >= 1000 ? value / 1000 + 'k' : value}`} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(value) => `${value >= 1000 ? value / 1000 + 'k' : value}`} />
                 <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }}
+                  contentStyle={{ 
+                    backgroundColor: '#0f172a', 
+                    borderRadius: '6px', 
+                    border: '1px solid #334155',
+                    color: '#f8fafc',
+                    fontSize: '12px'
+                  }}
                   formatter={(value: number) => [`${value} ج.م`, '']}
                 />
-                <Bar dataKey="revenue" name="إيرادات" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                <Bar dataKey="expenses" name="مصروفات" fill="#dc2626" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="revenue" name="إيرادات" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="expenses" name="مصروفات" fill="#64748b" radius={[3, 3, 0, 0]} maxBarSize={36} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-rose-50 to-orange-50 dark:from-rose-950/20 dark:to-orange-950/20 rounded-xl shadow-xs border border-rose-100 dark:border-rose-900/30 p-6 flex flex-col justify-center items-center text-center">
-          <AlertCircle className="w-12 h-12 text-rose-500 mb-4" />
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">إجمالي المتأخرات غير المحصلة</h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">مجموع المبالغ المتبقية على الطلاب من اشتراكات شهرية وحصص غير مسددة بالكامل.</p>
-          
-          <div className="text-4xl font-black text-rose-600 dark:text-rose-500">
-            {toMajorUnits(stats.outstanding).toLocaleString()} <span className="text-lg font-bold text-rose-400">ج.م</span>
+        {/* Clean, Non-Slop Outstanding Dues Panel */}
+        <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle className="w-4 h-4 text-amber-500" />
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">المتأخرات غير المحصلة</h2>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
+              مجموع المبالغ المتبقية على الطلاب من اشتراكات شهرية وحصص غير مسددة بالكامل.
+            </p>
+            
+            <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 my-2">
+              <span className="text-[11px] text-slate-400 block mb-1">إجمالي المستحقات المعلقة</span>
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
+                {toMajorUnits(stats.outstanding).toLocaleString()} <span className="text-xs font-normal text-slate-500">ج.م</span>
+              </div>
+            </div>
           </div>
 
-          <Link to="/dues" className="mt-8 px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-lg transition-colors shadow-sm w-full">
-            مراجعة المستحقات
+          <Link 
+            to="/dues" 
+            className="mt-4 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg transition-colors text-center shadow-xs"
+          >
+            مراجعة سجل المستحقات
           </Link>
         </div>
       </div>

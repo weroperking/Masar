@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
-import { Download, Users, BookOpen, Package, DollarSign, ArrowUpRight } from 'lucide-react';
+import { Download, Users, BookOpen, Package, DollarSign, TrendingUp, BarChart3, PieChart } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { toMajorUnits } from '../../utils/currency';
 
@@ -10,13 +10,13 @@ export function Reports() {
 
   const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
   const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at).toArray(), []);
-  const payments = useLiveQuery(() => db.monthlySubscriptions.filter(p => !p.deleted_at).toArray(), []);
   const ledgerEntries = useLiveQuery(() => db.ledgerEntries.filter(e => !e.deleted_at).toArray(), []);
   const products = useLiveQuery(() => db.products.filter(p => !p.deleted_at).toArray(), []);
 
   // Compute total financials
   const totalRevenue = ledgerEntries?.filter(e => e.type === 'revenue').reduce((acc, e) => acc + (e.amount || 0), 0) || 0;
   const totalExpense = ledgerEntries?.filter(e => e.type === 'expense').reduce((acc, e) => acc + (e.amount || 0), 0) || 0;
+  const netProfit = totalRevenue - totalExpense;
 
   // Chart data
   const currentYear = new Date().getFullYear();
@@ -89,99 +89,156 @@ export function Reports() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">التقارير والتحليلات</h1>
-          <p className="text-sm text-slate-500 mt-0.5">مؤشرات الأداء المالي، نمو الطلاب، ومبيعات المناهج</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <span>التقارير والتحليلات</span>
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            مؤشرات الأداء المالي، نمو الطلاب، ومبيعات المناهج والكتب الدراسية
+          </p>
         </div>
         <button 
           onClick={handleExportCSV}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold shadow-sm transition-colors"
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
         >
-          <Download className="w-4 h-4 ml-2" />
-          تصدير التقرير (Export CSV)
+          <Download className="w-3.5 h-3.5" />
+          <span>تصدير البيانات (CSV)</span>
         </button>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-        <div className="flex border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
-          <button 
-            onClick={() => setActiveTab('financials')} 
-            className={`shrink-0 px-6 py-3.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'financials' ? 'border-blue-600 text-blue-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            الماليات
-          </button>
-          <button 
-            onClick={() => setActiveTab('students')} 
-            className={`shrink-0 px-6 py-3.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'students' ? 'border-blue-600 text-blue-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            الطلاب ومصادر التسجيل
-          </button>
-          <button 
-            onClick={() => setActiveTab('courses')} 
-            className={`shrink-0 px-6 py-3.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'courses' ? 'border-blue-600 text-blue-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            الكورسات
-          </button>
-          <button 
-            onClick={() => setActiveTab('products')} 
-            className={`shrink-0 px-6 py-3.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'products' ? 'border-blue-600 text-blue-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            المخزون والمبيعات
-          </button>
+      {/* Main Container */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-slate-200 dark:border-slate-800 overflow-x-auto bg-slate-50/50 dark:bg-slate-900/50">
+          {[
+            { id: 'financials', label: 'الأداء المالي والتدفقات' },
+            { id: 'students', label: 'الطلاب ومصادر التسجيل' },
+            { id: 'courses', label: 'الكورسات والاشتراكات' },
+            { id: 'products', label: 'المخزون والمبيعات' },
+          ].map((tab) => (
+            <button 
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)} 
+              className={`shrink-0 px-5 py-3 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === tab.id 
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold bg-white dark:bg-slate-900' 
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         <div className="p-6">
           {/* Financials Tab */}
           {activeTab === 'financials' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <span className="text-xs font-semibold text-emerald-800">إجمالي الإيرادات المسجلة</span>
-                  <p className="text-2xl font-bold text-emerald-700 mt-1">{toMajorUnits(totalRevenue).toLocaleString()} ج.م</p>
+              {/* Financial KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">إجمالي الإيرادات المسجلة</span>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1.5 font-mono">
+                    {toMajorUnits(totalRevenue).toLocaleString()} ج.م
+                  </p>
+                  <span className="inline-block text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1">
+                    إجمالي الرسوم ومبيعات المذكرات
+                  </span>
                 </div>
-                <div className="p-4 bg-red-50 rounded-xl border border-red-100">
-                  <span className="text-xs font-semibold text-red-800">إجمالي المصروفات التشغيلية</span>
-                  <p className="text-2xl font-bold text-red-700 mt-1">{toMajorUnits(totalExpense).toLocaleString()} ج.م</p>
+
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">إجمالي المصروفات التشغيلية</span>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1.5 font-mono">
+                    {toMajorUnits(totalExpense).toLocaleString()} ج.م
+                  </p>
+                  <span className="inline-block text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1">
+                    أجور، إيجار، طباعة، ونثريات
+                  </span>
                 </div>
-                <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-                  <span className="text-xs font-semibold text-blue-800">صافي الأرباح</span>
-                  <p className="text-2xl font-bold text-blue-700 mt-1">{toMajorUnits(totalRevenue - totalExpense).toLocaleString()} ج.م</p>
+
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">صافي الأرباح</span>
+                  <p className={`text-xl font-bold mt-1.5 font-mono ${
+                    netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'
+                  }`}>
+                    {toMajorUnits(netProfit).toLocaleString()} ج.م
+                  </p>
+                  <span className="inline-block text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1">
+                    الفارق بعد خصم المصروفات
+                  </span>
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-4">منحنى التدفقات النقدية (الإيرادات مقابل المصروفات)</h3>
-                <div className="h-80 w-full" dir="ltr">
+              {/* Cash Flow Chart */}
+              <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span>منحنى التدفقات النقدية (الإيرادات مقابل المصروفات)</span>
+                  </h3>
+                  <div className="flex items-center gap-4 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                      <span className="text-slate-600 dark:text-slate-400 text-[11px]">الإيرادات</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
+                      <span className="text-slate-600 dark:text-slate-400 text-[11px]">المصروفات</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="h-72 w-full" dir="ltr">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={dynamicChartData.length > 0 ? dynamicChartData : [{ name: 'الشهر الحالي', revenue: totalRevenue, expenses: totalExpense }]}
-                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                      margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
                     >
-                      <defs>
-                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <Tooltip />
-                      <Area type="monotone" name="الإيرادات" dataKey="revenue" stroke="#10b981" fillOpacity={1} fill="url(#colorRevenue)" />
-                      <Area type="monotone" name="المصروفات" dataKey="expenses" stroke="#ef4444" fillOpacity={1} fill="url(#colorExpenses)" />
+                      <XAxis 
+                        dataKey="name" 
+                        stroke="#94a3b8" 
+                        fontSize={11} 
+                        tickLine={false} 
+                        axisLine={false} 
+                      />
+                      <YAxis 
+                        stroke="#94a3b8" 
+                        fontSize={11} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tickFormatter={(val) => `${val}`} 
+                      />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#0f172a', 
+                          border: '1px solid #1e293b', 
+                          borderRadius: '8px', 
+                          color: '#f8fafc',
+                          fontSize: '12px'
+                        }} 
+                      />
+                      <Area 
+                        type="monotone" 
+                        name="الإيرادات" 
+                        dataKey="revenue" 
+                        stroke="#2563eb" 
+                        strokeWidth={2}
+                        fill="#2563eb" 
+                        fillOpacity={0.08} 
+                      />
+                      <Area 
+                        type="monotone" 
+                        name="المصروفات" 
+                        dataKey="expenses" 
+                        stroke="#64748b" 
+                        strokeWidth={2}
+                        fill="#64748b" 
+                        fillOpacity={0.05} 
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -192,33 +249,55 @@ export function Reports() {
           {/* Students Tab */}
           {activeTab === 'students' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-xs font-semibold text-slate-600">إجمالي عدد الطلاب</span>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{students?.length || 0} طالب</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">إجمالي عدد الطلاب</span>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1.5 font-mono">
+                    {students?.length || 0} طالب
+                  </p>
+                  <span className="inline-block text-[11px] text-slate-500 mt-1">الطلاب المسجلين بالمنظومة</span>
                 </div>
-                <div className="p-4 bg-green-50 rounded-xl border border-green-200">
-                  <span className="text-xs font-semibold text-green-800">الطلاب النشطين</span>
-                  <p className="text-2xl font-bold text-green-700 mt-1">
+
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">الطلاب النشطين</span>
+                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1.5 font-mono">
                     {students?.filter(s => s.isActive).length || 0} طالب
                   </p>
+                  <span className="inline-block text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-1">
+                    {students?.length ? Math.round(((students.filter(s => s.isActive).length) / students.length) * 100) : 0}% من إجمالي المسجلين
+                  </span>
                 </div>
-                <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
-                  <span className="text-xs font-semibold text-amber-800">قنوات الاستقطاب (Leads)</span>
-                  <p className="text-2xl font-bold text-amber-700 mt-1">{leadSourceData.length} قنوات</p>
+
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">قنوات الاستقطاب (Leads)</span>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1.5 font-mono">
+                    {leadSourceData.length} قنوات
+                  </p>
+                  <span className="inline-block text-[11px] text-slate-500 mt-1">مصادر المعرفة بالسنتر</span>
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-4">توزيع الطلاب حسب قنوات التعرف على السنتر</h3>
+              <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span>توزيع الطلاب حسب قنوات التعرف على السنتر</span>
+                </h3>
                 <div className="h-72 w-full" dir="ltr">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={leadSourceData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="count" name="عدد الطلاب" fill="#4f46e5" radius={[6, 6, 0, 0]} />
+                    <BarChart data={leadSourceData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#0f172a', 
+                          border: '1px solid #1e293b', 
+                          borderRadius: '8px', 
+                          color: '#f8fafc',
+                          fontSize: '12px'
+                        }} 
+                      />
+                      <Bar dataKey="count" name="عدد الطلاب" fill="#2563eb" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -229,40 +308,44 @@ export function Reports() {
           {/* Courses Tab */}
           {activeTab === 'courses' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-xs font-semibold text-slate-600">الكورسات المتاحة</span>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{courses?.length || 0}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">الكورسات المتاحة</span>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1.5 font-mono">
+                    {courses?.length || 0} كورس
+                  </p>
                 </div>
-                <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                  <span className="text-xs font-semibold text-emerald-800">متوسط سعر الكورس</span>
-                  <p className="text-2xl font-bold text-emerald-700 mt-1">
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">متوسط سعر الكورس</span>
+                  <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1.5 font-mono">
                     {courses?.length 
-                      ? toMajorUnits(Math.round(courses.reduce((acc, c) => acc + c.price, 0) / courses.length)) 
+                      ? toMajorUnits(Math.round(courses.reduce((acc, c) => acc + c.price, 0) / courses.length)).toLocaleString() 
                       : 0} ج.م
                   </p>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-right">
-                  <thead className="bg-slate-50 dark:bg-slate-900 text-slate-600">
+              <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                <table className="w-full text-xs text-right">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th className="px-4 py-3 font-medium rounded-r-lg">اسم الكورس</th>
-                      <th className="px-4 py-3 font-medium">سعر الاشتراك</th>
-                      <th className="px-4 py-3 font-medium">نظام الدفع</th>
-                      <th className="px-4 py-3 font-medium rounded-l-lg">الحالة</th>
+                      <th className="px-4 py-3 font-semibold">اسم الكورس</th>
+                      <th className="px-4 py-3 font-semibold">سعر الاشتراك</th>
+                      <th className="px-4 py-3 font-semibold">نظام الدفع</th>
+                      <th className="px-4 py-3 font-semibold">الحالة</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {courses?.map(course => (
-                      <tr key={course.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900">
-                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{course.name}</td>
-                        <td className="px-4 py-3 font-bold text-emerald-600">{toMajorUnits(course.price)} ج.م</td>
-                        <td className="px-4 py-3 text-slate-600">{course.paymentType === 'monthly' ? 'شهري' : 'باقة'}</td>
+                      <tr key={course.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{course.name}</td>
+                        <td className="px-4 py-3 font-mono font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(course.price)} ج.م</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{course.paymentType === 'monthly' ? 'شهري' : 'باقة'}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
-                            course.isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-800'
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                            course.isActive 
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                           }`}>
                             {course.isActive ? 'نشط' : 'متوقف'}
                           </span>
@@ -278,44 +361,44 @@ export function Reports() {
           {/* Products Tab */}
           {activeTab === 'products' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-xs font-semibold text-slate-600">إجمالي الأصناف بالمخزن</span>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{products?.length || 0}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">إجمالي الأصناف بالمخزن</span>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1.5 font-mono">{products?.length || 0} صنف</p>
                 </div>
-                <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-                  <span className="text-xs font-semibold text-blue-800">إجمالي المذكرات المباعة</span>
-                  <p className="text-2xl font-bold text-blue-700 mt-1">
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">إجمالي المذكرات المباعة</span>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1.5 font-mono">
                     {products?.reduce((acc, p) => acc + (p.soldQty || 0), 0) || 0} نسخة
                   </p>
                 </div>
-                <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-                  <span className="text-xs font-semibold text-blue-800">قيمة المخزون الحالي</span>
-                  <p className="text-2xl font-bold text-blue-700 mt-1">
+                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">قيمة المخزون الحالي</span>
+                  <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1.5 font-mono">
                     {toMajorUnits((products?.reduce((acc, p) => acc + (p.stockQty * p.salePrice), 0) || 0)).toLocaleString()} ج.م
                   </p>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-right">
-                  <thead className="bg-slate-50 dark:bg-slate-900 text-slate-600">
+              <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                <table className="w-full text-xs text-right">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th className="px-4 py-3 font-medium rounded-r-lg">اسم الصنف</th>
-                      <th className="px-4 py-3 font-medium">الرصيد المتاح</th>
-                      <th className="px-4 py-3 font-medium">الكمية المباعة</th>
-                      <th className="px-4 py-3 font-medium">سعر البيع</th>
-                      <th className="px-4 py-3 font-medium rounded-l-lg">إجمالي المبيعات المحققة</th>
+                      <th className="px-4 py-3 font-semibold">اسم الصنف</th>
+                      <th className="px-4 py-3 font-semibold">الرصيد المتاح</th>
+                      <th className="px-4 py-3 font-semibold">الكمية المباعة</th>
+                      <th className="px-4 py-3 font-semibold">سعر البيع</th>
+                      <th className="px-4 py-3 font-semibold">إجمالي المبيعات المحققة</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {products?.map(p => (
-                      <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900">
-                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{p.name}</td>
-                        <td className="px-4 py-3 font-bold text-slate-800 dark:text-slate-200">{p.stockQty} نسخة</td>
-                        <td className="px-4 py-3 text-slate-600">{p.soldQty || 0} نسخة</td>
-                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(p.salePrice)} ج.م</td>
-                        <td className="px-4 py-3 font-bold text-emerald-600">
+                      <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{p.name}</td>
+                        <td className="px-4 py-3 font-mono font-medium text-slate-700 dark:text-slate-300">{p.stockQty} نسخة</td>
+                        <td className="px-4 py-3 font-mono text-slate-600 dark:text-slate-400">{p.soldQty || 0} نسخة</td>
+                        <td className="px-4 py-3 font-mono font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(p.salePrice)} ج.م</td>
+                        <td className="px-4 py-3 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                           {toMajorUnits(((p.soldQty || 0) * p.salePrice)).toLocaleString()} ج.م
                         </td>
                       </tr>

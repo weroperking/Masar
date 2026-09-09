@@ -1,184 +1,528 @@
-import { QrCode, Plus, Printer, CheckCircle2, User as UserIcon } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { 
+  QrCode, Plus, Printer, CheckCircle2, User as UserIcon, 
+  Search, Eye, ShieldAlert, Filter, Trash2, 
+  UserPlus, Check, Layers
+} from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
-import { useState } from 'react';
 import { useToast } from '../../context/ToastContext';
-import { v4 as uuidv4 } from 'uuid';
-import { QrCard } from '../../types';
+import { useConfirm } from '../../context/ConfirmContext';
+import { QrCard, Student } from '../../types';
+import { QrCardModal } from '../../components/Qr/QrCardModal';
+import { QrCardViewModal } from '../../components/Qr/QrCardViewModal';
+import { QrPrintSheetModal } from '../../components/Qr/QrPrintSheetModal';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
+
+type FilterTab = 'all' | 'linked' | 'available' | 'queued' | 'revoked';
 
 export function QrCards() {
+  const toast = useToast();
+  const { confirm } = useConfirm();
+
   const cards = useLiveQuery(() => db.qrCards.filter(c => !c.deleted_at).reverse().sortBy('created_at'), []);
   const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
-  
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generateCount, setGenerateCount] = useState(10);
-  const toast = useToast();
+  const settings = useLiveQuery(() => db.settings.toArray(), []);
 
-  const handleGenerateCards = async () => {
-    setIsGenerating(true);
+  // Modals state
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [selectedCardForView, setSelectedCardForView] = useState<QrCard | null>(null);
+  const [isPrintSheetOpen, setIsPrintSheetOpen] = useState(false);
+
+  // Search & Filter
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<FilterTab>('all');
+
+  const academyName = settings?.[0]?.academyName || 'سنتر مسار التعليمي';
+
+  const studentMap = useMemo(() => {
+    return new Map((students || []).map(s => [s.id, s]));
+  }, [students]);
+
+  // Handle Save from Generator Modal
+  const handleSaveCards = async (newCards: Partial<QrCard>[], shouldPrintImmediately: boolean = false) => {
     try {
-      const now = Date.now();
-      const newCards: QrCard[] = Array.from({ length: generateCount }).map(() => {
-        const id = uuidv4();
-        const shortCode = id.split('-')[0].toUpperCase();
-        return {
-          id,
-          cardNumber: `MSR-${shortCode}`,
-          qrCodeData: `https://masar.app/qr/${id}`,
-          printStatus: 'queued',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        };
-      });
+      await db.qrCards.bulkAdd(newCards as QrCard[]);
+      toast.success(`تم إنشاء وتخصيص ${newCards.length} بطاقة QR بنجاح`);
 
-      await db.qrCards.bulkAdd(newCards);
-      toast.success(`تم توليد ${generateCount} بطاقة بنجاح وإضافتها لقائمة الطباعة`);
-    } catch (error) {
-      toast.error('حدث خطأ أثناء توليد البطاقات');
+      if (shouldPrintImmediately && newCards.length > 0) {
+        if (newCards.length === 1) {
+          setSelectedCardForView(newCards[0] as QrCard);
+        } else {
+          setIsPrintSheetOpen(true);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save cards', err);
+      toast.error('حدث خطأ أثناء حفظ البطاقات');
     }
-    setIsGenerating(false);
   };
 
+  // Mark single card as printed
   const handleMarkPrinted = async (cardId: string) => {
     await db.qrCards.update(cardId, {
       printStatus: 'available',
       updated_at: Date.now(),
       sync_status: 'pending'
     });
-    toast.success('تم تحديث حالة البطاقة إلى "متاحة"');
+    toast.success('تم تحديث حالة البطاقة إلى "متاحة وجاهزة"');
   };
 
-  const getStudentName = (studentId?: string | null) => {
-    if (!studentId) return null;
-    return students?.find(s => s.id === studentId)?.name || 'طالب محذوف';
+  // Mark all queued cards as printed
+  const handleMarkAllQueuedPrinted = async () => {
+    const queuedCards = cards?.filter(c => c.printStatus === 'queued') || [];
+    if (queuedCards.length === 0) return;
+
+    const now = Date.now();
+    for (const card of queuedCards) {
+      await db.qrCards.update(card.id, {
+        printStatus: 'available',
+        updated_at: now,
+        sync_status: 'pending'
+      });
+    }
+    toast.success(`تم تحديث حالة ${queuedCards.length} بطاقة إلى مطبوعة`);
   };
 
-  // Stats
+  // Toggle card active / revoked status
+  const handleToggleStatus = async (cardId: string, newStatus: 'active' | 'revoked') => {
+    await db.qrCards.update(cardId, {
+      status: newStatus,
+      updated_at: Date.now(),
+      sync_status: 'pending'
+    });
+
+    if (selectedCardForView?.id === cardId) {
+      setSelectedCardForView(prev => prev ? { ...prev, status: newStatus } : null);
+    }
+
+    toast.success(newStatus === 'active' ? 'تم تنشيط البطاقة بنجاح' : 'تم إيقاف البطاقة');
+  };
+
+  // Link card to a student
+  const handleLinkStudent = async (cardId: string, studentId: string) => {
+    const student = studentMap.get(studentId);
+    const now = Date.now();
+    await db.qrCards.update(cardId, {
+      studentId,
+      linkedAt: now,
+      printStatus: 'available',
+      updated_at: now,
+      sync_status: 'pending'
+    });
+
+    if (selectedCardForView?.id === cardId) {
+      setSelectedCardForView(prev => prev ? { ...prev, studentId, linkedAt: now } : null);
+    }
+
+    toast.success(`تم ربط البطاقة بنجاح بالطالب (${student?.name || 'المحدد'})`);
+  };
+
+  // Delete card with confirmation dialog
+  const handleDeleteCard = async (card: QrCard) => {
+    const studentName = card.studentId ? studentMap.get(card.studentId)?.name : null;
+    const isConfirmed = await confirm({
+      title: 'حذف بطاقة QR',
+      message: `هل أنت متأكد من حذف البطاقة رقم (${card.cardNumber})؟`,
+      description: studentName 
+        ? `هذه البطاقة مرتبطة بالطالب (${studentName}). لن يتمكن من استخدامها لتسجيل الحضور بعد الحذف.` 
+        : 'سيتم أرشفة هذه البطاقة وإزالتها من النظام نهائياً.',
+      confirmText: 'نعم، احذف البطاقة',
+      cancelText: 'تراجع',
+      variant: 'danger',
+    });
+
+    if (isConfirmed) {
+      await db.qrCards.update(card.id, {
+        deleted_at: Date.now(),
+        updated_at: Date.now(),
+        sync_status: 'pending'
+      });
+      if (selectedCardForView?.id === card.id) {
+        setSelectedCardForView(null);
+      }
+      toast.success('تم حذف بطاقة QR بنجاح');
+    }
+  };
+
+  // Stats calculation
   const queued = cards?.filter(c => c.printStatus === 'queued').length || 0;
   const available = cards?.filter(c => c.printStatus === 'available' && !c.studentId).length || 0;
   const linked = cards?.filter(c => c.studentId).length || 0;
+  const revoked = cards?.filter(c => c.status === 'revoked').length || 0;
   const total = cards?.length || 0;
+
+  // Filtered Cards List
+  const filteredCards = useMemo(() => {
+    if (!cards) return [];
+    return cards.filter(card => {
+      // Tab filter
+      if (activeTab === 'linked' && !card.studentId) return false;
+      if (activeTab === 'available' && (card.studentId || card.printStatus !== 'available')) return false;
+      if (activeTab === 'queued' && card.printStatus !== 'queued') return false;
+      if (activeTab === 'revoked' && card.status !== 'revoked') return false;
+
+      // Search filter
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase();
+        const student = card.studentId ? studentMap.get(card.studentId) : null;
+        const matchesSerial = (card.cardNumber || '').toLowerCase().includes(term);
+        const matchesStudentName = (student?.name || '').toLowerCase().includes(term);
+        const matchesPhone = (student?.phone || '').includes(term);
+        if (!matchesSerial && !matchesStudentName && !matchesPhone) return false;
+      }
+
+      return true;
+    });
+  }, [cards, activeTab, searchTerm, studentMap]);
+
+  const queuedCardsList = useMemo(() => {
+    return cards?.filter(c => c.printStatus === 'queued') || [];
+  }, [cards]);
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">بطاقات QR الخاصة بالطلاب</h1>
-        <div className="flex items-center gap-3">
-          <input 
-            type="number" 
-            min="1" 
-            max="100" 
-            value={generateCount}
-            onChange={(e) => setGenerateCount(Number(e.target.value))}
-            className="w-20 px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            title="عدد البطاقات"
-          />
-          <button 
-            onClick={handleGenerateCards}
-            disabled={isGenerating}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <QrCode className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <span>بطاقات QR للطلاب</span>
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            إدارة وتخصيص كروت الهوية الذكية للحضور ومسح الباركود مع دعم التخصيص والطباعة
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          {queued > 0 && (
+            <button
+              onClick={() => setIsPrintSheetOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold transition-colors border border-slate-200 dark:border-slate-700"
+            >
+              <Printer className="w-3.5 h-3.5 text-slate-500" />
+              <span>طباعة الانتظار ({queued})</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setIsGenerateModalOpen(true)}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors"
           >
-            <Plus className="w-4 h-4 ml-2" />
-            {isGenerating ? 'جاري التوليد...' : 'توليد بطاقات جديدة'}
+            <Plus className="w-3.5 h-3.5" />
+            <span>توليد وتخصيص بطاقات</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-5">
-          <div className="flex justify-between items-start">
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">إجمالي البطاقات</p>
-            <QrCode className="w-5 h-5 text-slate-400" />
+      {/* KPI Stats Overview - Human-made clean card style */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`text-right bg-white dark:bg-slate-900 rounded-lg p-4 border transition-colors ${
+            activeTab === 'all'
+              ? 'border-blue-500 bg-blue-50/20 dark:bg-blue-950/20'
+              : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+          }`}
+        >
+          <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-medium">إجمالي البطاقات</span>
+            <QrCode className="w-4 h-4 text-slate-400" />
           </div>
-          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">{total}</p>
+          <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-2">{total}</p>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('linked')}
+          className={`text-right bg-white dark:bg-slate-900 rounded-lg p-4 border transition-colors ${
+            activeTab === 'linked'
+              ? 'border-blue-500 bg-blue-50/20 dark:bg-blue-950/20'
+              : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+          }`}
+        >
+          <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-medium">مرتبطة بطلاب</span>
+            <UserIcon className="w-4 h-4 text-blue-500" />
+          </div>
+          <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-2">{linked}</p>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('available')}
+          className={`text-right bg-white dark:bg-slate-900 rounded-lg p-4 border transition-colors ${
+            activeTab === 'available'
+              ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20'
+              : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+          }`}
+        >
+          <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-medium">متاحة للتوزيع</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          </div>
+          <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-2">{available}</p>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('queued')}
+          className={`text-right bg-white dark:bg-slate-900 rounded-lg p-4 border transition-colors ${
+            activeTab === 'queued'
+              ? 'border-amber-500 bg-amber-50/20 dark:bg-amber-950/20'
+              : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+          }`}
+        >
+          <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-medium">في انتظار الطباعة</span>
+            <Printer className="w-4 h-4 text-amber-500" />
+          </div>
+          <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-2">{queued}</p>
+        </button>
+      </div>
+
+      {/* Filter Tabs & Search Bar */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              activeTab === 'all'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            الكل ({total})
+          </button>
+          <button
+            onClick={() => setActiveTab('linked')}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              activeTab === 'linked'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            مرتبطة ({linked})
+          </button>
+          <button
+            onClick={() => setActiveTab('available')}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              activeTab === 'available'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            متاحة ({available})
+          </button>
+          <button
+            onClick={() => setActiveTab('queued')}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              activeTab === 'queued'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            قيد الطباعة ({queued})
+          </button>
+          <button
+            onClick={() => setActiveTab('revoked')}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              activeTab === 'revoked'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            موقوفة ({revoked})
+          </button>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-5">
-          <div className="flex justify-between items-start">
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">في قائمة الطباعة</p>
-            <Printer className="w-5 h-5 text-slate-400" />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">{queued}</p>
-        </div>
-        <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-xl shadow-sm border border-emerald-100 dark:border-emerald-800/30 p-5">
-          <div className="flex justify-between items-start">
-            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-400">متاحة وجاهزة للربط</p>
-            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-          </div>
-          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-2">{available}</p>
-        </div>
-        <div className="bg-blue-50 dark:bg-blue-900/10 rounded-xl shadow-sm border border-blue-100 dark:border-blue-800/30 p-5">
-          <div className="flex justify-between items-start">
-            <p className="text-sm font-medium text-blue-800 dark:text-blue-400">مرتبطة بطالب</p>
-            <UserIcon className="w-5 h-5 text-blue-500" />
-          </div>
-          <p className="text-2xl font-bold text-blue-700 dark:text-blue-400 mt-2">{linked}</p>
+
+        <div className="relative sm:w-72">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="بحث برقم البطاقة، اسم الطالب، أو الهاتف..."
+            className="w-full pl-3 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-        {cards?.length === 0 ? (
+      {/* Cards Table */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+        {filteredCards.length === 0 ? (
           <div className="p-12 text-center flex flex-col items-center">
-            <QrCode className="w-12 h-12 text-slate-300 mb-4" />
-            <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-300">لا يوجد بطاقات مسجلة</h2>
-            <p className="text-slate-500 mt-2">قم بتوليد بطاقات جديدة للبدء في استخدام نظام الحضور بالـ QR</p>
+            <QrCode className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300">
+              {searchTerm ? 'لا توجد بطاقات مطابقة لنتائج البحث' : 'لا توجد بطاقات في هذا التبويب'}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+              اضغط على زر "توليد وتخصيص بطاقات" لإنشاء كرنيه مخصص لطالب أو دفعة بطاقات جديدة.
+            </p>
+            <button
+              onClick={() => setIsGenerateModalOpen(true)}
+              className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors"
+            >
+              توليد بطاقة الآن
+            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400">
+            <table className="w-full text-xs text-right">
+              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="px-6 py-4 font-medium">رقم البطاقة التسلسلي</th>
-                  <th className="px-6 py-4 font-medium">الطالب المرتبط</th>
-                  <th className="px-6 py-4 font-medium">حالة البطاقة</th>
-                  <th className="px-6 py-4 font-medium">حالة الطباعة</th>
-                  <th className="px-6 py-4 font-medium">إجراءات</th>
+                  <th className="px-4 py-3 font-semibold">كود البطاقة والسمة</th>
+                  <th className="px-4 py-3 font-semibold">الطالب المرتبط</th>
+                  <th className="px-4 py-3 font-semibold">حالة الكود</th>
+                  <th className="px-4 py-3 font-semibold">حالة الطباعة</th>
+                  <th className="px-4 py-3 font-semibold">تاريخ الإنشاء</th>
+                  <th className="px-4 py-3 font-semibold text-left">إجراءات ومعاينة</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {cards?.map((card) => {
-                  const studentName = getStudentName(card.studentId);
-                  
+                {filteredCards.map((card) => {
+                  const student = card.studentId ? studentMap.get(card.studentId) : null;
+                  const isRevoked = card.status === 'revoked';
+
                   return (
-                    <tr key={card.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="px-6 py-4 font-mono font-bold text-slate-700 dark:text-slate-300">
-                        {card.cardNumber}
+                    <tr 
+                      key={card.id} 
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      {/* Card Number & Theme badge */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSelectedCardForView(card)}
+                            className="font-mono font-bold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors"
+                            title="اضغط لعرض ومعاينة الكرنيه"
+                          >
+                            <QrCode className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{card.cardNumber}</span>
+                          </button>
+                          {card.themeColor && (
+                            <span 
+                              className={`w-2 h-2 rounded-full ${
+                                card.themeColor === 'emerald' ? 'bg-emerald-500' :
+                                card.themeColor === 'indigo' ? 'bg-indigo-500' :
+                                card.themeColor === 'amber' ? 'bg-amber-500' :
+                                card.themeColor === 'rose' ? 'bg-rose-500' :
+                                card.themeColor === 'slate' ? 'bg-slate-700' :
+                                'bg-blue-500'
+                              }`}
+                              title={`سمة الكرنيه: ${card.themeColor}`}
+                            />
+                          )}
+                        </div>
                       </td>
-                      <td className="px-6 py-4">
-                        {studentName ? (
+
+                      {/* Associated Student */}
+                      <td className="px-4 py-3">
+                        {student ? (
                           <div className="flex items-center gap-2">
-                            <UserIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                            <span className="font-semibold text-slate-900 dark:text-slate-100">{studentName}</span>
+                            <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold text-[10px]">
+                              {student.name[0]}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-900 dark:text-slate-100 block">
+                                {student.name}
+                              </span>
+                              <span className="text-[11px] text-slate-400 font-mono">
+                                {student.phone}
+                              </span>
+                            </div>
                           </div>
                         ) : (
-                          <span className="text-slate-400 dark:text-slate-500">غير مرتبط</span>
+                          <button
+                            onClick={() => setSelectedCardForView(card)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                          >
+                            <UserPlus className="w-3 h-3" />
+                            <span>غير مرتبط (ربط بطالب)</span>
+                          </button>
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex px-2 py-1 rounded text-xs font-semibold ${card.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
-                          {card.status === 'active' ? 'نشطة' : 'موقوفة'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex px-2 py-1 rounded text-xs font-semibold ${
-                          card.printStatus === 'queued' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
-                          card.printStatus === 'available' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-                          'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400'
+
+                      {/* Card Status */}
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                          !isRevoked 
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                            : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
                         }`}>
-                          {card.printStatus === 'queued' ? 'قيد الطباعة' : card.printStatus === 'available' ? 'متاحة للربط' : 'تم الربط'}
+                          {!isRevoked ? (
+                            <>
+                              <CheckCircle2 className="w-3 h-3" />
+                              نشطة
+                            </>
+                          ) : (
+                            <>
+                              <ShieldAlert className="w-3 h-3" />
+                              موقوفة
+                            </>
+                          )}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+
+                      {/* Print Status */}
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                          card.printStatus === 'queued'
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                            : card.printStatus === 'available'
+                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                        }`}>
+                          {card.printStatus === 'queued' ? (
+                            <>
+                              <Printer className="w-3 h-3" />
+                              قيد الطباعة
+                            </>
+                          ) : card.printStatus === 'available' ? (
+                            <>
+                              <Check className="w-3 h-3" />
+                              جاهزة ومتاحة
+                            </>
+                          ) : (
+                            'تم التسليم'
+                          )}
+                        </span>
+                      </td>
+
+                      {/* Date */}
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
+                        {card.created_at ? format(new Date(card.created_at), 'yyyy-MM-dd') : '-'}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3 text-left">
+                        <div className="flex items-center justify-end gap-1">
+                          {/* View Badge Modal Trigger */}
+                          <button
+                            onClick={() => setSelectedCardForView(card)}
+                            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="معاينة وطباعة الكرنيه"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Quick Mark Printed */}
                           {card.printStatus === 'queued' && (
                             <button
                               onClick={() => handleMarkPrinted(card.id)}
-                              className="text-xs font-semibold px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                              className="px-2 py-0.5 text-[10px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-700 transition-colors"
+                              title="تعليم كمطبوعة"
                             >
-                              تعليم كمطبوعة
+                              تم الطباعة
                             </button>
                           )}
+
+                          {/* Delete Card */}
+                          <button
+                            onClick={() => handleDeleteCard(card)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-red-500/10 transition-colors"
+                            title="حذف البطاقة"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -189,6 +533,38 @@ export function QrCards() {
           </div>
         )}
       </div>
+
+      {/* Pop-up Modal 1: Generate & Customize QR Cards */}
+      <QrCardModal
+        isOpen={isGenerateModalOpen}
+        onClose={() => setIsGenerateModalOpen(false)}
+        students={students || []}
+        existingCards={cards || []}
+        defaultCenterName={academyName}
+        onSaveCards={handleSaveCards}
+      />
+
+      {/* Pop-up Modal 2: View Single Card Badge & Print */}
+      <QrCardViewModal
+        isOpen={!!selectedCardForView}
+        onClose={() => setSelectedCardForView(null)}
+        card={selectedCardForView}
+        student={selectedCardForView?.studentId ? studentMap.get(selectedCardForView.studentId) : null}
+        allStudents={students || []}
+        onLinkStudent={handleLinkStudent}
+        onToggleStatus={handleToggleStatus}
+        onMarkPrinted={handleMarkPrinted}
+      />
+
+      {/* Pop-up Modal 3: Batch Print Sheet Modal */}
+      <QrPrintSheetModal
+        isOpen={isPrintSheetOpen}
+        onClose={() => setIsPrintSheetOpen(false)}
+        cards={queuedCardsList.length > 0 ? queuedCardsList : (cards || []).slice(0, 16)}
+        students={students || []}
+        title={queuedCardsList.length > 0 ? `طباعة كروت الانتظار (${queuedCardsList.length})` : 'طباعة مجموعة كروت QR'}
+        onConfirmPrinted={handleMarkAllQueuedPrinted}
+      />
     </div>
   );
 }

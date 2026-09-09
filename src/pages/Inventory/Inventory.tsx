@@ -5,6 +5,7 @@ import { Package, Plus, ShoppingCart, Trash2, Edit2, X, AlertTriangle, BookOpen,
 import { v4 as uuidv4 } from 'uuid';
 import { Product, ProductSale } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 
 export function Inventory() {
@@ -16,6 +17,7 @@ export function Inventory() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'book' | 'other'>('all');
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const toast = useToast();
+  const { confirm } = useConfirm();
 
   const products = useLiveQuery(() => db.products.filter(p => !p.deleted_at).toArray(), []);
   const sales = useLiveQuery(() => db.productSales.filter(s => !s.deleted_at).reverse().sortBy('saleDate'), []);
@@ -40,7 +42,16 @@ export function Inventory() {
   }, 0) || 0;
 
   const handleDeleteProduct = async (id: string, name?: string) => {
-    if (confirm(`هل أنت متأكد من حذف المنتج ${name ? `(${name})` : ''}؟ سيتم نقله لسلة المهملات.`)) {
+    const isConfirmed = await confirm({
+      title: 'حذف المنتج من المخزون',
+      message: `هل أنت متأكد من حذف المنتج ${name ? `(${name})` : ''}؟`,
+      description: 'سيتم نقل المنتج إلى سلة المهملات وإلغاء ظهوره في المخزون النشط.',
+      confirmText: 'نعم، احذف المنتج',
+      cancelText: 'إلغاء',
+      variant: 'danger',
+    });
+
+    if (isConfirmed) {
       try {
         const now = Date.now();
         await db.products.update(id, {
@@ -59,79 +70,79 @@ export function Inventory() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">المخزون والمبيعات</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">إدارة المذكرات المطبوعة، الكتب، وتتبع عمليات البيع والأرباح</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">المخزون والمبيعات</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">إدارة المذكرات المطبوعة، الكتب، وتتبع عمليات البيع والأرباح</p>
         </div>
-        <div className="flex gap-2.5">
+        <div className="flex items-center gap-2">
           <button 
             onClick={() => setIsAddProductOpen(true)}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm"
+            className="flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs font-semibold shadow-xs"
           >
-            <Plus className="w-4 h-4 ml-1.5" />
+            <Plus className="w-3.5 h-3.5 ml-1.5" />
             إضافة منتج/مذكرة
           </button>
           <button 
             onClick={() => setIsSellProductOpen(true)}
-            className="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-semibold shadow-sm"
+            className="flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors text-xs font-semibold shadow-xs"
           >
-            <ShoppingCart className="w-4 h-4 ml-1.5" />
+            <ShoppingCart className="w-3.5 h-3.5 ml-1.5" />
             بيع منتج
           </button>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-        <div className="flex border-b border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 px-2 bg-slate-50/50 dark:bg-slate-900">
           <button 
             onClick={() => setActiveTab('products')} 
-            className={`px-6 py-3.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'products' ? 'border-blue-600 text-blue-600 font-bold' : 'border-transparent text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:text-slate-300'
+            className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+              activeTab === 'products' ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
             المنتجات والمذكرات ({products?.length || 0})
           </button>
           <button 
             onClick={() => setActiveTab('sales')} 
-            className={`px-6 py-3.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'sales' ? 'border-blue-600 text-blue-600 font-bold' : 'border-transparent text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:text-slate-300'
+            className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+              activeTab === 'sales' ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
             سجل المبيعات ({sales?.length || 0})
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-5">
           {/* Products Tab */}
           {activeTab === 'products' && (
             <div className="space-y-4">
               {/* Search and Filters Bar */}
-              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between pb-2">
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between pb-1">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="البحث باسم الصنف أو المذكرة..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pr-9 pl-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pr-8 pl-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-md text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   <select
                     value={typeFilter}
                     onChange={e => setTypeFilter(e.target.value as any)}
-                    className="px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 dark:text-slate-300"
+                    className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="all">جميع الأصناف</option>
                     <option value="book">مذكرات وكتب تعليمية</option>
                     <option value="other">أدوات ومنتجات أخرى</option>
                   </select>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                  <label className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={lowStockOnly}
                       onChange={e => setLowStockOnly(e.target.checked)}
-                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 dark:border-slate-700"
+                      className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-700 text-amber-600 focus:ring-amber-500"
                     />
                     <span>نقص المخزون (&lt; 5)</span>
                   </label>
@@ -139,82 +150,82 @@ export function Inventory() {
               </div>
 
               {filteredProducts?.length === 0 ? (
-                <div className="text-center py-16 flex flex-col items-center">
-                  <Package className="w-12 h-12 text-slate-300 mb-4" />
-                  <h2 className="text-lg font-bold text-slate-700 dark:text-slate-300">
+                <div className="text-center py-12 flex flex-col items-center">
+                  <Package className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+                  <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300">
                     {searchTerm || typeFilter !== 'all' || lowStockOnly ? 'لا توجد نتائج مطابقة للبحث أو الفلتر' : 'لا توجد منتجات أو مذكرات في المخزون'}
                   </h2>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+                  <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
                     {searchTerm || typeFilter !== 'all' || lowStockOnly ? 'جرّب تعديل خيارات البحث والفلترة' : 'اضغط على "إضافة منتج/مذكرة" لإدخال أول صنف للمخزن.'}
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredProducts?.map(prod => {
                     const profitPerUnit = toMajorUnits(prod.salePrice) - toMajorUnits(prod.costPrice);
                     const isLowStock = prod.stockQty < 5;
 
                     return (
-                      <div key={prod.id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:border-blue-400 transition-colors flex flex-col justify-between bg-white dark:bg-slate-900">
+                      <div key={prod.id} className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 hover:border-slate-300 dark:hover:border-slate-700 transition-colors flex flex-col justify-between bg-white dark:bg-slate-900">
                         <div>
                           <div className="flex justify-between items-start mb-2">
-                            <span className="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                               {prod.type === 'book' ? 'مذكرة / كتاب' : 'أخرى'}
                             </span>
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => setEditingProduct(prod)}
-                                className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded transition-colors"
                                 title="تعديل الصنف"
                               >
-                                <Edit2 className="w-4 h-4" />
+                                <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                                className="text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 p-1 rounded transition-colors"
                                 title="حذف الصنف (حذف ناعم)"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
 
-                          <div className="flex items-start gap-2.5 mt-2">
-                            <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base leading-snug">{prod.name}</h3>
+                          <div className="flex items-start gap-2 mt-1">
+                            <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug">{prod.name}</h3>
                           </div>
 
-                          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
+                          <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
                             <div className="flex justify-between">
-                              <span>سعر البيع:</span>
-                              <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{toMajorUnits(prod.salePrice)} ج.م</span>
+                              <span className="text-slate-500 dark:text-slate-400">سعر البيع:</span>
+                              <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(prod.salePrice)} ج.م</span>
                             </div>
                             <div className="flex justify-between">
-                              <span>تكلفة الشراء/الطباعة:</span>
-                              <span>{toMajorUnits(prod.costPrice)} ج.م</span>
+                              <span className="text-slate-500 dark:text-slate-400">تكلفة الشراء/الطباعة:</span>
+                              <span className="font-mono">{toMajorUnits(prod.costPrice)} ج.م</span>
                             </div>
-                            <div className="flex justify-between text-emerald-600 font-medium">
+                            <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-medium">
                               <span>هامش الربح للنسخة:</span>
-                              <span>+{profitPerUnit} ج.م</span>
+                              <span className="font-mono font-semibold">+{profitPerUnit} ج.م</span>
                             </div>
                             <div className="flex justify-between items-center pt-1">
-                              <span>الرصيد المتاح بالمخزن:</span>
-                              <span className={`font-bold text-sm flex items-center ${isLowStock ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100'}`}>
-                                {isLowStock && <AlertTriangle className="w-3.5 h-3.5 ml-1 text-amber-500" />}
+                              <span className="text-slate-500 dark:text-slate-400">الرصيد المتاح:</span>
+                              <span className={`font-mono font-bold text-xs flex items-center ${isLowStock ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100'}`}>
+                                {isLowStock && <AlertTriangle className="w-3 h-3 ml-1 text-amber-500" />}
                                 {prod.stockQty} نسخة
                               </span>
                             </div>
                             <div className="flex justify-between text-slate-400 dark:text-slate-500 text-[11px]">
                               <span>إجمالي المبيعات السابقة:</span>
-                              <span>{prod.soldQty || 0} نسخة</span>
+                              <span className="font-mono">{prod.soldQty || 0} نسخة</span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                           <button
                             onClick={() => setIsSellProductOpen(true)}
-                            className="w-full py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 rounded-lg text-xs font-bold transition-colors"
+                            className="w-full py-1.5 bg-slate-50 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-semibold transition-colors text-center"
                           >
                             بيع نسخة الآن
                           </button>
@@ -229,59 +240,61 @@ export function Inventory() {
 
           {/* Sales Tab */}
           {activeTab === 'sales' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col justify-center items-center">
-                  <span className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">إجمالي الإيرادات</span>
-                  <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(totalSalesRevenue)} ج.م</span>
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg p-3.5 flex flex-col justify-center">
+                  <span className="text-slate-500 dark:text-slate-400 text-xs font-medium">إجمالي الإيرادات</span>
+                  <span className="text-lg font-bold font-mono text-slate-900 dark:text-slate-100 mt-1">{toMajorUnits(totalSalesRevenue)} ج.م</span>
                 </div>
-                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex flex-col justify-center items-center">
-                  <span className="text-emerald-600 dark:text-emerald-400 text-sm font-medium mb-1">صافي الأرباح</span>
-                  <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{toMajorUnits(totalProfit)} ج.م</span>
+                <div className="bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg p-3.5 flex flex-col justify-center">
+                  <span className="text-slate-500 dark:text-slate-400 text-xs font-medium">صافي الأرباح</span>
+                  <span className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">{toMajorUnits(totalProfit)} ج.م</span>
                 </div>
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex flex-col justify-center items-center">
-                  <span className="text-blue-600 dark:text-blue-400 text-sm font-medium mb-1">الكمية المباعة</span>
-                  <span className="text-2xl font-bold text-blue-700 dark:text-blue-300">{totalQuantitySold} وحدة</span>
+                <div className="bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-lg p-3.5 flex flex-col justify-center">
+                  <span className="text-slate-500 dark:text-slate-400 text-xs font-medium">الكمية المباعة</span>
+                  <span className="text-lg font-bold font-mono text-blue-600 dark:text-blue-400 mt-1">{totalQuantitySold} وحدة</span>
                 </div>
               </div>
 
               {sales?.length === 0 ? (
-                <div className="text-center py-16 flex flex-col items-center">
-                  <ShoppingCart className="w-12 h-12 text-slate-300 mb-4" />
-                  <h2 className="text-lg font-bold text-slate-700 dark:text-slate-300">لا توجد عمليات بيع مسجلة بعد</h2>
-                  <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 text-sm mt-1">اضغط على زر "بيع منتج" لتسجيل أول عملية بيع.</p>
+                <div className="text-center py-12 flex flex-col items-center">
+                  <ShoppingCart className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+                  <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300">لا توجد عمليات بيع مسجلة بعد</h2>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">اضغط على زر "بيع منتج" لتسجيل أول عملية بيع.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-right">
-                    <thead className="bg-slate-50 dark:bg-slate-900 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
-                      <tr>
-                        <th className="px-4 py-3 font-medium rounded-r-lg">المنتج</th>
-                        <th className="px-4 py-3 font-medium">العميل / الطالب</th>
-                        <th className="px-4 py-3 font-medium">الكمية</th>
-                        <th className="px-4 py-3 font-medium">الإجمالي</th>
-                        <th className="px-4 py-3 font-medium">طريقة الدفع</th>
-                        <th className="px-4 py-3 font-medium">التاريخ</th>
-                        <th className="px-4 py-3 font-medium rounded-l-lg">رقم الإيصال</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {sales?.map(sale => {
-                        const product = productMap.get(sale.productId);
-                        return (
-                          <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900 dark:bg-slate-800/60 transition-colors">
-                            <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{product?.name || 'منتج غير معروف'}</td>
-                            <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{sale.customerName || 'عميل نقدي'}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{sale.quantity}</td>
-                            <td className="px-4 py-3 font-bold text-emerald-600 text-base">{toMajorUnits(sale.total)} ج.م</td>
-                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400 dark:text-slate-500 text-xs">{sale.paymentMethod}</td>
-                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400 dark:text-slate-500 text-xs">{sale.saleDate}</td>
-                            <td className="px-4 py-3 font-mono text-xs text-blue-600">{sale.receiptNumber}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-right">
+                      <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                        <tr>
+                          <th className="px-4 py-2.5 font-semibold">المنتج</th>
+                          <th className="px-4 py-2.5 font-semibold">العميل / الطالب</th>
+                          <th className="px-4 py-2.5 font-semibold text-center">الكمية</th>
+                          <th className="px-4 py-2.5 font-semibold text-center">الإجمالي</th>
+                          <th className="px-4 py-2.5 font-semibold text-center">طريقة الدفع</th>
+                          <th className="px-4 py-2.5 font-semibold text-center">التاريخ</th>
+                          <th className="px-4 py-2.5 font-semibold text-center">رقم الإيصال</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {sales?.map(sale => {
+                          const product = productMap.get(sale.productId);
+                          return (
+                            <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                              <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{product?.name || 'منتج غير معروف'}</td>
+                              <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{sale.customerName || 'عميل نقدي'}</td>
+                              <td className="px-4 py-3 text-center font-mono font-bold text-slate-900 dark:text-slate-100">{sale.quantity}</td>
+                              <td className="px-4 py-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">{toMajorUnits(sale.total)} ج.م</td>
+                              <td className="px-4 py-3 text-center text-slate-500 dark:text-slate-400 text-[11px]">{sale.paymentMethod}</td>
+                              <td className="px-4 py-3 text-center text-slate-500 font-mono text-[11px]">{sale.saleDate}</td>
+                              <td className="px-4 py-3 text-center font-mono text-[11px] text-blue-600 dark:text-blue-400">{sale.receiptNumber}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -367,34 +380,34 @@ function ProductModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
             {isEdit ? 'تعديل بيانات الصنف / المذكرة' : 'إضافة صنف للمخزون'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">اسم الصنف / المذكرة *</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الصنف / المذكرة *</label>
             <input 
               required
               type="text"
               placeholder="مثال: مذكرة مراجعة الكيمياء للصف الثالث"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">النوع</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">النوع</label>
             <select
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 dark:text-slate-300"
+              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={formData.type}
               onChange={e => setFormData({ ...formData, type: e.target.value as any })}
             >
@@ -403,26 +416,26 @@ function ProductModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">سعر البيع (ج.م) *</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">سعر البيع (ج.م) *</label>
               <input 
                 required
                 type="number"
                 min="0"
                 placeholder="0"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 value={formData.salePrice}
                 onChange={e => setFormData({ ...formData, salePrice: e.target.value })}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">سعر التكلفة (ج.م)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">سعر التكلفة (ج.م)</label>
               <input 
                 type="number"
                 min="0"
                 placeholder="0"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 value={formData.costPrice}
                 onChange={e => setFormData({ ...formData, costPrice: e.target.value })}
               />
@@ -430,22 +443,29 @@ function ProductModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">الرصيد المتاح حالياً (الكمية) *</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">الرصيد المتاح حالياً (الكمية) *</label>
             <input 
               required
               type="number"
               min="0"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={formData.stockQty}
               onChange={e => setFormData({ ...formData, stockQty: e.target.value })}
             />
           </div>
 
-          <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-sm">
+          <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+            >
               إلغاء
             </button>
-            <button type="submit" className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">
+            <button 
+              type="submit" 
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold transition-colors shadow-xs"
+            >
               {isEdit ? 'حفظ التعديلات' : 'إضافة للمخزن'}
             </button>
           </div>
@@ -542,20 +562,20 @@ function SellProductModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">تسجيل عملية بيع منتج</h2>
-          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300">
-            <X className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">تسجيل عملية بيع منتج</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">اختر الصنف *</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اختر الصنف *</label>
             <select
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               value={selectedProductId}
               onChange={e => setSelectedProductId(e.target.value)}
             >
@@ -567,23 +587,23 @@ function SellProductModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">الكمية *</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">الكمية *</label>
               <input 
                 required
                 type="number"
                 min="1"
                 max={selectedProduct?.stockQty || 999}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 value={quantity}
                 onChange={e => setQuantity(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">طريقة الدفع</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">طريقة الدفع</label>
               <select
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 value={paymentMethod}
                 onChange={e => setPaymentMethod(e.target.value)}
               >
@@ -595,25 +615,25 @@ function SellProductModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">العميل</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">العميل</label>
             <div className="flex gap-4 mb-2">
-              <label className="flex items-center text-xs text-slate-700 dark:text-slate-300">
+              <label className="flex items-center text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                 <input 
                   type="radio" 
                   name="custType" 
                   checked={customerType === 'student'} 
                   onChange={() => setCustomerType('student')}
-                  className="ml-1.5 text-emerald-600"
+                  className="ml-1.5 text-emerald-600 focus:ring-emerald-500"
                 />
                 طالب مسجل
               </label>
-              <label className="flex items-center text-xs text-slate-700 dark:text-slate-300">
+              <label className="flex items-center text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                 <input 
                   type="radio" 
                   name="custType" 
                   checked={customerType === 'external'} 
                   onChange={() => setCustomerType('external')}
-                  className="ml-1.5 text-emerald-600"
+                  className="ml-1.5 text-emerald-600 focus:ring-emerald-500"
                 />
                 عميل خارجي / نقدي
               </label>
@@ -621,7 +641,7 @@ function SellProductModal({
 
             {customerType === 'student' ? (
               <select
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 value={studentId}
                 onChange={e => setStudentId(e.target.value)}
               >
@@ -633,7 +653,7 @@ function SellProductModal({
               <input 
                 type="text"
                 placeholder="اسم العميل أو اتركه فارغاً"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
               />
@@ -641,16 +661,23 @@ function SellProductModal({
           </div>
 
           {/* Price preview */}
-          <div className="p-3 bg-emerald-50 rounded-xl flex items-center justify-between border border-emerald-100">
-            <span className="text-sm text-emerald-800 font-medium">المبلغ المطلوب تحصيله:</span>
-            <span className="text-xl font-bold text-emerald-700">{toMajorUnits(totalAmount)} ج.م</span>
+          <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-md flex items-center justify-between border border-slate-200 dark:border-slate-700">
+            <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">المبلغ المطلوب تحصيله:</span>
+            <span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400">{toMajorUnits(totalAmount)} ج.م</span>
           </div>
 
-          <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 text-sm">
+          <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+            >
               إلغاء
             </button>
-            <button type="submit" className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-semibold">
+            <button 
+              type="submit" 
+              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold transition-colors shadow-xs"
+            >
               تأكيد البيع والتحصيل
             </button>
           </div>

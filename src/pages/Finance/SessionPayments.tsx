@@ -5,8 +5,12 @@ import { Wallet, Search, Plus, X, Trash2, CheckCircle2, Edit2 } from 'lucide-rea
 import { v4 as uuidv4 } from 'uuid';
 import { SessionPayment } from '../../types';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export function SessionPayments() {
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'all' | 'fee' | 'package'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<SessionPayment | null>(null);
@@ -59,12 +63,22 @@ export function SessionPayments() {
   );
 
   const handleDelete = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذه الدفعة؟')) {
+    const isConfirmed = await confirm({
+      title: 'حذف دفعة الحصة',
+      message: 'هل أنت متأكد من حذف سجل هذه الدفعة؟',
+      description: 'سيتم أرشفة سجل الدفعة المالية وإعادة حساب إجمالي التحصيلات.',
+      confirmText: 'نعم، احذف الدفعة',
+      cancelText: 'إلغاء',
+      variant: 'danger',
+    });
+
+    if (isConfirmed) {
       await db.sessionPayments.update(id, {
         deleted_at: Date.now(),
         updated_at: Date.now(),
         sync_status: 'pending'
       });
+      toast.success('تم حذف الدفعة بنجاح');
     }
   };
 
@@ -98,119 +112,117 @@ export function SessionPayments() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">مدفوعات الحصص والباقات</h1>
-          <p className="text-sm text-slate-500 mt-0.5">متابعة رسوم الحصص الفردية، الباقات، وسداد الطلاب</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">مدفوعات الحصص والباقات</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">متابعة رسوم الحصص الفردية، الباقات، وسداد الطلاب</p>
         </div>
         <button 
           onClick={() => {
             setEditingPayment(null);
             setIsModalOpen(true);
           }}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm"
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-bold shadow-xs"
         >
-          <Plus className="w-4 h-4 ml-2" />
+          <Plus className="w-3.5 h-3.5 ml-1.5" />
           تحصيل جديد
         </button>
       </div>
 
       {/* Summary Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6">
-          <p className="text-sm font-medium text-slate-500 mb-1">الإيراد المكتسب (الحصص والباقات المقررة)</p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(totalEarned).toLocaleString()}</span>
-            <span className="text-slate-500 font-medium">ج.م</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">الإيراد المكتسب (الحصص والباقات المقررة)</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(totalEarned).toLocaleString()}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">ج.م</span>
           </div>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6">
-          <p className="text-sm font-medium text-slate-500 mb-1">النقد المحصّل فعلياً في الخزينة</p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-blue-600">{toMajorUnits(totalCollected).toLocaleString()}</span>
-            <span className="text-slate-500 font-medium">ج.م</span>
+        <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">النقد المحصّل فعلياً في الخزينة</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{toMajorUnits(totalCollected).toLocaleString()}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">ج.م</span>
           </div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-        <div className="flex border-b border-slate-200 dark:border-slate-700">
-          <button onClick={() => setActiveTab('all')} className={`px-6 py-3.5 text-sm font-medium border-b-2 ${activeTab === 'all' ? 'border-blue-600 text-blue-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 px-4">
+          <button onClick={() => setActiveTab('all')} className={`px-4 py-3 text-xs font-semibold border-b-2 transition-colors ${activeTab === 'all' ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
             الكل ({payments?.length || 0})
           </button>
-          <button onClick={() => setActiveTab('fee')} className={`px-6 py-3.5 text-sm font-medium border-b-2 ${activeTab === 'fee' ? 'border-blue-600 text-blue-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+          <button onClick={() => setActiveTab('fee')} className={`px-4 py-3 text-xs font-semibold border-b-2 transition-colors ${activeTab === 'fee' ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
             رسوم حصة
           </button>
-          <button onClick={() => setActiveTab('package')} className={`px-6 py-3.5 text-sm font-medium border-b-2 ${activeTab === 'package' ? 'border-blue-600 text-blue-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+          <button onClick={() => setActiveTab('package')} className={`px-4 py-3 text-xs font-semibold border-b-2 transition-colors ${activeTab === 'package' ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
             باقات شهرية
           </button>
         </div>
 
-        <div className="p-6">
-          <div className="relative max-w-md mb-6">
+        <div className="p-5">
+          <div className="relative max-w-sm mb-4">
             <input
               type="text"
               placeholder="بحث باسم الطالب أو الكورس..."
-              className="w-full pl-4 pr-10 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full pl-3 pr-9 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs placeholder-slate-400 dark:placeholder-slate-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <Search className="absolute right-3 top-2.5 text-slate-400 w-4 h-4" />
+            <Search className="absolute right-2.5 top-2 text-slate-400 dark:text-slate-500 w-4 h-4" />
           </div>
 
           {filteredPayments?.length === 0 ? (
-            <div className="text-center py-16">
-              <Wallet className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500 text-sm">لا توجد حركات مالية للحصص في هذا القسم</p>
+            <div className="text-center py-12">
+              <Wallet className="w-8 h-8 text-slate-400 opacity-40 mx-auto mb-2" />
+              <p className="text-slate-500 text-xs">لا توجد حركات مالية للحصص في هذا القسم</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-right">
-                <thead className="bg-slate-50 dark:bg-slate-900 text-slate-600">
+              <table className="w-full text-xs text-right">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
                   <tr>
-                    <th className="px-4 py-3 font-medium rounded-r-lg">الطالب</th>
-                    <th className="px-4 py-3 font-medium">الكورس</th>
-                    <th className="px-4 py-3 font-medium">النوع</th>
-                    <th className="px-4 py-3 font-medium">التاريخ</th>
-                    <th className="px-4 py-3 font-medium">المطلوب</th>
-                    <th className="px-4 py-3 font-medium">المدفوع</th>
-                    <th className="px-4 py-3 font-medium">الحالة</th>
-                    <th className="px-4 py-3 font-medium rounded-l-lg">الإجراءات</th>
+                    <th className="px-4 py-2.5 font-semibold">الطالب</th>
+                    <th className="px-4 py-2.5 font-semibold">الكورس</th>
+                    <th className="px-4 py-2.5 font-semibold">النوع</th>
+                    <th className="px-4 py-2.5 font-semibold">التاريخ</th>
+                    <th className="px-4 py-2.5 font-semibold">المطلوب</th>
+                    <th className="px-4 py-2.5 font-semibold">المدفوع</th>
+                    <th className="px-4 py-2.5 font-semibold">الحالة</th>
+                    <th className="px-4 py-2.5 font-semibold">الإجراءات</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredPayments?.map(p => {
                     const remaining = p.amount - p.paidAmount;
                     return (
-                      <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900 transition-colors">
-                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{p.studentName}</td>
-                        <td className="px-4 py-3 text-slate-600">{p.courseName}</td>
+                      <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{p.studentName}</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{p.courseName}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
-                            p.type === 'fee' ? 'bg-blue-100 text-blue-800' : 'bg-blue-100 text-blue-800'
-                          }`}>
+                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                             {p.type === 'fee' ? 'رسوم حصة' : 'باقة'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-slate-500 text-xs">{p.date}</td>
-                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">{toMajorUnits(p.amount)} ج.م</td>
-                        <td className="px-4 py-3 font-bold text-blue-700">{toMajorUnits(p.paidAmount)} ج.م</td>
+                        <td className="px-4 py-3 text-slate-500 font-mono text-[11px]">{p.date}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 font-mono">{toMajorUnits(p.amount)} ج.م</td>
+                        <td className="px-4 py-3 font-semibold text-blue-600 dark:text-blue-400 font-mono">{toMajorUnits(p.paidAmount)} ج.م</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                            p.status === 'paid' ? 'bg-green-100 text-green-800' : 
-                            p.status === 'partial' ? 'bg-amber-100 text-amber-800' : 
-                            'bg-red-100 text-red-800'
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                            p.status === 'paid' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 
+                            p.status === 'partial' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' : 
+                            'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
                           }`}>
                             {p.status === 'paid' ? 'مدفوع بالكامل' : p.status === 'partial' ? `متبقي ${toMajorUnits(remaining)} ج.م` : 'غير مدفوع'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             {remaining > 0 && (
                               <button
                                 onClick={() => handleSettle(p)}
-                                className="inline-flex items-center px-2 py-1 bg-green-50 text-green-700 hover:bg-green-100 rounded text-xs font-semibold transition-colors"
+                                className="inline-flex items-center px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 rounded text-[10px] font-semibold transition-colors"
                                 title="تسديد المتبقي"
                               >
-                                <CheckCircle2 className="w-3.5 h-3.5 ml-1" />
+                                <CheckCircle2 className="w-3 h-3 ml-1" />
                                 تسديد
                               </button>
                             )}
@@ -219,17 +231,17 @@ export function SessionPayments() {
                                 setEditingPayment(p);
                                 setIsModalOpen(true);
                               }}
-                              className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors"
+                              className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded transition-colors"
                               title="تعديل"
                             >
-                              <Edit2 className="w-4 h-4" />
+                              <Edit2 className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDelete(p.id)}
-                              className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors"
+                              className="p-1 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
                               title="حذف"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
@@ -342,23 +354,23 @@ function CreateSessionPaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
             {initialData ? 'تعديل بيانات الدفعة' : 'تحصيل رسوم حصة أو باقة'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">الطالب *</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">الطالب *</label>
             <select
               required
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={formData.studentId}
               onChange={e => setFormData({ ...formData, studentId: e.target.value })}
             >
@@ -369,10 +381,10 @@ function CreateSessionPaymentModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">الكورس *</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">الكورس *</label>
             <select
               required
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={formData.courseId}
               onChange={e => setFormData({ ...formData, courseId: e.target.value })}
             >
@@ -382,11 +394,11 @@ function CreateSessionPaymentModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">نوع التحصيل</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">نوع التحصيل</label>
               <select
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 value={formData.type}
                 onChange={e => setFormData({ ...formData, type: e.target.value as any })}
               >
@@ -395,44 +407,51 @@ function CreateSessionPaymentModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">التاريخ</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">التاريخ</label>
               <input
                 type="date"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                 value={formData.date}
                 onChange={e => setFormData({ ...formData, date: e.target.value })}
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">المبلغ المطلوب (ج.م)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">المبلغ المطلوب (ج.م)</label>
               <input
                 type="number"
                 min="0"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                 value={formData.amount}
                 onChange={e => setFormData({ ...formData, amount: e.target.value })}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">المبلغ المدفوع (ج.م)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">المبلغ المدفوع (ج.م)</label>
               <input
                 type="number"
                 min="0"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                 value={formData.paidAmount}
                 onChange={e => setFormData({ ...formData, paidAmount: e.target.value })}
               />
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 text-sm">
+          <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+            >
               إلغاء
             </button>
-            <button type="submit" className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">
+            <button 
+              type="submit" 
+              className="px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs"
+            >
               حفظ التحصيل
             </button>
           </div>

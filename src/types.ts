@@ -206,6 +206,9 @@ export interface QrCard extends BaseRecord {
   studentId?: string;
   qrCodeData?: string;
   status?: 'active' | 'revoked' | string;
+  themeColor?: 'blue' | 'emerald' | 'indigo' | 'amber' | 'rose' | 'slate';
+  centerName?: string;
+  notes?: string;
 }
 
 export interface SyncMeta {

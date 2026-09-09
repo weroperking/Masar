@@ -6,8 +6,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { Assessment, Student, Course } from '../../types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export function Assessments() {
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAssessment, setEditingAssessment] = useState<Assessment | null>(null);
@@ -27,7 +31,16 @@ export function Assessments() {
   ).sort((a, b) => b.created_at - a.created_at);
 
   const handleDelete = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا التقييم؟ سيتم نقله لسلة المهملات.')) {
+    const isConfirmed = await confirm({
+      title: 'حذف التقييم والواجب',
+      message: 'هل أنت متأكد من حذف هذا التقييم؟',
+      description: 'سيتم نقله لسلة المهملات مع أرشفة جميع درجات وتقييمات الطلاب المرتبطة به.',
+      confirmText: 'نعم، احذف التقييم',
+      cancelText: 'إلغاء',
+      variant: 'danger',
+    });
+
+    if (isConfirmed) {
       const now = Date.now();
       // Soft-delete the assessment
       await db.assessments.update(id, {
@@ -44,6 +57,7 @@ export function Assessments() {
           sync_status: 'pending'
         });
       }
+      toast.success('تم حذف التقييم بنجاح');
     }
   };
 
