@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
-import { Play, CheckCircle, Clock, X, Users, MessageCircle, StopCircle, Calendar, AlertTriangle, QrCode } from 'lucide-react';
+import { 
+  Play, CheckCircle, Clock, X, Users, MessageCircle, StopCircle, Calendar, 
+  AlertTriangle, QrCode, Check, Search, Sparkles, UserCheck, UserX, Trash2, ArrowRight
+} from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { AttendanceSession, Student } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { getWhatsAppUrl } from '../../utils/phone';
 
 export function Attendance() {
   const toast = useToast();
@@ -311,7 +315,8 @@ export function Attendance() {
                         if (!student) return null;
                         
                         const msg = `مرحباً ولي أمر الطالب ${student.name}، نود إعلامكم بغياب الطالب عن حصة مجموعة ${groupMap.get(record.groupId)?.name || ''} اليوم.`;
-                        const waLink = `https://wa.me/2${student.parentPhone || student.phone}?text=${encodeURIComponent(msg)}`;
+                        const targetPhone = student.parentPhone || student.phone;
+                        const waLink = getWhatsAppUrl(targetPhone, msg);
                         
                         return (
                           <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
@@ -320,15 +325,19 @@ export function Attendance() {
                             <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">{student.parentName || '-'} <span className="font-mono text-slate-500" dir="ltr">({student.parentPhone})</span></td>
                             <td className="px-4 py-2.5 text-slate-500 font-mono">{format(new Date(record.markedAt), 'dd MMM yyyy', { locale: ar })}</td>
                             <td className="px-4 py-2.5 text-center">
-                              <a 
-                                href={waLink} 
-                                target="_blank" 
-                                rel="noreferrer"
-                                className="inline-flex items-center px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-semibold transition-colors shadow-xs"
-                              >
-                                <MessageCircle className="w-3 h-3 ml-1" />
-                                واتساب
-                              </a>
+                              {waLink ? (
+                                <a 
+                                  href={waLink} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="inline-flex items-center px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-semibold transition-colors shadow-2xs"
+                                >
+                                  <MessageCircle className="w-3 h-3 ml-1" />
+                                  واتساب
+                                </a>
+                              ) : (
+                                <span className="text-slate-400 dark:text-slate-600 text-[11px]">بدون رقم</span>
+                              )}
                             </td>
                           </tr>
                         );
@@ -415,25 +424,130 @@ function AttendanceModal({
   
   const [recordMap, setRecordMap] = useState<Record<string, 'present' | 'absent'>>({});
   const [isSaved, setIsSaved] = useState(false);
+  const [viewTab, setViewTab] = useState<'attended' | 'absent'>('attended');
+  const [extraGuestStudents, setExtraGuestStudents] = useState<Student[]>([]);
   
   // QR Code Scanner State
   const qrCards = useLiveQuery(() => db.qrCards.filter(c => !c.deleted_at).toArray(), []);
   const [qrInput, setQrInput] = useState('');
   
-  
   const qrInputRef = useRef<HTMLInputElement>(null);
   const handleQrScanRef = useRef<any>(null);
 
+  // Combine roster students and any guest students attended in this session
+  const combinedStudents = [
+    ...rosterStudents,
+    ...extraGuestStudents.filter(g => !rosterStudents.some(r => r.id === g.id))
+  ];
 
-  
-  
+  // Process code scanning or manual submit
+  const processStudentCode = (rawCode: string) => {
+    const code = rawCode.trim();
+    setQrInput('');
+    if (!code) return;
+
+    const cleanDigits = code.replace(/\D/g, '');
+
+    // 1. Try finding in roster first
+    let foundStudent: any = rosterStudents.find(s => 
+      s.studentCode === code || 
+      (cleanDigits && s.studentCode === cleanDigits) ||
+      (cleanDigits && s.studentCode && parseInt(s.studentCode, 10) === parseInt(cleanDigits, 10)) ||
+      s.phone === code ||
+      s.id === code
+    );
+
+    // 2. If not found by student code, check qr cards
+    if (!foundStudent) {
+      const card = qrCards?.find(c => 
+        c.cardNumber === code || 
+        c.qrCodeData === code ||
+        (cleanDigits && (c.cardNumber === cleanDigits || c.qrCodeData === cleanDigits)) ||
+        (cleanDigits && c.cardNumber && parseInt(c.cardNumber, 10) === parseInt(cleanDigits, 10))
+      );
+      if (card && card.status === 'active' && card.studentId) {
+        foundStudent = rosterStudents.find(s => s.id === card.studentId);
+      } else if (card && card.status !== 'active') {
+        toast.error('هذه البطاقة موقوفة وغير صالحة');
+        return;
+      }
+    }
+
+    // 3. If still not found in roster, check all students in academy
+    if (!foundStudent && allStudents) {
+      const globalStudent = allStudents.find(s => 
+        s.studentCode === code || 
+        (cleanDigits && s.studentCode === cleanDigits) ||
+        (cleanDigits && s.studentCode && parseInt(s.studentCode, 10) === parseInt(cleanDigits, 10)) ||
+        s.phone === code ||
+        s.id === code
+      );
+
+      if (globalStudent) {
+        foundStudent = globalStudent;
+        // add to guest students so it gets tracked and saved
+        setExtraGuestStudents(prev => [...prev.filter(x => x.id !== globalStudent.id), globalStudent]);
+      } else {
+        // check global qr card
+        const card = qrCards?.find(c => 
+          c.cardNumber === code || 
+          c.qrCodeData === code ||
+          (cleanDigits && (c.cardNumber === cleanDigits || c.qrCodeData === cleanDigits)) ||
+          (cleanDigits && c.cardNumber && parseInt(c.cardNumber, 10) === parseInt(cleanDigits, 10))
+        );
+        if (card && card.status === 'active' && card.studentId) {
+          const cardStudent = allStudents.find(s => s.id === card.studentId);
+          if (cardStudent) {
+            foundStudent = cardStudent;
+            setExtraGuestStudents(prev => [...prev.filter(x => x.id !== cardStudent.id), cardStudent]);
+          }
+        }
+      }
+    }
+
+    if (!foundStudent) {
+      toast.error(`لم يتم العثور على طالب بكود (${code}) في النظام`);
+      return;
+    }
+
+    if (session.isTrial) {
+      const pastTrialsCount = allTrialRecords?.filter(r => 
+        r.studentId === foundStudent.id && 
+        r.status === 'present' && 
+        trialSessionIds.includes(r.sessionId) &&
+        r.sessionId !== session.id
+      ).length || 0;
+      
+      if (pastTrialsCount >= freeSessionLimit) {
+        toast.error('استنفد الطالب الحد الأقصى لحصص التجربة');
+        return;
+      }
+    }
+
+    setRecordMap(prev => ({ ...prev, [foundStudent.id]: 'present' }));
+    
+    // Switch to attended view so user immediately sees the success feedback
+    setViewTab('attended');
+
+    const sub = currentSubscriptions?.find(s => s.studentId === foundStudent.id);
+    if (!session.isTrial && (!sub || sub.status !== 'paid')) {
+      toast.success(`تم التحضير: ${foundStudent.name} (تنبيه: لم يسدد اشتراك الشهر)`);
+    } else {
+      toast.success(`تم تحضير الطالب: ${foundStudent.name} (#${foundStudent.studentCode || code})`);
+    }
+  };
+
   useEffect(() => {
-    handleQrScanRef.current = handleQrScan;
+    handleQrScanRef.current = (e: any, overrideCode?: string) => {
+      if (e?.key === 'Enter') {
+        e.preventDefault();
+        processStudentCode(overrideCode || qrInput);
+      }
+    };
   });
 
   useEffect(() => {
-
-    // Always focus barcode input on mount and when modal opens
+    // Focus barcode input on mount and when modal opens
     setTimeout(() => {
       if (qrInputRef.current) {
         qrInputRef.current.focus();
@@ -445,7 +559,6 @@ function AttendanceModal({
     let lastKeyTime = 0;
     
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if already in an input/textarea (like the barcode input itself)
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
          return;
       }
@@ -462,15 +575,8 @@ function AttendanceModal({
         e.preventDefault();
         const code = buffer.trim();
         buffer = '';
-        
         if (!code) return;
-        
-        // We simulate setting the input and firing handleQrScan
-        setQrInput(code);
-        setTimeout(() => {
-          const fakeEvent = { key: 'Enter', preventDefault: () => {} };
-          handleQrScanRef.current(fakeEvent, code);
-        }, 10);
+        processStudentCode(code);
       }
     };
 
@@ -478,80 +584,14 @@ function AttendanceModal({
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
-  const handleQrScan = (e: any, overrideCode?: string) => {
+  const handleQrScan = (e: any) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const code = overrideCode || qrInput.trim();
-      setQrInput('');
-      
-      if (!code) return;
-      
-      let foundStudentId = null;
-      const cleanDigits = code.replace(/\D/g, '');
-
-      let matchedStudent = rosterStudents.find(s => 
-        s.studentCode === code || 
-        (cleanDigits && s.studentCode === cleanDigits) ||
-        (cleanDigits && s.studentCode && parseInt(s.studentCode, 10) === parseInt(cleanDigits, 10))
-      );
-      
-      if (matchedStudent) {
-        foundStudentId = matchedStudent.id;
-      } else {
-        const card = qrCards?.find(c => 
-          c.cardNumber === code || 
-          c.qrCodeData === code ||
-          (cleanDigits && (c.cardNumber === cleanDigits || c.qrCodeData === cleanDigits)) ||
-          (cleanDigits && c.cardNumber && parseInt(c.cardNumber, 10) === parseInt(cleanDigits, 10))
-        );
-        if (card && card.status === 'active' && card.studentId) {
-          foundStudentId = card.studentId;
-        } else if (card && card.status !== 'active') {
-          toast.error('هذه البطاقة موقوفة');
-          return;
-        }
-      }
-
-      if (!foundStudentId) {
-        toast.error('لم يتم العثور على طالب بهذا الكود في النظام');
-        return;
-      }
-      
-      const studentInRoster = rosterStudents.find(s => s.id === foundStudentId);
-      if (!studentInRoster) {
-        toast.error('الطالب غير مقيد في هذه المجموعة');
-        return;
-      }
-
-      if (session.isTrial) {
-        const pastTrialsCount = allTrialRecords?.filter(r => 
-          r.studentId === foundStudentId && 
-          r.status === 'present' && 
-          trialSessionIds.includes(r.sessionId) &&
-          r.sessionId !== session.id
-        ).length || 0;
-        
-        if (pastTrialsCount >= freeSessionLimit) {
-          toast.error('استنفد الطالب الحد الأقصى لحصص التجربة');
-          return;
-        }
-      }
-
-      
-      setRecordMap(prev => ({ ...prev, [foundStudentId]: 'present' }));
-      
-      const sub = currentSubscriptions?.find(s => s.studentId === foundStudentId);
-      if (!session.isTrial && (!sub || sub.status !== 'paid')) {
-        toast.success(`تم التحضير: ${studentInRoster.name} (تنبيه: لم يسدد اشتراك الشهر)`);
-      } else {
-        toast.success(`تم تحضير الطالب: ${studentInRoster.name}`);
-      }
-
+      processStudentCode(qrInput);
     }
   };
 
   useEffect(() => {
-
     if (existingRecords) {
       const map: Record<string, 'present' | 'absent'> = {};
       existingRecords.forEach(r => {
@@ -570,7 +610,7 @@ function AttendanceModal({
 
   const markAll = (status: 'present' | 'absent') => {
     const nextMap: Record<string, 'present' | 'absent'> = {};
-    rosterStudents.forEach(s => {
+    combinedStudents.forEach(s => {
       nextMap[s.id] = status;
     });
     setRecordMap(nextMap);
@@ -579,13 +619,13 @@ function AttendanceModal({
   const handleSave = async () => {
     // If it's a trial session, prevent saving if limit exceeded for any present student
     if (session.isTrial) {
-      const overLimitStudents = rosterStudents.filter(student => {
+      const overLimitStudents = combinedStudents.filter(student => {
         if (recordMap[student.id] === 'present') {
           const pastTrials = allTrialRecords?.filter(r => 
             r.studentId === student.id && 
             r.status === 'present' && 
             trialSessionIds.includes(r.sessionId) &&
-            r.sessionId !== session.id // exclude current
+            r.sessionId !== session.id
           ).length || 0;
           
           if (pastTrials >= freeSessionLimit) return true;
@@ -600,9 +640,8 @@ function AttendanceModal({
     }
 
     const now = Date.now();
-    let updates = 0;
     
-    for (const student of rosterStudents) {
+    for (const student of combinedStudents) {
       const status = recordMap[student.id] || 'absent';
       const existing = existingRecords?.find(r => r.studentId === student.id);
       
@@ -614,7 +653,6 @@ function AttendanceModal({
             updated_at: now,
             sync_status: 'pending'
           });
-          updates++;
         }
       } else {
         await db.attendanceRecords.add({
@@ -628,192 +666,277 @@ function AttendanceModal({
           updated_at: now,
           sync_status: 'pending'
         });
-        updates++;
       }
     }
     
     setIsSaved(true);
-    toast.success('تم حفظ سجل الحضور بنجاح');
+    toast.success('تم حفظ كشف الحضور بنجاح');
     setTimeout(() => {
       onClose();
     }, 800);
   };
 
-  const presentCount = Object.values(recordMap).filter(s => s === 'present').length;
-  const absentCount = Object.values(recordMap).filter(s => s === 'absent').length;
+  // Split students into attended (present) and absent
+  const attendedStudents = combinedStudents.filter(s => recordMap[s.id] === 'present');
+  const absentStudents = combinedStudents.filter(s => recordMap[s.id] !== 'present');
+
+  const presentCount = attendedStudents.length;
+  const absentCount = absentStudents.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-4" dir="rtl">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-4xl h-[85vh] max-h-[850px] min-h-[580px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <QrCode className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               <span>تسجيل كشف الحضور: {groupName}</span>
               {session.isTrial && (
-                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[10px] border border-slate-200 dark:border-slate-700 font-semibold">
+                <span className="px-2.5 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded-full text-[11px] border border-amber-200 dark:border-amber-800 font-bold">
                   حصة تجريبية
                 </span>
               )}
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              المقيدين: <span className="font-bold text-slate-700 dark:text-slate-300">{rosterStudents.length}</span> |
-              الحاضرين: <span className="text-emerald-600 dark:text-emerald-400 font-bold">{presentCount}</span> | 
-              الغائبين: <span className="text-red-600 dark:text-red-400 font-bold">{absentCount}</span>
-            </p>
+            <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+              <span>إجمالي مقيدي المجموعة: <strong className="text-slate-700 dark:text-slate-300 font-mono">{rosterStudents.length}</strong></span>
+              <span>•</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">الحاضرين: <strong className="font-mono">{presentCount}</strong></span>
+              <span>•</span>
+              <span className="text-slate-400">المتبقين / الغائبين: <strong className="font-mono">{absentCount}</strong></span>
+            </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-            <X className="w-4 h-4" />
+          <button 
+            onClick={onClose} 
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
-        
-        <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 text-xs gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-500 font-medium">إجراء سريع:</span>
-            <button 
-              onClick={() => markAll('present')} 
-              className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-[11px] font-semibold transition-colors"
-            >
-              تحضير الجميع
-            </button>
-            <button 
-              onClick={() => markAll('absent')} 
-              className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30 text-[11px] font-semibold transition-colors"
-            >
-              تغييب الجميع
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-2 w-full sm:w-auto relative group">
-            <QrCode className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-            <input
-              ref={qrInputRef}
-              type="text"
-              placeholder="انتظار قارئ الباركود..."
-              className="pl-3 pr-9 py-1.5 border-2 border-blue-200 dark:border-blue-900/50 rounded-lg text-sm text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 focus:outline-none w-full sm:w-56 text-left font-mono font-bold tracking-widest transition-all shadow-sm"
-              dir="ltr"
-              value={qrInput}
-              onChange={e => setQrInput(e.target.value)}
-              onKeyDown={handleQrScan}
-              onBlur={() => {
-                // Try to keep focus on scanner input if clicked outside within the modal
-                setTimeout(() => {
-                  if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
-                    qrInputRef.current?.focus();
-                  }
-                }, 100);
-              }}
-            />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 rounded">
-              جاهز
-            </span>
-          </div>
-        </div>
-        
-        <div className="p-5 overflow-y-auto flex-1 divide-y divide-slate-100 dark:divide-slate-800">
-          {rosterStudents.length === 0 ? (
-            <div className="text-center py-10 text-slate-500 text-xs">
-              <Users className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-40" />
-              <p>لا يوجد طلاب مقيدين نشطين في هذه المجموعة.</p>
+
+        {/* Clean, Prominent Scanner Input Bar */}
+        <div className="p-5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="relative flex-1">
+              <QrCode className="w-5 h-5 text-blue-600 dark:text-blue-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                ref={qrInputRef}
+                type="text"
+                placeholder="أدخل كود الطالب أو امسح الباركود (مثال: 0009)..."
+                className="w-full pl-4 pr-11 py-3 border-2 border-blue-300 dark:border-blue-700/80 rounded-xl text-base text-slate-900 dark:text-slate-100 bg-blue-50/20 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-none text-left font-mono font-bold tracking-wider transition-all placeholder:text-slate-400 placeholder:text-xs placeholder:font-sans placeholder:tracking-normal shadow-2xs"
+                dir="ltr"
+                value={qrInput}
+                onChange={e => setQrInput(e.target.value)}
+                onKeyDown={handleQrScan}
+              />
             </div>
-          ) : (
-            rosterStudents.map(student => {
-              
-              const currentStatus = recordMap[student.id];
-              
-              // Subscription check
-              const studentSub = currentSubscriptions?.find(s => s.studentId === student.id);
-              const hasUnpaidSub = studentSub && studentSub.status !== 'paid';
-              const noSubRecord = !studentSub;
+            
+            <button
+              type="button"
+              onClick={() => processStudentCode(qrInput)}
+              className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-colors shadow-sm shrink-0"
+            >
+              <Check className="w-4 h-4" />
+              <span>تسجيل الحضور (Enter)</span>
+            </button>
+          </div>
 
-              
-              // 1. Check if absent previously
-              const wasAbsentPreviously = prevSessionRecords?.some(r => r.studentId === student.id && r.status === 'absent');
-              
-              // 2. Check if exceeds free trial limit
-              let pastTrialsCount = 0;
-              let trialLimitExceeded = false;
-              if (session.isTrial) {
-                pastTrialsCount = allTrialRecords?.filter(r => 
-                  r.studentId === student.id && 
-                  r.status === 'present' && 
-                  trialSessionIds.includes(r.sessionId) &&
-                  r.sessionId !== session.id
-                ).length || 0;
-                
-                trialLimitExceeded = pastTrialsCount >= freeSessionLimit;
-              }
+          {/* Sub-bar: View Selector & Quick Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setViewTab('attended')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-xs transition-all ${
+                  viewTab === 'attended'
+                    ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>الطلاب الحاضرين ({presentCount})</span>
+              </button>
 
-              return (
-                <div key={student.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs">{student.name}</p>
-                      {student.studentCode && (
-                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                          #{student.studentCode}
-                        </span>
-                      )}
-                      {wasAbsentPreviously && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded text-[10px] font-medium" title="تغيب الطالب عن الحصة الماضية">
-                          <AlertTriangle className="w-3 h-3" />
-                          غائب الحصة السابقة
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5 font-mono">{student.phone} - {student.school || '-'}</p>
-                    {session.isTrial && trialLimitExceeded && (
-                      <p className="text-[11px] text-red-600 dark:text-red-400 mt-1 font-medium">
-                        استنفد الحد الأقصى لحصص التجربة ({freeSessionLimit})
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                    <button
-                      type="button"
-                      disabled={session.isTrial && trialLimitExceeded && currentStatus !== 'present'}
-                      onClick={() => toggleStudentStatus(student.id, 'present')}
-                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                        currentStatus === 'present'
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      حاضر
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleStudentStatus(student.id, 'absent')}
-                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                        currentStatus === 'absent'
-                          ? 'bg-red-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      غائب
-                    </button>
-                  </div>
+              <button
+                type="button"
+                onClick={() => setViewTab('absent')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-xs transition-all ${
+                  viewTab === 'absent'
+                    ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <UserX className="w-3.5 h-3.5" />
+                <span>الطلاب المتبقين / الغائبين ({absentCount})</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => markAll('present')} 
+                className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-semibold transition-colors"
+              >
+                تحضير الكل
+              </button>
+              <button 
+                onClick={() => markAll('absent')} 
+                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition-colors"
+              >
+                تغييب الكل
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Content Body: DOES NOT list all students by default, shows live attended feed */}
+        <div className="p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-950/20">
+          {viewTab === 'attended' ? (
+            attendedStudents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
+                <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
+                  <QrCode className="w-8 h-8 opacity-70" />
                 </div>
-              );
-            })
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  في انتظار مسح أكواد الطلاب
+                </h3>
+                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                  مرر كارت أو باركود الطالب أمام القارئ أو اكتب كود الطالب (مثال: <strong>0009</strong>) ثم اضغط Enter ليتم إدراجه فوراً في كشف الحاضرين.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => qrInputRef.current?.focus()}
+                  className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold transition-colors"
+                >
+                  التركيز على خانة المسح الآن
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-xs text-slate-500 px-1 mb-1">
+                  <span>تم تحضير <strong>{attendedStudents.length}</strong> طالب في هذه الحصة:</span>
+                  <span className="text-[11px]">مرتب حسب التسجيل</span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {attendedStudents.map(student => {
+                    const studentSub = currentSubscriptions?.find(s => s.studentId === student.id);
+                    const isPaid = studentSub && studentSub.status === 'paid';
+                    
+                    return (
+                      <div 
+                        key={student.id} 
+                        className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200/80 dark:border-emerald-900/40 shadow-2xs flex items-center justify-between gap-3 hover:border-emerald-400 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0 border border-emerald-200/60 dark:border-emerald-800/40">
+                            ✓
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                                {student.name}
+                              </p>
+                              {student.studentCode && (
+                                <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                  #{student.studentCode}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-[11px]">
+                              <span className="text-slate-400 font-mono">{student.phone || '-'}</span>
+                              <span className="text-slate-300">•</span>
+                              {isPaid ? (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">سدد الاشتراك</span>
+                              ) : (
+                                <span className="text-amber-600 dark:text-amber-400 font-medium">لم يسدد الشهر</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleStudentStatus(student.id, 'absent')}
+                          className="px-2.5 py-1 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg text-[11px] font-semibold transition-colors shrink-0"
+                          title="إلغاء التحضير ورصده كغائب"
+                        >
+                          إلغاء التحضير
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+                <span>قائمة الطلاب غير المسجلين كحضور بعد ({absentStudents.length}):</span>
+                <span className="text-[11px]">يمكنك الضغط على "تحضير" لتسجيل الطالب يدوياً</span>
+              </div>
+
+              {absentStudents.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  <UserCheck className="w-8 h-8 mx-auto mb-2 text-emerald-500 opacity-60" />
+                  <p className="font-bold text-slate-800 dark:text-slate-200">اكتمل الحضور! تم تحضير جميع الطلاب المقيدين.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {absentStudents.map(student => (
+                    <div 
+                      key={student.id} 
+                      className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs">{student.name}</p>
+                          {student.studentCode && (
+                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              #{student.studentCode}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">{student.phone || '-'}</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleStudentStatus(student.id, 'present')}
+                        className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        + تحضير
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
-        
-        <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
-          {isSaved ? (
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">✓ تم حفظ كشف الحضور بنجاح!</span>
-          ) : (
-            <span className="text-xs text-slate-500">الطلاب غير المحددين يعتبرون غائبين تلقائياً</span>
-          )}
-          <div className="flex gap-2">
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+          <div className="text-xs">
+            {isSaved ? (
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓ تم حفظ كشف الحضور بنجاح!</span>
+            ) : (
+              <span className="text-slate-500">
+                إجمالي المسجلين كحضور: <strong className="text-emerald-600 dark:text-emerald-400 font-mono text-sm">{presentCount}</strong>
+              </span>
+            )}
+          </div>
+
+          <div className="flex gap-2.5">
             <button 
               onClick={onClose} 
-              className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
             >
               إلغاء
             </button>
             <button 
               onClick={handleSave} 
-              className="px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs"
+              className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-xs font-bold transition-colors shadow-2xs"
             >
               حفظ كشف الحضور
             </button>

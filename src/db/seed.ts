@@ -4,8 +4,22 @@ import { v4 as uuidv4 } from 'uuid';
 import { Course, Student, Group, Product, User, MessageTemplate, Settings, QrCard, MonthlySubscription } from '../types';
 
 export async function seedDatabaseIfEmpty() {
-  const studentCount = await db.students.count();
-  if (studentCount > 0) return; // Already initialized
+  if (typeof window !== 'undefined' && localStorage.getItem('masar_db_seeded_v1')) {
+    return; // Already initialized in this browser
+  }
+
+  const [studentCount, groupCount, courseCount] = await Promise.all([
+    db.students.count(),
+    db.groups.count(),
+    db.courses.count()
+  ]);
+
+  if (studentCount > 0 || groupCount > 0 || courseCount > 0) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('masar_db_seeded_v1', 'true');
+    }
+    return; // Already initialized or user has existing data
+  }
 
   // Check if legacy EduSaaSDB has data to migrate
   try {
@@ -326,6 +340,10 @@ export async function seedDatabaseIfEmpty() {
     sync_status: 'pending'
   };
   await db.users.bulkAdd([u1, u2]);
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('masar_db_seeded_v1', 'true');
+  }
 }
 
 /**

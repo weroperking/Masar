@@ -13,26 +13,39 @@ export function Groups() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   
-  const confirm = useConfirm();
+  const { confirm } = useConfirm();
   const toast = useToast();
   
-  const groups = useLiveQuery(() => db.groups.where('status').equals(activeTab).toArray(), [activeTab]);
+  const groups = useLiveQuery(
+    () => db.groups.filter(g => g.status === activeTab && !g.deleted_at).toArray(),
+    [activeTab]
+  );
   const courses = useLiveQuery(() => db.courses.toArray(), []);
 
   const handleDelete = async (id: string, name: string) => {
     const isConfirmed = await confirm({
       title: 'حذف المجموعة',
-      message: `هل أنت متأكد من حذف مجموعة "${name}"؟ جميع جلسات الحضور والغياب الخاصة بها قد تتأثر.`,
-      confirmText: 'حذف',
+      message: `هل أنت متأكد من حذف مجموعة "${name}"؟`,
+      description: 'سيتم حذف المجموعة بشكل نهائي وإلغاء تسجيلات الطلاب وحصص الحضور المرتبطة بها.',
+      confirmText: 'نعم، حذف المجموعة',
       cancelText: 'إلغاء',
-      type: 'danger'
+      variant: 'danger'
     });
 
     if (isConfirmed) {
       try {
-        await db.groups.delete(id);
-        toast.success('تم حذف المجموعة بنجاح');
+        await db.transaction('rw', [db.groups, db.enrollments, db.attendanceSessions, db.attendanceRecords], async () => {
+          await db.groups.delete(id);
+          await db.enrollments.where('groupId').equals(id).delete();
+          const sessions = await db.attendanceSessions.where('groupId').equals(id).toArray();
+          for (const session of sessions) {
+            await db.attendanceRecords.where('sessionId').equals(session.id).delete();
+          }
+          await db.attendanceSessions.where('groupId').equals(id).delete();
+        });
+        toast.success(`تم حذف مجموعة "${name}" بنجاح`);
       } catch (err) {
+        console.error(err);
         toast.error('فشل حذف المجموعة');
       }
     }
@@ -197,7 +210,7 @@ function GroupFormModal({ onClose, courses, initialData }: { onClose: () => void
     sessionCount: initialData?.sessionCount ? String(initialData.sessionCount) : '', 
     maxStudents: initialData?.maxStudents ? String(initialData.maxStudents) : '', 
     room: initialData?.room || '',
-    status: initialData?.status || 'scheduled', 
+    status: initialData?.status || 'in_progress', 
     notes: initialData?.notes || ''
   });
 
@@ -328,6 +341,18 @@ function GroupFormModal({ onClose, courses, initialData }: { onClose: () => void
                 value={formData.maxStudents} 
                 onChange={e => setFormData({...formData, maxStudents: e.target.value})} 
               />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">حالة المجموعة</label>
+              <select 
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                value={formData.status} 
+                onChange={e => setFormData({...formData, status: e.target.value as any})}
+              >
+                <option value="in_progress">قيد التنفيذ (جارية الآن)</option>
+                <option value="scheduled">مجدولة (قادمة)</option>
+                <option value="finished">منتهية</option>
+              </select>
             </div>
           </div>
 

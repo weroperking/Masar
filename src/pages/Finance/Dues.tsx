@@ -4,6 +4,7 @@ import { db } from '../../db/db';
 import { AlertCircle, MessageCircle, DollarSign, X, CheckCircle2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
+import { getWhatsAppUrl } from '../../utils/phone';
 
 export function Dues() {
   const [settlingDue, setSettlingDue] = useState<any | null>(null);
@@ -27,6 +28,7 @@ export function Dues() {
         source: 'monthly' as const,
         studentId: p.studentId,
         studentName: student?.name || 'غير معروف',
+        studentPhone: student?.phone || '',
         parentName: student?.parentName || '',
         parentPhone: student?.parentPhone || '',
         courseName: courseMap.get(p.courseId) || 'غير معروف',
@@ -49,6 +51,7 @@ export function Dues() {
         source: 'session' as const,
         studentId: p.studentId,
         studentName: student?.name || 'غير معروف',
+        studentPhone: student?.phone || '',
         parentName: student?.parentName || '',
         parentPhone: student?.parentPhone || '',
         courseName: courseMap.get(p.courseId) || 'غير معروف',
@@ -112,8 +115,9 @@ export function Dues() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {allDues.map(due => {
-                  const cleanPhone = due.parentPhone.replace(/[^0-9]/g, '');
-                  const waLink = `https://wa.me/2${cleanPhone}?text=${encodeURIComponent(`السلام عليكم أ/ ${due.parentName || due.studentName}، نود تذكيركم بسداد المبلغ المستحق بقيمة ${toMajorUnits(due.remaining)} ج.م للطالب ${due.studentName} عن (${due.title} - كورس ${due.courseName}). شكراً لتعاونكم - سنتر مسار.`)}`;
+                  const targetPhone = due.parentPhone || due.studentPhone;
+                  const msg = `السلام عليكم أ/ ${due.parentName || due.studentName}، نود تذكيركم بسداد المبلغ المستحق بقيمة ${toMajorUnits(due.remaining)} ج.م للطالب ${due.studentName} عن (${due.title} - كورس ${due.courseName}). شكراً لتعاونكم - سنتر مسار.`;
+                  const waLink = getWhatsAppUrl(targetPhone, msg);
                   
                   const progressPct = due.amountTotal > 0 ? Math.round((due.amountPaid / due.amountTotal) * 100) : 0;
                   
@@ -121,7 +125,7 @@ export function Dues() {
                     <tr key={`${due.source}-${due.id}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="px-4 py-3">
                         <div className="font-semibold text-slate-900 dark:text-slate-100">{due.studentName}</div>
-                        <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono" dir="ltr">{due.parentPhone}</div>
+                        <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono" dir="ltr">{targetPhone || '-'}</div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-800 dark:text-slate-200">{due.title}</div>
@@ -146,7 +150,7 @@ export function Dues() {
                             <DollarSign className="w-3 h-3 ml-1" />
                             سداد سريع
                           </button>
-                          {cleanPhone && (
+                          {waLink && (
                             <a
                               href={waLink}
                               target="_blank"

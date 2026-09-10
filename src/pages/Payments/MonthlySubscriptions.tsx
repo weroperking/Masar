@@ -5,6 +5,7 @@ import { MonthlySubscription, Course, Student, Enrollment, Group } from '../../t
 import { Search, Plus, Edit2, AlertTriangle, X, MessageCircle, Check } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
+import { getWhatsAppUrl, formatPhoneDisplay } from '../../utils/phone';
 import { useToast } from '../../context/ToastContext';
 
 export function MonthlySubscriptions() {
@@ -78,6 +79,8 @@ export function MonthlySubscriptions() {
           courseId: enrollment.courseId,
           studentName: student?.name || 'غير معروف',
           studentPhone: student?.phone || '',
+          parentName: student?.parentName || '',
+          parentPhone: student?.parentPhone || '',
           courseName: course?.name || 'غير معروف',
           groupName: group?.name || 'مجموعة غير معروفة',
           amountTotal,
@@ -414,17 +417,39 @@ function PaymentModal({ sub, month, year, onClose }: { sub: any, month: number, 
 
 function ReminderModal({ sub, month, year, onClose }: { sub: any, month: number, year: number, onClose: () => void }) {
   const toast = useToast();
-  const [template, setTemplate] = useState(`مرحباً {{StudentName}}،\nنود تذكيركم بموعد سداد اشتراك كورس {{CourseName}} لشهر ${month}/${year}.\nالمبلغ المطلوب: {{AmountTotal}} ج.م.\nتاريخ الاستحقاق: {{DueDate}}.\n\nمركز مسار التعليمي`);
+  const [recipient, setRecipient] = useState<'student' | 'parent'>('student');
+  const [template, setTemplate] = useState(`مرحباً {{RecipientName}}،\nنود تذكيركم بموعد سداد اشتراك كورس {{CourseName}} لشهر ${month}/${year}.\nالمبلغ المطلوب: {{AmountTotal}} ج.م.\nتاريخ الاستحقاق: {{DueDate}}.\n\nمركز مسار التعليمي`);
+
+  const activePhone = recipient === 'student' ? sub.studentPhone : (sub.parentPhone || sub.studentPhone);
+  const activeName = recipient === 'student' ? sub.studentName : (sub.parentName || `ولي أمر الطالب ${sub.studentName}`);
 
   const preview = template
+    .replace('{{RecipientName}}', activeName)
     .replace('{{StudentName}}', sub.studentName)
     .replace('{{CourseName}}', sub.courseName)
     .replace('{{AmountTotal}}', toMajorUnits(sub.amountTotal).toString())
     .replace('{{DueDate}}', sub.dueDate);
 
+  const formattedDisplay = formatPhoneDisplay(activePhone);
+
+  const handleSend = () => {
+    if (!activePhone) {
+      toast.error('لا يوجد رقم هاتف مسجل لهذا المستلم');
+      return;
+    }
+    const waUrl = getWhatsAppUrl(activePhone, preview);
+    if (!waUrl) {
+      toast.error('صيغة رقم الهاتف غير صالحة للواتساب، يرجى مراجعة الرقم');
+      return;
+    }
+    window.open(waUrl, '_blank');
+    toast.success('جارٍ فتح محادثة الواتساب...');
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <MessageCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -434,42 +459,79 @@ function ReminderModal({ sub, month, year, onClose }: { sub: any, month: number,
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-5 space-y-3.5">
+        <div className="p-5 space-y-4">
+          {/* Recipient Selector if parent phone is available */}
+          {sub.parentPhone && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">إرسال التذكير إلى:</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRecipient('student')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    recipient === 'student'
+                      ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-700 dark:text-blue-300'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  الطالب ({sub.studentName})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecipient('parent')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    recipient === 'parent'
+                      ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-700 dark:text-blue-300'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  ولي الأمر ({sub.parentName || 'مسجل'})
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">رقم هاتف الطالب</label>
-            <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 font-mono text-xs text-left" dir="ltr">
-              {sub.studentPhone || 'لا يوجد رقم مسجل'}
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              رقم الهاتف المستهدف (بتنسيق الواتساب التلقائي)
+            </label>
+            <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-between">
+              <span className="text-slate-900 dark:text-slate-100 font-mono text-xs font-bold" dir="ltr">
+                {activePhone || 'لا يوجد رقم مسجل'}
+              </span>
+              {activePhone && (
+                <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800" dir="ltr">
+                  واتساب: {formattedDisplay}
+                </span>
+              )}
             </div>
           </div>
+
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">معاينة الرسالة</label>
-            <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-md text-xs whitespace-pre-wrap text-slate-800 dark:text-slate-200 leading-relaxed font-sans">
-              {preview}
-            </div>
+            <textarea
+              rows={5}
+              className="w-full p-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-lg text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-sans focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              value={preview}
+              onChange={e => setTemplate(e.target.value)}
+            />
           </div>
+
           <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
             >
               إلغاء
             </button>
             <button 
-              onClick={() => {
-                if (!sub.studentPhone) {
-                  toast.error('لا يوجد رقم هاتف مسجل لهذا الطالب');
-                  return;
-                }
-                const text = encodeURIComponent(preview);
-                window.open(`https://wa.me/${sub.studentPhone}?text=${text}`, '_blank');
-                onClose();
-              }}
-              disabled={!sub.studentPhone}
-              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold flex items-center gap-1.5 disabled:opacity-50 transition-colors shadow-xs"
+              onClick={handleSend}
+              disabled={!activePhone}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50 transition-colors shadow-2xs"
             >
-              <MessageCircle className="w-3.5 h-3.5" />
-              إرسال عبر واتساب
+              <MessageCircle className="w-4 h-4" />
+              <span>إرسال عبر واتساب</span>
             </button>
           </div>
         </div>

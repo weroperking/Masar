@@ -4,11 +4,13 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
 import { 
   ArrowRight, User, BookOpen, Clock, Calendar, Wallet, 
-  QrCode, Printer, RefreshCw, Sparkles, CheckCircle2, ShieldAlert, Palette
+  QrCode, Printer, RefreshCw, Sparkles, CheckCircle2, ShieldAlert, Palette,
+  GraduationCap, Edit2, Check, X, MessageCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toMajorUnits } from '../../utils/currency';
+import { getWhatsAppUrl } from '../../utils/phone';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
@@ -16,9 +18,12 @@ import { QrCardBadge, CardThemeColor } from '../../components/Qr/QrCardBadge';
 
 export function StudentDetails() {
   const { id } = useParams<{ id: string }>();
-  const [activeTab, setActiveTab] = useState<'overview' | 'enrollments' | 'attendance' | 'payments' | 'qrcard'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'enrollments' | 'attendance' | 'payments' | 'grades' | 'qrcard'>('overview');
   const toast = useToast();
   const { confirm } = useConfirm();
+
+  const [isEditingCardNumber, setIsEditingCardNumber] = useState(false);
+  const [newCardNumberInput, setNewCardNumberInput] = useState('');
 
   const student = useLiveQuery(() => db.students.get(id as string), [id]);
   const settings = useLiveQuery(() => db.settings.toArray(), []);
@@ -56,6 +61,13 @@ export function StudentDetails() {
     [id]
   );
 
+  // Assessments and Grades
+  const allAssessments = useLiveQuery(() => db.assessments.filter(a => !a.deleted_at).toArray(), []);
+  const studentGrades = useLiveQuery(
+    () => db.assessmentGrades.where('studentId').equals(id as string).filter(g => !g.deleted_at).toArray(),
+    [id]
+  );
+
   if (!student) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -71,7 +83,7 @@ export function StudentDetails() {
     if (!student) return;
     try {
       const now = Date.now();
-      const serial = `MSR-${uuidv4().slice(0, 6).toUpperCase()}`;
+      const serial = student.studentCode || (student.phone ? student.phone.slice(-4) : '0001');
       await db.qrCards.add({
         id: uuidv4(),
         cardNumber: serial,
@@ -86,7 +98,7 @@ export function StudentDetails() {
         updated_at: now,
         sync_status: 'pending'
       });
-      toast.success(`تم إصدار كرنيه الطالب بنجاح برقم (${serial})`);
+      toast.success(`تم إصدار كرنيه الطالب بنجاح برقم كود (${serial})`);
     } catch (err) {
       toast.error('فشل إصدار الكرنيه، يرجى المحاولة لاحقاً');
     }
@@ -94,7 +106,7 @@ export function StudentDetails() {
 
   // Re-issue / replace current card
   const handleReissueCard = async () => {
-    if (!studentCard) return;
+    if (!studentCard || !student) return;
     const isConfirmed = await confirm({
       title: 'إعادة إصدار كرنيه جديد',
       message: `هل أنت متأكد من إلغاء البطاقة الحالية (${studentCard.cardNumber}) وإصدار بطاقة جديدة؟`,
@@ -114,8 +126,8 @@ export function StudentDetails() {
           sync_status: 'pending'
         });
 
-        // Add new card
-        const serial = `MSR-${uuidv4().slice(0, 6).toUpperCase()}`;
+        // Add new card with student's actual studentCode
+        const serial = student.studentCode || (student.phone ? student.phone.slice(-4) : '0001');
         await db.qrCards.add({
           id: uuidv4(),
           cardNumber: serial,
@@ -131,10 +143,51 @@ export function StudentDetails() {
           sync_status: 'pending'
         });
 
-        toast.success(`تم إصدار الكرنيه الجديد برقم (${serial}) وإيقاف البطاقة السابقة`);
+        toast.success(`تم إصدار الكرنيه الجديد بكود الطالب (${serial}) وإيقاف البطاقة السابقة`);
       } catch (err) {
         toast.error('فشل إعادة إصدار الكرنيه');
       }
+    }
+  };
+
+  // Sync card number with studentCode (e.g. migrate from MSR-xxx to 0009)
+  const handleSyncWithStudentCode = async () => {
+    if (!studentCard || !student?.studentCode) return;
+    try {
+      const now = Date.now();
+      await db.qrCards.update(studentCard.id, {
+        cardNumber: student.studentCode,
+        qrCodeData: student.studentCode,
+        updated_at: now,
+        sync_status: 'pending'
+      });
+      toast.success(`تمت مزامنة الكرنيه والباركود مع كود الطالب (${student.studentCode}) بنجاح`);
+    } catch (err) {
+      toast.error('فشل تحديث رقم الكرنيه');
+    }
+  };
+
+  // Manually update card number
+  const handleSaveCustomCardNumber = async () => {
+    if (!studentCard) return;
+    const trimmed = newCardNumberInput.trim();
+    if (!trimmed) {
+      toast.error('يرجى إدخال رقم كود صحيح');
+      return;
+    }
+    try {
+      const now = Date.now();
+      await db.qrCards.update(studentCard.id, {
+        cardNumber: trimmed,
+        qrCodeData: trimmed,
+        updated_at: now,
+        sync_status: 'pending'
+      });
+      setIsEditingCardNumber(false);
+      setNewCardNumberInput('');
+      toast.success(`تم تعديل كود الكرنيه إلى (${trimmed}) بنجاح`);
+    } catch (err) {
+      toast.error('فشل تعديل رقم الكرنيه');
     }
   };
 
@@ -185,7 +238,21 @@ export function StudentDetails() {
                 {student.isActive ? 'نشط' : 'غير نشط'}
               </span>
               <span>•</span>
-              <span className="font-mono" dir="ltr">{student.phone}</span>
+              <div className="inline-flex items-center gap-1.5">
+                <span className="font-mono" dir="ltr">{student.phone}</span>
+                {student.phone && getWhatsAppUrl(student.phone) && (
+                  <a
+                    href={getWhatsAppUrl(student.phone)}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="محادثة واتساب سريعة"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors"
+                  >
+                    <MessageCircle className="w-2.5 h-2.5" />
+                    <span>واتساب</span>
+                  </a>
+                )}
+              </div>
               {student.gradeLevel && (
                 <>
                   <span>•</span>
@@ -226,6 +293,7 @@ export function StudentDetails() {
           { id: 'enrollments', label: 'المجموعات المسجل بها', icon: BookOpen },
           { id: 'attendance', label: 'سجل الحضور', icon: Clock },
           { id: 'payments', label: 'المدفوعات', icon: Wallet },
+          { id: 'grades', label: 'الامتحانات والتقييمات', icon: GraduationCap },
           { id: 'qrcard', label: 'كرنيه وباركود الطالب (QR)', icon: QrCode },
         ].map(tab => (
           <button
@@ -268,7 +336,21 @@ export function StudentDetails() {
               </div>
               <div>
                 <span className="block text-[11px] text-slate-500 mb-0.5">هاتف ولي الأمر</span>
-                <p className="font-semibold text-slate-900 dark:text-slate-100 font-mono" dir="ltr">{student.parentPhone || '-'}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-slate-900 dark:text-slate-100 font-mono" dir="ltr">{student.parentPhone || '-'}</p>
+                  {student.parentPhone && getWhatsAppUrl(student.parentPhone) && (
+                    <a
+                      href={getWhatsAppUrl(student.parentPhone)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="مراسلة ولي الأمر عبر واتساب"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors"
+                    >
+                      <MessageCircle className="w-2.5 h-2.5" />
+                      <span>واتساب</span>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -531,6 +613,149 @@ export function StudentDetails() {
         </div>
       )}
 
+      {/* Grades and Assessments Tab */}
+      {activeTab === 'grades' && (
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  سجل الامتحانات والواجبات والتقييمات
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  عرض درجات الطالب في كافة الاختبارات مع إمكانية رصد وتعديل الدرجة فوراً
+                </p>
+              </div>
+            </div>
+
+            {allAssessments?.length === 0 ? (
+              <div className="text-center py-10 text-slate-500 text-xs">
+                <GraduationCap className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>لا توجد امتحانات أو واجبات مضافة في النظام حتى الآن.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-right">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">اسم الاختبار / الواجب</th>
+                      <th className="px-4 py-3 font-semibold">النوع</th>
+                      <th className="px-4 py-3 font-semibold">الكورس</th>
+                      <th className="px-4 py-3 font-semibold">التاريخ</th>
+                      <th className="px-4 py-3 font-semibold">الدرجة العظمى</th>
+                      <th className="px-4 py-3 font-semibold">درجة الطالب</th>
+                      <th className="px-4 py-3 font-semibold">النسبة والتقدير</th>
+                      <th className="px-4 py-3 font-semibold">تعديل / رصد</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {allAssessments?.map(assessment => {
+                      const gradeRecord = studentGrades?.find(g => g.assessmentId === assessment.id);
+                      const course = courses?.find(c => c.id === assessment.courseId);
+                      const numericGrade = gradeRecord ? Number(gradeRecord.grade) : null;
+                      const percentage = (numericGrade !== null && assessment.maxGrade > 0)
+                        ? Math.round((numericGrade / assessment.maxGrade) * 100)
+                        : null;
+
+                      return (
+                        <tr key={assessment.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100">
+                            {assessment.name}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              assessment.type === 'exam' 
+                                ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                            }`}>
+                              {assessment.type === 'exam' ? 'امتحان' : 'واجب'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-300">
+                            {course?.name || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 font-mono">
+                            {assessment.date ? format(new Date(assessment.date), 'dd/MM/yyyy') : '-'}
+                          </td>
+                          <td className="px-4 py-3 font-mono font-bold text-slate-600 dark:text-slate-400">
+                            {assessment.maxGrade}
+                          </td>
+                          <td className="px-4 py-3 font-mono font-bold">
+                            {gradeRecord ? (
+                              <span className="text-blue-600 dark:text-blue-400 text-sm">
+                                {gradeRecord.grade}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[11px]">- لم ترصد -</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {percentage !== null ? (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                percentage >= 85 
+                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                  : percentage >= 65 
+                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+                                  : percentage >= 50
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                                  : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
+                              }`}>
+                                {percentage}% ({percentage >= 85 ? 'ممتاز' : percentage >= 65 ? 'جيد جداً' : percentage >= 50 ? 'ناجح' : 'راسب'})
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const input = window.prompt(`أدخل درجة الطالب في (${assessment.name}) من أصل ${assessment.maxGrade}:`, gradeRecord?.grade?.toString() || '');
+                                if (input === null) return;
+                                const parsed = parseFloat(input.trim());
+                                if (isNaN(parsed) || parsed < 0) {
+                                  toast.error('يرجى إدخال درجة رقمية صحيحة');
+                                  return;
+                                }
+                                const now = Date.now();
+                                if (gradeRecord) {
+                                  await db.assessmentGrades.update(gradeRecord.id, {
+                                    grade: parsed,
+                                    gradedAt: now,
+                                    updated_at: now,
+                                    sync_status: 'pending'
+                                  });
+                                } else {
+                                  await db.assessmentGrades.add({
+                                    id: uuidv4(),
+                                    assessmentId: assessment.id,
+                                    studentId: student.id,
+                                    grade: parsed,
+                                    gradedAt: now,
+                                    created_at: now,
+                                    updated_at: now,
+                                    sync_status: 'pending'
+                                  });
+                                }
+                                toast.success(`تم رصد الدرجة (${parsed}/${assessment.maxGrade}) للطالب بنجاح`);
+                              }}
+                              className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded text-[11px] font-semibold transition-colors"
+                            >
+                              {gradeRecord ? 'تعديل الدرجة' : '+ رصد درجة'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Dedicated QR Card & ID Badge Tab */}
       {activeTab === 'qrcard' && (
         <div className="space-y-6">
@@ -544,10 +769,74 @@ export function StudentDetails() {
                       <QrCode className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       إدارة بطاقة الطالب
                     </h3>
-                    <span className="font-mono text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold rounded-md">
-                      {studentCard.cardNumber}
-                    </span>
+                    {!isEditingCardNumber ? (
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold rounded-md">
+                          #{studentCard.cardNumber}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewCardNumberInput(studentCard.cardNumber || '');
+                            setIsEditingCardNumber(true);
+                          }}
+                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-blue-600"
+                          title="تعديل كود الكرنيه يدوياً"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={newCardNumberInput}
+                          onChange={e => setNewCardNumberInput(e.target.value)}
+                          placeholder="الكود الجديد (مثال: 0009)"
+                          className="px-2 py-1 border border-blue-400 rounded text-xs font-mono font-bold w-28 text-left bg-white dark:bg-slate-800 dark:text-slate-100"
+                          dir="ltr"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveCustomCardNumber}
+                          className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                          title="حفظ"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingCardNumber(false)}
+                          className="p-1 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded hover:bg-slate-300"
+                          title="إلغاء"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Migration banner if old MSR format or not matching studentCode */}
+                  {student?.studentCode && studentCard.cardNumber !== student.studentCode && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center justify-between gap-3 text-xs">
+                      <div>
+                        <p className="font-semibold text-amber-800 dark:text-amber-300">
+                          الكرنيه الحالي برقم ({studentCard.cardNumber})
+                        </p>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                          كود الطالب المسجل بالنظام هو (#{student.studentCode})
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSyncWithStudentCode}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded text-xs shrink-0 transition-colors shadow-2xs"
+                      >
+                        مزامنة مع كود الطالب
+                      </button>
+                    </div>
+                  )}
 
                   <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-slate-200 dark:border-slate-800 text-xs space-y-2">
                     <div className="flex justify-between">
@@ -607,7 +896,7 @@ export function StudentDetails() {
                       className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
-                      <span>إعادة إصدار بدل فاقد</span>
+                      <span>إعادة إصدار بكود الطالب</span>
                     </button>
                   </div>
                 </div>
@@ -628,8 +917,8 @@ export function StudentDetails() {
                 {/* The card */}
                 <div className="py-4 px-2">
                   <QrCardBadge
-                    cardNumber={studentCard.cardNumber || 'MSR-SAMPLE'}
-                    qrCodeData={studentCard.qrCodeData || studentCard.cardNumber}
+                    cardNumber={studentCard.cardNumber || student.studentCode || '0001'}
+                    qrCodeData={studentCard.qrCodeData || studentCard.cardNumber || student.studentCode || '0001'}
                     studentName={student.name}
                     studentPhone={student.phone}
                     studentGrade={student.gradeLevel}
@@ -642,7 +931,7 @@ export function StudentDetails() {
                 </div>
 
                 <p className="text-[11px] text-slate-400 text-center mt-3 print:hidden">
-                  جاهز للطباعة على طابعات PVC الكارنيهات أو على ورق الطباعة اللاصق
+                  كود الباركود المشفر مطابق تماماً لرقم الكرنيه وكود الطالب
                 </p>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
 import { ArrowRight, Users, UserPlus, Calendar, Clock, X, Trash2 } from 'lucide-react';
@@ -11,6 +11,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 
 export function GroupDetails() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const toast = useToast();
   const { confirm } = useConfirm();
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
@@ -31,6 +32,37 @@ export function GroupDetails() {
     () => db.students.filter(s => !s.deleted_at).toArray(), 
     []
   );
+
+  const handleDeleteGroup = async () => {
+    if (!group) return;
+    const isConfirmed = await confirm({
+      title: 'حذف المجموعة بالكامل',
+      message: `هل أنت متأكد من حذف مجموعة "${group.name}" نهائياً؟`,
+      description: 'سيتم حذف المجموعة وإلغاء تسجيلات جميع الطلاب المرتبطين بها وحصص الحضور.',
+      confirmText: 'نعم، حذف المجموعة',
+      cancelText: 'إلغاء',
+      variant: 'danger'
+    });
+
+    if (isConfirmed) {
+      try {
+        await db.transaction('rw', [db.groups, db.enrollments, db.attendanceSessions, db.attendanceRecords], async () => {
+          await db.groups.delete(group.id);
+          await db.enrollments.where('groupId').equals(group.id).delete();
+          const sessions = await db.attendanceSessions.where('groupId').equals(group.id).toArray();
+          for (const s of sessions) {
+            await db.attendanceRecords.where('sessionId').equals(s.id).delete();
+          }
+          await db.attendanceSessions.where('groupId').equals(group.id).delete();
+        });
+        toast.success(`تم حذف مجموعة "${group.name}" بنجاح`);
+        navigate('/groups');
+      } catch (err) {
+        console.error(err);
+        toast.error('فشل حذف المجموعة');
+      }
+    }
+  };
 
   if (!group || !course) {
     return (
@@ -66,24 +98,34 @@ export function GroupDetails() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Link to="/groups" className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
-          <ArrowRight className="w-4 h-4" />
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{group.name}</h1>
-          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
-              group.status === 'in_progress' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' :
-              group.status === 'finished' ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700' :
-              'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-            }`}>
-              {group.status === 'in_progress' ? 'جارية' : group.status === 'finished' ? 'منتهية' : 'مجدولة'}
-            </span>
-            <span>•</span>
-            <span>{course.name}</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link to="/groups" className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{group.name}</h1>
+            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                group.status === 'in_progress' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' :
+                group.status === 'finished' ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700' :
+                'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+              }`}>
+                {group.status === 'in_progress' ? 'جارية' : group.status === 'finished' ? 'منتهية' : 'مجدولة'}
+              </span>
+              <span>•</span>
+              <span>{course.name}</span>
+            </div>
           </div>
         </div>
+
+        <button
+          onClick={handleDeleteGroup}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-900/60 transition-colors"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>حذف المجموعة</span>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

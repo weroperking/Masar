@@ -174,7 +174,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 dark:bg-slate-950 flex transition-colors duration-150">
       {/* Sidebar */}
-      <aside className="w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col hidden md:flex shrink-0">
+      <aside className="w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col hidden md:flex shrink-0 sticky top-0 h-screen">
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-700 shrink-0">
           <h1 className="text-2xl font-black text-blue-600 dark:text-blue-400 font-brand tracking-tight">
             مسار
@@ -245,9 +245,9 @@ export function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 w-full min-h-screen">
         {/* Top Header Bar (Desktop & Mobile) */}
-        <header className="bg-white dark:bg-slate-900 h-16 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 md:px-8 shrink-0">
+        <header className="bg-white dark:bg-slate-900 h-16 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 md:px-8 shrink-0 sticky top-0 z-20">
           <div className="flex items-center gap-3">
             {/* Mobile logo */}
             <h1 className="md:hidden text-xl font-black text-blue-600 dark:text-blue-400 font-brand">
@@ -288,8 +288,8 @@ export function Layout() {
         </header>
         
         {/* Page Content */}
-        <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-50 dark:bg-slate-900 dark:bg-slate-950 transition-colors duration-150">
-          <div className="mx-auto max-w-7xl pb-12">
+        <div className="flex-1 w-full min-h-full p-4 md:p-6 lg:p-8 bg-slate-50 dark:bg-slate-900 dark:bg-slate-950 transition-colors duration-150 flex flex-col">
+          <div className="w-full flex-1 flex flex-col pb-12">
             <Outlet />
           </div>
         </div>

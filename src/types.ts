@@ -175,10 +175,15 @@ export interface Event extends BaseRecord {
 export interface User extends BaseRecord {
   status?: string;
   branch?: string;
+  phone?: string;
+  subject?: string;
+  notes?: string;
   clerkUserId?: string;
   role: 'admin' | 'manager' | 'teacher' | 'assistant' | 'staff';
   name: string;
   email: string;
+  assignedCourseIds?: string[];
+  assignedGroupIds?: string[];
 }
 
 export interface MessageTemplate extends BaseRecord {
