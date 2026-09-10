@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import QRCode from 'qrcode';
+import Barcode from 'react-barcode';
 import { User, Phone, GraduationCap, School, ShieldCheck, QrCode as QrIcon } from 'lucide-react';
 
 export type CardThemeColor = 'blue' | 'emerald' | 'indigo' | 'amber' | 'rose' | 'slate';
@@ -19,6 +19,7 @@ export interface QrCardBadgeProps {
   showCardNumber?: boolean;
   status?: 'active' | 'revoked' | string;
   size?: 'normal' | 'large' | 'compact' | 'print';
+  backgroundImage?: string;
   className?: string;
 }
 
@@ -110,26 +111,10 @@ export function QrCardBadge({
   showCardNumber = true,
   status = 'active',
   size = 'normal',
+  backgroundImage,
   className = ''
 }: QrCardBadgeProps) {
-  const [qrUrl, setQrUrl] = useState<string>('');
-  const theme = themeStyles[themeColor] || themeStyles.blue;
-  const isRevoked = status === 'revoked';
-
-  useEffect(() => {
-    const data = qrCodeData || cardNumber || 'MASAR';
-    QRCode.toDataURL(data, {
-      margin: 1,
-      width: 256,
-      errorCorrectionLevel: 'M',
-      color: {
-        dark: '#0f172a',
-        light: '#ffffff'
-      }
-    })
-      .then((url) => setQrUrl(url))
-      .catch((err) => console.error('Failed to generate QR code', err));
-  }, [qrCodeData, cardNumber]);
+  
 
   const isPrint = size === 'print';
   const isCompact = size === 'compact';
@@ -138,6 +123,7 @@ export function QrCardBadge({
   return (
     <div
       dir="rtl"
+      style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
       className={`relative select-none rounded-xl overflow-hidden border transition-all duration-150 text-right ${
         isPrint
           ? 'w-[340px] h-[215px] bg-white text-slate-900 border-slate-300 shadow-none'
@@ -148,10 +134,15 @@ export function QrCardBadge({
           : 'w-[350px] sm:w-[360px] h-[225px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm'
       } ${className}`}
     >
+      {/* Background Overlay if image is used */}
+      {backgroundImage && (
+        <div className="absolute inset-0 bg-white/90 dark:bg-slate-900/90 z-0"></div>
+      )}
+      
       {/* Top Header Strip - Clean Architectural Header */}
-      <div className={`px-4 py-2.5 flex items-center justify-between border-b border-slate-800 ${theme.headerBg} ${theme.headerText}`}>
+      <div className={`relative z-10 px-4 py-2.5 flex items-center justify-between border-b border-slate-800/20 dark:border-slate-800 ${themeStyles[themeColor].headerBg} ${themeStyles[themeColor].headerText}`}>
         <div className="flex items-center gap-2">
-          <div className={`w-5 h-5 rounded flex items-center justify-center font-black text-[11px] ${theme.brandMark}`}>
+          <div className={`w-5 h-5 rounded flex items-center justify-center font-black text-[11px] ${themeStyles[themeColor].brandMark}`}>
             م
           </div>
           {showCenterName && (
@@ -162,12 +153,12 @@ export function QrCardBadge({
         </div>
 
         <div className="flex items-center gap-1.5">
-          {isRevoked ? (
+          {(status === 'revoked') ? (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
               موقوفة
             </span>
           ) : (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${theme.tagBg} ${theme.tagText} flex items-center gap-1`}>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${themeStyles[themeColor].tagBg} ${themeStyles[themeColor].tagText} flex items-center gap-1`}>
               <ShieldCheck className="w-3 h-3" />
               {studentName ? 'بطاقة طالب' : 'بطاقة حضور'}
             </span>
@@ -176,10 +167,10 @@ export function QrCardBadge({
       </div>
 
       {/* Solid subtle accent hairline */}
-      <div className={`h-[2px] w-full ${theme.accentBorder.replace('border-', 'bg-')}`} />
+      <div className={`relative z-10 h-[2px] w-full ${themeStyles[themeColor].accentBorder.replace('border-', 'bg-')}`} />
 
       {/* Card Body */}
-      <div className="p-4 flex items-center justify-between gap-3 h-[calc(100%-46px)]">
+      <div className="relative z-10 p-4 flex items-center justify-between gap-3 h-[calc(100%-46px)]">
         {/* Student Details / Identification Info */}
         <div className="flex-1 flex flex-col justify-between h-full min-w-0 pr-0.5">
           <div className="space-y-1.5">
@@ -236,35 +227,37 @@ export function QrCardBadge({
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
             {showCardNumber && (
               <div>
-                <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-sans">كود البطاقة</span>
+                <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-sans">رقم الطالب (الباركود)</span>
                 <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 tracking-wider">
-                  {cardNumber}
+                  {String(cardNumber || qrCodeData || '0001').replace(/\D/g, '') || '0001'}
                 </span>
               </div>
             )}
-            <div className="text-[10px] text-slate-400 font-mono tracking-widest uppercase">
-              MASAR
+            <div className="text-[10px] text-slate-400 font-bold">
+              مسار
             </div>
           </div>
         </div>
 
-        {/* QR Code Container */}
+        {/* Barcode Container - Strict numeric encoding only */}
         <div className="shrink-0 flex flex-col items-center justify-center">
-          <div className="bg-white p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs flex flex-col items-center">
-            {qrUrl ? (
-              <img
-                src={qrUrl}
-                alt={`QR code for ${cardNumber}`}
-                className="w-22 h-22 sm:w-24 sm:h-24 object-contain rounded"
-              />
-            ) : (
-              <div className="w-22 h-22 sm:w-24 sm:h-24 bg-slate-100 rounded flex items-center justify-center text-slate-400">
-                <QrIcon className="w-7 h-7 animate-pulse" />
-              </div>
-            )}
+          <div className="bg-white p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs flex flex-col items-center justify-center overflow-hidden w-28 sm:w-32 h-20 sm:h-24">
+            <Barcode 
+              value={String(cardNumber || qrCodeData || '0001').replace(/\D/g, '') || '0001'} 
+              format="CODE128" 
+              width={1.5} 
+              height={38} 
+              displayValue={false} 
+              margin={0}
+              background="#ffffff"
+              lineColor="#0f172a"
+            />
+            <span className="font-mono text-[10px] font-bold text-slate-900 tracking-wider mt-0.5">
+              {String(cardNumber || qrCodeData || '0001').replace(/\D/g, '') || '0001'}
+            </span>
           </div>
           <span className="text-[9px] text-slate-500 dark:text-slate-400 mt-1 font-medium text-center">
-            امسح للحضور
+            امسح الباركود
           </span>
         </div>
       </div>

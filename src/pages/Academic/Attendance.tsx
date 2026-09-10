@@ -374,6 +374,16 @@ function AttendanceModal({
   const allStudents = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
   const rosterStudents = allStudents?.filter(s => activeStudentIds.includes(s.id)) || [];
 
+  
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear = new Date().getFullYear();
+  const currentSubscriptions = useLiveQuery(() => 
+    db.monthlySubscriptions
+      .where('courseId').equals(session.courseId)
+      .and(sub => sub.month === currentMonth && sub.year === currentYear)
+      .toArray(), 
+  [session.courseId, currentMonth, currentYear]);
+
   const existingRecords = useLiveQuery(
     () => db.attendanceRecords.where('sessionId').equals(session.id).toArray(),
     [session.id]
@@ -409,38 +419,105 @@ function AttendanceModal({
   // QR Code Scanner State
   const qrCards = useLiveQuery(() => db.qrCards.filter(c => !c.deleted_at).toArray(), []);
   const [qrInput, setQrInput] = useState('');
-  const [isQrMode, setIsQrMode] = useState(false);
+  
+  
   const qrInputRef = useRef<HTMLInputElement>(null);
+  const handleQrScanRef = useRef<any>(null);
+
+
+  
+  
+  useEffect(() => {
+    handleQrScanRef.current = handleQrScan;
+  });
 
   useEffect(() => {
-    if (isQrMode && qrInputRef.current) {
-      qrInputRef.current.focus();
-    }
-  }, [isQrMode]);
 
-  const handleQrScan = (e: any) => {
+    // Always focus barcode input on mount and when modal opens
+    setTimeout(() => {
+      if (qrInputRef.current) {
+        qrInputRef.current.focus();
+      }
+    }, 100);
+    
+    // Global keyboard listener to capture barcode even if input loses focus
+    let buffer = '';
+    let lastKeyTime = 0;
+    
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if already in an input/textarea (like the barcode input itself)
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+         return;
+      }
+
+      const currentTime = performance.now();
+      if (currentTime - lastKeyTime > 100) {
+        buffer = '';
+      }
+      lastKeyTime = currentTime;
+
+      if (/^[0-9a-zA-Z\-]$/.test(e.key)) {
+        buffer += e.key;
+      } else if (e.key === 'Enter' && buffer.length > 0) {
+        e.preventDefault();
+        const code = buffer.trim();
+        buffer = '';
+        
+        if (!code) return;
+        
+        // We simulate setting the input and firing handleQrScan
+        setQrInput(code);
+        setTimeout(() => {
+          const fakeEvent = { key: 'Enter', preventDefault: () => {} };
+          handleQrScanRef.current(fakeEvent, code);
+        }, 10);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  const handleQrScan = (e: any, overrideCode?: string) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const code = qrInput.trim();
+      const code = overrideCode || qrInput.trim();
       setQrInput('');
       
       if (!code) return;
+      
+      let foundStudentId = null;
+      const cleanDigits = code.replace(/\D/g, '');
 
-      const card = qrCards?.find(c => c.cardNumber === code || c.qrCodeData === code);
-      if (!card) {
-        toast.error('بطاقة غير مسجلة في النظام');
-        return;
-      }
-      if (!card.studentId) {
-        toast.error('هذه البطاقة غير مرتبطة بأي طالب');
-        return;
-      }
-      if (card.status !== 'active') {
-        toast.error('هذه البطاقة موقوفة');
-        return;
+      let matchedStudent = rosterStudents.find(s => 
+        s.studentCode === code || 
+        (cleanDigits && s.studentCode === cleanDigits) ||
+        (cleanDigits && s.studentCode && parseInt(s.studentCode, 10) === parseInt(cleanDigits, 10))
+      );
+      
+      if (matchedStudent) {
+        foundStudentId = matchedStudent.id;
+      } else {
+        const card = qrCards?.find(c => 
+          c.cardNumber === code || 
+          c.qrCodeData === code ||
+          (cleanDigits && (c.cardNumber === cleanDigits || c.qrCodeData === cleanDigits)) ||
+          (cleanDigits && c.cardNumber && parseInt(c.cardNumber, 10) === parseInt(cleanDigits, 10))
+        );
+        if (card && card.status === 'active' && card.studentId) {
+          foundStudentId = card.studentId;
+        } else if (card && card.status !== 'active') {
+          toast.error('هذه البطاقة موقوفة');
+          return;
+        }
       }
 
-      const studentInRoster = rosterStudents.find(s => s.id === card.studentId);
+      if (!foundStudentId) {
+        toast.error('لم يتم العثور على طالب بهذا الكود في النظام');
+        return;
+      }
+      
+      const studentInRoster = rosterStudents.find(s => s.id === foundStudentId);
       if (!studentInRoster) {
         toast.error('الطالب غير مقيد في هذه المجموعة');
         return;
@@ -448,7 +525,7 @@ function AttendanceModal({
 
       if (session.isTrial) {
         const pastTrialsCount = allTrialRecords?.filter(r => 
-          r.studentId === card.studentId && 
+          r.studentId === foundStudentId && 
           r.status === 'present' && 
           trialSessionIds.includes(r.sessionId) &&
           r.sessionId !== session.id
@@ -460,12 +537,21 @@ function AttendanceModal({
         }
       }
 
-      setRecordMap(prev => ({ ...prev, [card.studentId!]: 'present' }));
-      toast.success(`تم تحضير الطالب: ${studentInRoster.name}`);
+      
+      setRecordMap(prev => ({ ...prev, [foundStudentId]: 'present' }));
+      
+      const sub = currentSubscriptions?.find(s => s.studentId === foundStudentId);
+      if (!session.isTrial && (!sub || sub.status !== 'paid')) {
+        toast.success(`تم التحضير: ${studentInRoster.name} (تنبيه: لم يسدد اشتراك الشهر)`);
+      } else {
+        toast.success(`تم تحضير الطالب: ${studentInRoster.name}`);
+      }
+
     }
   };
 
   useEffect(() => {
+
     if (existingRecords) {
       const map: Record<string, 'present' | 'absent'> = {};
       existingRecords.forEach(r => {
@@ -597,35 +683,29 @@ function AttendanceModal({
             </button>
           </div>
           
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button 
-              onClick={() => setIsQrMode(!isQrMode)} 
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                isQrMode 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-              }`}
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>مسح بطاقة QR</span>
-            </button>
-            {isQrMode && (
-              <input
-                ref={qrInputRef}
-                type="text"
-                placeholder="انتظار القارئ..."
-                className="px-2.5 py-1 border border-slate-300 dark:border-slate-600 rounded-md text-xs text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 focus:ring-1 focus:ring-blue-500 focus:outline-none w-full sm:w-44 text-left font-mono"
-                dir="ltr"
-                value={qrInput}
-                onChange={e => setQrInput(e.target.value)}
-                onKeyDown={handleQrScan}
-                onBlur={() => {
-                  if (isQrMode) {
-                     setTimeout(() => qrInputRef.current?.focus(), 100);
+          <div className="flex items-center gap-2 w-full sm:w-auto relative group">
+            <QrCode className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+            <input
+              ref={qrInputRef}
+              type="text"
+              placeholder="انتظار قارئ الباركود..."
+              className="pl-3 pr-9 py-1.5 border-2 border-blue-200 dark:border-blue-900/50 rounded-lg text-sm text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 focus:outline-none w-full sm:w-56 text-left font-mono font-bold tracking-widest transition-all shadow-sm"
+              dir="ltr"
+              value={qrInput}
+              onChange={e => setQrInput(e.target.value)}
+              onKeyDown={handleQrScan}
+              onBlur={() => {
+                // Try to keep focus on scanner input if clicked outside within the modal
+                setTimeout(() => {
+                  if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+                    qrInputRef.current?.focus();
                   }
-                }}
-              />
-            )}
+                }, 100);
+              }}
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 rounded">
+              جاهز
+            </span>
           </div>
         </div>
         
@@ -637,7 +717,14 @@ function AttendanceModal({
             </div>
           ) : (
             rosterStudents.map(student => {
+              
               const currentStatus = recordMap[student.id];
+              
+              // Subscription check
+              const studentSub = currentSubscriptions?.find(s => s.studentId === student.id);
+              const hasUnpaidSub = studentSub && studentSub.status !== 'paid';
+              const noSubRecord = !studentSub;
+
               
               // 1. Check if absent previously
               const wasAbsentPreviously = prevSessionRecords?.some(r => r.studentId === student.id && r.status === 'absent');
@@ -661,6 +748,11 @@ function AttendanceModal({
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs">{student.name}</p>
+                      {student.studentCode && (
+                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          #{student.studentCode}
+                        </span>
+                      )}
                       {wasAbsentPreviously && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded text-[10px] font-medium" title="تغيب الطالب عن الحصة الماضية">
                           <AlertTriangle className="w-3 h-3" />

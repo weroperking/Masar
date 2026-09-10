@@ -147,14 +147,14 @@ export function Students() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleEdit(student)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-blue-600 cursor-pointer dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           title="تعديل بيانات الطالب"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(student.id, student.name)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer dark:hover:text-red-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           title="حذف الطالب"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -182,6 +182,7 @@ export function Students() {
 function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, existingStudent: Student | null }) {
   const toast = useToast();
   const [formData, setFormData] = useState({
+    studentCode: existingStudent?.studentCode || '',
     name: existingStudent?.name || '', 
     phone: existingStudent?.phone || '', 
     parentName: existingStudent?.parentName || '', 
@@ -196,17 +197,34 @@ function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, e
     try {
       const now = Date.now();
       
-      if (existingStudent) {
-        await db.students.update(existingStudent.id, {
-          ...formData,
-          updated_at: now,
-          sync_status: 'pending'
-        });
+      
+        let finalStudentCode = formData.studentCode.trim();
+        if (!existingStudent && !finalStudentCode) {
+          const allStudents = await db.students.toArray();
+          let maxSeq = 0;
+          allStudents.forEach(s => {
+            if (s.studentCode && /^\d+$/.test(s.studentCode)) {
+              const num = parseInt(s.studentCode, 10);
+              if (num > maxSeq) maxSeq = num;
+            }
+          });
+          finalStudentCode = String(maxSeq + 1).padStart(4, '0');
+        }
+
+        if (existingStudent) {
+          await db.students.update(existingStudent.id, {
+            ...formData,
+            studentCode: finalStudentCode,
+            updated_at: now,
+            sync_status: 'pending'
+          });
+
         toast.success(`تم تحديث بيانات الطالب (${formData.name}) بنجاح!`);
       } else {
         const newStudent: Student = {
           id: uuidv4(),
           ...formData,
+          studentCode: finalStudentCode,
           created_at: now,
           updated_at: now,
           sync_status: 'pending'
@@ -234,17 +252,32 @@ function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, e
         </div>
         
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-3.5">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الطالب *</label>
-            <input 
-              required 
-              type="text" 
-              placeholder="الاسم ثلاثي أو رباعي"
-              className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-              value={formData.name} 
-              onChange={e => setFormData({...formData, name: e.target.value})} 
-            />
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">كود الطالب (رقم الباركود)</label>
+              <input 
+                type="text" 
+                placeholder="تلقائي إذا تُرك فارغاً"
+                dir="ltr"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono text-left"
+                value={formData.studentCode} 
+                onChange={e => setFormData({...formData, studentCode: e.target.value.replace(/\D/g, '')})} 
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الطالب *</label>
+              <input 
+                required 
+                type="text" 
+                placeholder="الاسم ثلاثي أو رباعي"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                value={formData.name} 
+                onChange={e => setFormData({...formData, name: e.target.value})} 
+              />
+            </div>
           </div>
+
           
           <div className="grid grid-cols-2 gap-3">
             <div>

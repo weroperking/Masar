@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, X, Trash2, BookOpen } from 'lucide-react';
+import { Plus, X, Trash2, BookOpen, Edit2, Search } from 'lucide-react';
 import { Course } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
@@ -10,6 +10,7 @@ import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 
 export function Courses() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const toast = useToast();
   const { confirm } = useConfirm();
   
@@ -85,10 +86,20 @@ export function Courses() {
                   </div>
                 </div>
 
-                <div className="mt-4 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                <div className="mt-4 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-1.5">
+                  <button
+                    onClick={() => {
+                      setEditingCourse(course);
+                      setIsModalOpen(true);
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-blue-600 cursor-pointer rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    title="تعديل الكورس"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={() => handleDelete(course.id, course.name)}
-                    className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     title="حذف الكورس"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -101,35 +112,56 @@ export function Courses() {
       </div>
 
       {isModalOpen && (
-        <CourseFormModal onClose={() => setIsModalOpen(false)} />
+        <CourseFormModal 
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingCourse(null);
+          }} 
+          initialData={editingCourse}
+        />
       )}
     </div>
   );
 }
 
-function CourseFormModal({ onClose }: { onClose: () => void }) {
+function CourseFormModal({ onClose, initialData }: { onClose: () => void, initialData?: Course | null }) {
   const toast = useToast();
   const [formData, setFormData] = useState({
-    name: '', price: '', paymentType: 'monthly' as const, isActive: true
+    name: initialData?.name || '', 
+    price: initialData ? String(toMajorUnits(initialData.price)) : '', 
+    paymentType: initialData?.paymentType || 'monthly', 
+    isActive: initialData?.isActive ?? true
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const now = Date.now();
-      const newCourse: Course = {
-        id: uuidv4(),
-        name: formData.name,
-        price: toMinorUnits(Number(formData.price)),
-        paymentType: formData.paymentType,
-        isActive: formData.isActive,
-        created_at: now,
-        updated_at: now,
-        sync_status: 'pending'
-      };
       
-      await db.courses.add(newCourse);
-      toast.success(`تمت إضافة كورس (${formData.name}) بنجاح!`);
+      if (initialData) {
+        await db.courses.update(initialData.id, {
+          name: formData.name,
+          price: toMinorUnits(Number(formData.price)),
+          paymentType: formData.paymentType as any,
+          isActive: formData.isActive,
+          updated_at: now,
+          sync_status: 'pending'
+        });
+        toast.success(`تم تعديل الكورس (${formData.name}) بنجاح!`);
+      } else {
+        const newCourse: Course = {
+          id: uuidv4(),
+          name: formData.name,
+          price: toMinorUnits(Number(formData.price)),
+          paymentType: formData.paymentType as any,
+          isActive: formData.isActive,
+          created_at: now,
+          updated_at: now,
+          sync_status: 'pending'
+        };
+        await db.courses.add(newCourse);
+        toast.success(`تمت إضافة كورس (${formData.name}) بنجاح!`);
+      }
       onClose();
     } catch (err) {
       toast.error('حدث خطأ أثناء حفظ الكورس');
@@ -140,7 +172,9 @@ function CourseFormModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col">
         <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">إضافة كورس جديد</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            {initialData ? 'تعديل الكورس' : 'إضافة كورس جديد'}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
             <X className="w-4 h-4" />
           </button>
@@ -209,7 +243,7 @@ function CourseFormModal({ onClose }: { onClose: () => void }) {
               type="submit" 
               className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs"
             >
-              حفظ الكورس
+              {initialData ? 'حفظ التعديلات' : 'حفظ الكورس'}
             </button>
           </div>
         </form>

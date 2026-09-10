@@ -178,18 +178,18 @@ export function Schedule() {
       {view === 'week' && (
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">الجدول الأسبوعي</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+          <div className="flex flex-col gap-6">
             {arabicDays.map(day => {
               const dayGroups = filteredGroups.filter(g => g.daysOfWeek?.includes(day)) || [];
               const isToday = day === todayArabic;
               return (
                 <div 
                   key={day} 
-                  className={`rounded-xl p-3 border flex flex-col min-h-[300px] ${
+                  className={`rounded-xl p-5 border flex flex-col sm:flex-row gap-5 ${
                     isToday ? 'border-blue-300 bg-blue-50/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50/30'
                   }`}
                 >
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-700 mb-3">
+                  <div className="flex flex-col sm:w-48 shrink-0 sm:border-l border-slate-200 dark:border-slate-700 sm:pl-4 justify-center items-start sm:items-center">
                     <span className={`font-bold text-sm ${isToday ? 'text-blue-600' : 'text-slate-800 dark:text-slate-200'}`}>
                       {day}
                     </span>
@@ -198,7 +198,7 @@ export function Schedule() {
                     )}
                   </div>
                   
-                  <div className="space-y-3 flex-1">
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {dayGroups.length === 0 ? (
                       <div className="text-center py-8 text-xs text-slate-400">لا توجد حصص</div>
                     ) : (

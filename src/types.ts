@@ -7,6 +7,7 @@ export interface BaseRecord {
 }
 
 export interface Student extends BaseRecord {
+  studentCode?: string;
   name: string;
   phone: string;
   school?: string;
@@ -208,6 +209,7 @@ export interface QrCard extends BaseRecord {
   status?: 'active' | 'revoked' | string;
   themeColor?: 'blue' | 'emerald' | 'indigo' | 'amber' | 'rose' | 'slate';
   centerName?: string;
+  backgroundImage?: string;
   notes?: string;
 }
 

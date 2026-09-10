@@ -71,6 +71,7 @@ export async function seedDatabaseIfEmpty() {
   // 2. Seed Students
   const s1: Student = {
     id: 'student-1',
+    studentCode: '0001',
     name: 'أحمد محمد علي',
     phone: '01012345678',
     parentName: 'محمد علي',
@@ -85,6 +86,7 @@ export async function seedDatabaseIfEmpty() {
 
   const s2: Student = {
     id: 'student-2',
+    studentCode: '0002',
     name: 'سارة إبراهيم حسن',
     phone: '01122334455',
     parentName: 'إبراهيم حسن',
@@ -99,6 +101,7 @@ export async function seedDatabaseIfEmpty() {
 
   const s3: Student = {
     id: 'student-3',
+    studentCode: '0003',
     name: 'يوسف خالد محمود',
     phone: '01233445566',
     parentName: 'خالد محمود',
@@ -113,6 +116,7 @@ export async function seedDatabaseIfEmpty() {
 
   const s4: Student = {
     id: 'student-4',
+    studentCode: '0004',
     name: 'نور الهدى أحمد',
     phone: '01555667788',
     parentName: 'أحمد شريف',
@@ -291,10 +295,10 @@ export async function seedDatabaseIfEmpty() {
 
   // 8. Seed QR Cards
   const cards: QrCard[] = [
-    { id: uuidv4(), cardNumber: 'MSR-1001', studentId: s1.id, printStatus: 'printed', linkedAt: now, created_at: now, updated_at: now, sync_status: 'pending' },
-    { id: uuidv4(), cardNumber: 'MSR-1002', studentId: s2.id, printStatus: 'printed', linkedAt: now, created_at: now, updated_at: now, sync_status: 'pending' },
-    { id: uuidv4(), cardNumber: 'MSR-1003', studentId: null, printStatus: 'queued', linkedAt: null, created_at: now, updated_at: now, sync_status: 'pending' },
-    { id: uuidv4(), cardNumber: 'MSR-1004', studentId: null, printStatus: 'available', linkedAt: null, created_at: now, updated_at: now, sync_status: 'pending' },
+    { id: uuidv4(), cardNumber: '0001', qrCodeData: '0001', studentId: s1.id, printStatus: 'printed', linkedAt: now, created_at: now, updated_at: now, sync_status: 'pending' },
+    { id: uuidv4(), cardNumber: '0002', qrCodeData: '0002', studentId: s2.id, printStatus: 'printed', linkedAt: now, created_at: now, updated_at: now, sync_status: 'pending' },
+    { id: uuidv4(), cardNumber: '0003', qrCodeData: '0003', studentId: null, printStatus: 'queued', linkedAt: null, created_at: now, updated_at: now, sync_status: 'pending' },
+    { id: uuidv4(), cardNumber: '0004', qrCodeData: '0004', studentId: null, printStatus: 'available', linkedAt: null, created_at: now, updated_at: now, sync_status: 'pending' },
   ];
   await db.qrCards.bulkAdd(cards);
 
@@ -322,4 +326,78 @@ export async function seedDatabaseIfEmpty() {
     sync_status: 'pending'
   };
   await db.users.bulkAdd([u1, u2]);
+}
+
+/**
+ * Migration helper to sanitize existing IndexedDB records:
+ * Converts any non-numeric card numbers or student codes to clean sequential digits.
+ */
+export async function sanitizeNumericCodes() {
+  try {
+    const students = await db.students.toArray();
+    let maxNum = 0;
+
+    // 1. Identify current highest numeric sequence
+    for (const student of students) {
+      if (student.studentCode) {
+        const digits = student.studentCode.replace(/\D/g, '');
+        if (digits) {
+          const n = parseInt(digits, 10);
+          if (n > maxNum) maxNum = n;
+        }
+      }
+    }
+
+    // 2. Sanitize student codes
+    for (const student of students) {
+      let code = student.studentCode;
+      if (!code || !/^\d+$/.test(code)) {
+        const digits = code ? code.replace(/\D/g, '') : '';
+        if (digits.length > 0) {
+          code = digits.padStart(4, '0');
+        } else {
+          maxNum++;
+          code = String(maxNum).padStart(4, '0');
+        }
+        await db.students.update(student.id, {
+          studentCode: code,
+          updated_at: Date.now(),
+          sync_status: 'pending'
+        });
+      }
+    }
+
+    // 3. Sanitize cards to match student codes or numeric sequences
+    const currentStudents = await db.students.toArray();
+    const studentMap = new Map(currentStudents.map(s => [s.id, s]));
+    const cards = await db.qrCards.toArray();
+
+    for (const card of cards) {
+      let numericCode = '';
+      if (card.studentId && studentMap.has(card.studentId)) {
+        numericCode = studentMap.get(card.studentId)!.studentCode || '';
+      }
+
+      if (!numericCode || !/^\d+$/.test(numericCode)) {
+        const digits = (card.cardNumber || '').replace(/\D/g, '');
+        if (digits.length > 0) {
+          numericCode = digits.padStart(4, '0');
+        } else {
+          maxNum++;
+          numericCode = String(maxNum).padStart(4, '0');
+        }
+      }
+
+      if (card.cardNumber !== numericCode || card.qrCodeData !== numericCode) {
+        await db.qrCards.update(card.id, {
+          cardNumber: numericCode,
+          qrCodeData: numericCode,
+          updated_at: Date.now(),
+          sync_status: 'pending'
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Could not complete numeric code sanitization:', err);
+  }
 }

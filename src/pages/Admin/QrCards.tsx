@@ -103,8 +103,24 @@ export function QrCards() {
   // Link card to a student
   const handleLinkStudent = async (cardId: string, studentId: string) => {
     const student = studentMap.get(studentId);
+    const card = cards?.find(c => c.id === cardId);
     const now = Date.now();
+
+    // Ensure both card and student share the exact same numeric code
+    let finalCode = (card?.cardNumber || '').replace(/\D/g, '');
+    if (student?.studentCode && /^\d+$/.test(student.studentCode)) {
+      finalCode = student.studentCode;
+    } else if (finalCode) {
+      await db.students.update(studentId, {
+        studentCode: finalCode,
+        updated_at: now,
+        sync_status: 'pending'
+      });
+    }
+
     await db.qrCards.update(cardId, {
+      cardNumber: finalCode,
+      qrCodeData: finalCode,
       studentId,
       linkedAt: now,
       printStatus: 'available',
@@ -113,10 +129,10 @@ export function QrCards() {
     });
 
     if (selectedCardForView?.id === cardId) {
-      setSelectedCardForView(prev => prev ? { ...prev, studentId, linkedAt: now } : null);
+      setSelectedCardForView(prev => prev ? { ...prev, cardNumber: finalCode, qrCodeData: finalCode, studentId, linkedAt: now } : null);
     }
 
-    toast.success(`تم ربط البطاقة بنجاح بالطالب (${student?.name || 'المحدد'})`);
+    toast.success(`تم ربط البطاقة بنجاح بالطالب (${student?.name || 'المحدد'}) برقم (${finalCode})`);
   };
 
   // Delete card with confirmation dialog
@@ -518,7 +534,7 @@ export function QrCards() {
                           {/* Delete Card */}
                           <button
                             onClick={() => handleDeleteCard(card)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-red-500/10 transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer rounded-md hover:bg-red-500/10 transition-colors"
                             title="حذف البطاقة"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

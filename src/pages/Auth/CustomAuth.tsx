@@ -9,7 +9,7 @@ export function CustomAuth() {
   const { isLoaded: isSignInLoaded, signIn, setActive: setSignInActive } = useSignIn();
   const { isLoaded: isSignUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
   
-  const [view, setView] = useState<'signin' | 'signup' | 'verify'>('signin');
+  const [view, setView] = useState<'signin' | 'signup' | 'verify_signup' | 'verify_signin' | 'verify_signin_otp'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
@@ -42,40 +42,108 @@ export function CustomAuth() {
                       'المستخدم الحالي';
 
     return (
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 p-8 text-center" dir="rtl">
-        <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">أنت مسجل الدخول بالفعل</h2>
-        <p className="text-slate-500 text-sm mb-6">
-          جلسة تسجيل الدخول نشطة ومؤكدة للحساب: <br />
-          <span className="font-semibold text-slate-700 dark:text-slate-300 dir-ltr inline-block mt-1">{userEmail}</span>
-        </p>
+      <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4" dir="rtl">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 p-8 text-center">
+          <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">أنت مسجل الدخول بالفعل</h2>
+          <p className="text-slate-500 text-sm mb-6">
+            جلسة تسجيل الدخول نشطة ومؤكدة للحساب: <br />
+            <span className="font-semibold text-slate-700 dark:text-slate-300 dir-ltr inline-block mt-1">{userEmail}</span>
+          </p>
 
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={async () => {
-              const targetSession = session?.id || clerk.client?.sessions?.[0]?.id;
-              if (targetSession) {
-                await clerk.setActive({ session: targetSession });
-              }
-            }}
-            className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors shadow-sm"
-          >
-            الانتقال مباشرة إلى لوحة التحكم
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => clerk.signOut()}
-            className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-red-50 hover:text-red-600 text-slate-700 dark:text-slate-300 font-medium text-sm transition-colors flex items-center justify-center gap-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>تسجيل الخروج والتبديل لحساب آخر</span>
-          </button>
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={async () => {
+                const targetSession = session?.id || clerk.client?.sessions?.[0]?.id;
+                if (targetSession) {
+                  await clerk.setActive({ session: targetSession });
+                }
+              }}
+              className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors shadow-sm"
+            >
+              الانتقال مباشرة إلى لوحة التحكم
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => clerk.signOut()}
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-red-50 hover:text-red-600 text-slate-700 dark:text-slate-300 font-medium text-sm transition-colors flex items-center justify-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>تسجيل الخروج والتبديل لحساب آخر</span>
+            </button>
+          </div>
         </div>
       </div>
     );
   }
+
+  
+  const handleSendOTP = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!isSignInLoaded) return;
+    if (!email) {
+      setError('يرجى إدخال البريد الإلكتروني أولاً لإرسال الرمز');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const { supportedFirstFactors } = await signIn.create({
+        identifier: email,
+      });
+
+      const emailCodeFactor = supportedFirstFactors?.find(
+        (factor: any) => factor.strategy === 'email_code'
+      );
+
+      if (emailCodeFactor) {
+        await signIn.prepareFirstFactor({
+          strategy: 'email_code',
+          emailAddressId: (emailCodeFactor as any).emailAddressId,
+        });
+        setView('verify_signin_otp');
+      } else {
+        setError('لا يمكن إرسال رمز OTP لهذا الحساب');
+      }
+    } catch (err: any) {
+      const errCode = err.errors?.[0]?.code;
+      if (errCode === 'session_exists') {
+        const sessions = clerk.client?.sessions;
+        const targetSession = sessions?.find((s) => s.status === 'active') || sessions?.[0];
+        if (targetSession) {
+          await clerk.setActive({ session: targetSession.id });
+          return;
+        }
+      }
+      setError(err.errors?.[0]?.longMessage || 'فشل إرسال رمز التحقق. تأكد من صحة البريد.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSignInLoaded) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await signIn.attemptFirstFactor({
+        strategy: 'email_code',
+        code,
+      });
+      if (result.status === 'complete') {
+        await setSignInActive({ session: result.createdSessionId });
+      } else {
+        setError('حالة غير مكتملة. يرجى المراجعة.');
+      }
+    } catch (err: any) {
+      setError('رمز غير صحيح أو منتهي الصلاحية');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +225,7 @@ export function CustomAuth() {
         password,
       });
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-      setView('verify');
+      setView('verify_signup');
       setLoading(false);
     } catch (err: any) {
       const errCode = err.errors?.[0]?.code;
@@ -175,7 +243,7 @@ export function CustomAuth() {
     }
   };
 
-  const handleVerify = async (e: React.FormEvent) => {
+  const handleVerifySignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSignUpLoaded) return;
     setLoading(true);
@@ -205,6 +273,55 @@ export function CustomAuth() {
     }
   };
 
+  const handleRequestOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSignInLoaded) return;
+    
+    if (!email) {
+      setError('يرجى إدخال البريد الإلكتروني أولاً لطلب الرمز.');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      await signIn.create({
+        identifier: email,
+        strategy: 'email_code'
+      });
+      setView('verify_signin');
+      setLoading(false);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.errors?.[0]?.longMessage || 'حدث خطأ في طلب رمز التحقق.');
+      setLoading(false);
+    }
+  };
+
+  const handleVerifySignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSignInLoaded) return;
+    setLoading(true);
+    setError('');
+    
+    try {
+      const result = await signIn.attemptFirstFactor({
+        strategy: 'email_code',
+        code
+      });
+      if (result.status === 'complete') {
+        await setSignInActive({ session: result.createdSessionId });
+      } else {
+        setError('كود التحقق غير صحيح أو غير مكتمل.');
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err.errors?.[0]?.longMessage || 'كود التحقق غير صحيح.');
+      setLoading(false);
+    }
+  };
+
   if (!isSignInLoaded || !isSignUpLoaded) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -214,17 +331,18 @@ export function CustomAuth() {
   }
 
   return (
-    <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden" dir="rtl">
-      <div className="p-8">
-        <div className="text-center mb-8">
-          <ShieldCheck className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-            {view === 'signin' ? 'تسجيل الدخول' : view === 'signup' ? 'إنشاء حساب جديد' : 'تحقق من البريد'}
-          </h1>
-          <p className="text-slate-500 mt-2 text-sm">
-            {view === 'signin' ? 'مرحباً بك مجدداً في مسار' : view === 'signup' ? 'انضم إلينا وابدأ في إدارة منصة مسار' : 'أدخل الكود المرسل إلى بريدك الإلكتروني'}
-          </p>
-        </div>
+    <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4" dir="rtl">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+        <div className="p-8">
+          <div className="flex flex-col items-center justify-center text-center w-full mb-8">
+            <ShieldCheck className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 text-center">
+              {view === 'signin' ? 'تسجيل الدخول' : view === 'signup' ? 'إنشاء حساب جديد' : view === 'verify_signin_otp' ? 'تسجيل الدخول برمز التحقق' : 'تحقق من البريد'}
+            </h1>
+            <p className="text-slate-500 mt-2 text-sm text-center">
+              {view === 'signin' ? 'مرحباً بك مجدداً في مسار' : view === 'signup' ? 'انضم إلينا وابدأ في إدارة منصة مسار' : view === 'verify_signin_otp' ? 'أدخل رمز OTP المرسل إلى بريدك لتسجيل الدخول' : 'أدخل الكود المرسل إلى بريدك الإلكتروني'}
+            </p>
+          </div>
 
         {error && (
           <div className="mb-6 p-4 bg-red-50 border-r-4 border-red-500 text-red-700 text-sm rounded-l-md flex flex-col gap-2">
@@ -277,18 +395,31 @@ export function CustomAuth() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (view === 'signin' ? 'دخول' : 'إنشاء حساب')}
-            </button>
+            <div className="flex flex-col gap-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (view === 'signin' ? 'دخول' : 'إنشاء حساب')}
+              </button>
+
+              {view === 'signin' && (
+                <button
+                  type="button"
+                  onClick={handleRequestOTP}
+                  disabled={loading}
+                  className="w-full flex justify-center items-center py-3 px-4 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-70"
+                >
+                  نسيت كلمة المرور؟ الدخول برمز التحقق (OTP)
+                </button>
+              )}
+            </div>
           </form>
         )}
 
-        {view === 'verify' && (
-          <form onSubmit={handleVerify} className="space-y-5">
+        {(view === 'verify_signup' || view === 'verify_signin') && (
+          <form onSubmit={view === 'verify_signup' ? handleVerifySignUp : handleVerifySignIn} className="space-y-5">
             <div className="space-y-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">كود التحقق (OTP)</label>
               <input
@@ -324,29 +455,30 @@ export function CustomAuth() {
         </div>
       </div>
 
-      <div className="bg-slate-50 dark:bg-slate-900 px-8 py-5 border-t border-slate-100 dark:border-slate-800 flex justify-center">
-        {view === 'signin' ? (
-          <p className="text-sm text-slate-600">
-            ليس لديك حساب؟{' '}
-            <button type="button" onClick={() => { setView('signup'); setError(''); }} className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
-              سجل الآن
-            </button>
-          </p>
-        ) : view === 'signup' ? (
-          <p className="text-sm text-slate-600">
-            لديك حساب بالفعل؟{' '}
-            <button type="button" onClick={() => { setView('signin'); setError(''); }} className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
-              تسجيل الدخول
-            </button>
-          </p>
-        ) : (
-          <p className="text-sm text-slate-600">
-            <button type="button" onClick={() => { setView('signup'); setError(''); }} className="font-medium text-blue-600 hover:text-blue-500 transition-colors flex items-center gap-1">
-              <ArrowRight className="w-4 h-4" />
-              العودة للتسجيل
-            </button>
-          </p>
-        )}
+        <div className="bg-slate-50 dark:bg-slate-900 px-8 py-5 border-t border-slate-100 dark:border-slate-800 flex justify-center">
+          {view === 'signin' ? (
+            <p className="text-sm text-slate-600">
+              ليس لديك حساب؟{' '}
+              <button type="button" onClick={() => { setView('signup'); setError(''); }} className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+                سجل الآن
+              </button>
+            </p>
+          ) : view === 'signup' ? (
+            <p className="text-sm text-slate-600">
+              لديك حساب بالفعل؟{' '}
+              <button type="button" onClick={() => { setView('signin'); setError(''); }} className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+                تسجيل الدخول
+              </button>
+            </p>
+          ) : (
+            <p className="text-sm text-slate-600">
+              <button type="button" onClick={() => { setView('signin'); setError(''); }} className="font-medium text-blue-600 hover:text-blue-500 transition-colors flex items-center gap-1">
+                <ArrowRight className="w-4 h-4" />
+                العودة لتسجيل الدخول
+              </button>
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

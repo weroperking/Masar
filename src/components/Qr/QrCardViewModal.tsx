@@ -77,8 +77,8 @@ export function QrCardViewModal({
           {/* Card Badge Display Area */}
           <div className="flex justify-center p-4 sm:p-6 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-800 print:p-0 print:bg-transparent print:border-none">
             <QrCardBadge
-              cardNumber={card.cardNumber || 'MSR-SAMPLE'}
-              qrCodeData={card.qrCodeData || card.cardNumber}
+              cardNumber={card.cardNumber || '0001'}
+              qrCodeData={card.qrCodeData || card.cardNumber || '0001'}
               studentName={student?.name}
               studentPhone={student?.phone}
               studentGrade={student?.gradeLevel}

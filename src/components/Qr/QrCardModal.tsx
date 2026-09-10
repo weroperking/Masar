@@ -2,9 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   X, User, Layers, Users, RefreshCw, Check, 
-  Printer, Save, Search, CheckCircle2, AlertCircle, Palette, QrCode, Sparkles, SlidersHorizontal
+  Printer, Save, Search, CheckCircle2, AlertCircle, Palette, QrCode, Sparkles, SlidersHorizontal,
+  Image
 } from 'lucide-react';
 import { Student, QrCard } from '../../types';
+import { db } from '../../db/db';
 import { QrCardBadge, CardThemeColor } from './QrCardBadge';
 
 interface QrCardModalProps {
@@ -32,15 +34,39 @@ export function QrCardModal({
   const [centerName, setCenterName] = useState(defaultCenterName);
   const [themeColor, setThemeColor] = useState<CardThemeColor>('blue');
   const [cardSize, setCardSize] = useState<'normal' | 'compact'>('normal');
+  const [backgroundImage, setBackgroundImage] = useState<string>('');
 
   // Single student mode state
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [studentSearch, setStudentSearch] = useState('');
-  const [cardNumber, setCardNumber] = useState(() => `MSR-${uuidv4().slice(0, 6).toUpperCase()}`);
+  
+  // Calculate next sequential numeric code
+  const getNextSequenceStart = () => {
+    let max = 0;
+    existingCards.forEach(card => {
+      const numMatch = card.cardNumber?.match(/\d+/);
+      if (numMatch) {
+        const num = parseInt(numMatch[0], 10);
+        if (num > max) max = num;
+      }
+    });
+    students.forEach(s => {
+      if (s.studentCode && /^\d+$/.test(s.studentCode)) {
+        const num = parseInt(s.studentCode, 10);
+        if (num > max) max = num;
+      }
+    });
+    return max + 1;
+  };
+
+  const generateSequentialSerial = (currentNum: number) => {
+    return String(currentNum).padStart(4, '0');
+  };
+
+  const [cardNumber, setCardNumber] = useState<string>(() => generateSequentialSerial(getNextSequenceStart()));
   
   // Batch blank mode state
   const [batchCount, setBatchCount] = useState<number>(10);
-  const [batchPrefix] = useState('MSR-');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -81,12 +107,17 @@ export function QrCardModal({
   if (!isOpen) return null;
 
   const handleRegenerateCode = () => {
-    setCardNumber(`MSR-${uuidv4().slice(0, 6).toUpperCase()}`);
+    setCardNumber(generateSequentialSerial(getNextSequenceStart()));
   };
 
   const handleSelectStudent = (student: Student) => {
     setSelectedStudentId(student.id);
     setStudentSearch('');
+    if (student.studentCode) {
+      setCardNumber(student.studentCode.replace(/\D/g, ''));
+    } else {
+      setCardNumber(generateSequentialSerial(getNextSequenceStart()));
+    }
   };
 
   const calculatedTotalCards = () => {
@@ -102,9 +133,26 @@ export function QrCardModal({
     try {
       const now = Date.now();
       const generatedCards: Partial<QrCard>[] = [];
+      let nextSeq = getNextSequenceStart();
 
       if (mode === 'single_student') {
-        const serial = cardNumber.trim() || `MSR-${uuidv4().slice(0, 6).toUpperCase()}`;
+        let serial = (cardNumber || '').replace(/\D/g, '');
+        if (selectedStudent && selectedStudent.studentCode) {
+          serial = selectedStudent.studentCode.replace(/\D/g, '') || serial;
+        }
+        if (!serial) {
+          serial = generateSequentialSerial(nextSeq++);
+        }
+
+        // Keep studentCode in students table 100% matched with the barcode number
+        if (selectedStudent && (!selectedStudent.studentCode || selectedStudent.studentCode !== serial)) {
+          await db.students.update(selectedStudent.id, {
+            studentCode: serial,
+            updated_at: now,
+            sync_status: 'pending'
+          });
+        }
+
         const id = uuidv4();
         generatedCards.push({
           id,
@@ -116,12 +164,13 @@ export function QrCardModal({
           status: 'active',
           themeColor,
           centerName,
+          backgroundImage,
           created_at: now,
           updated_at: now,
           sync_status: 'pending'
         });
       } else if (mode === 'single_unassigned') {
-        const serial = `MSR-${uuidv4().slice(0, 6).toUpperCase()}`;
+        const serial = generateSequentialSerial(nextSeq++);
         const id = uuidv4();
         generatedCards.push({
           id,
@@ -131,6 +180,7 @@ export function QrCardModal({
           status: 'active',
           themeColor,
           centerName,
+          backgroundImage,
           created_at: now,
           updated_at: now,
           sync_status: 'pending'
@@ -139,7 +189,7 @@ export function QrCardModal({
         const count = Math.min(Math.max(1, batchCount), 200);
         for (let i = 0; i < count; i++) {
           const id = uuidv4();
-          const serial = `${batchPrefix}${uuidv4().slice(0, 6).toUpperCase()}`;
+          const serial = generateSequentialSerial(nextSeq++);
           generatedCards.push({
             id,
             cardNumber: serial,
@@ -148,6 +198,7 @@ export function QrCardModal({
             status: 'active',
             themeColor,
             centerName,
+            backgroundImage,
             created_at: now,
             updated_at: now,
             sync_status: 'pending'
@@ -156,7 +207,15 @@ export function QrCardModal({
       } else if (mode === 'batch_unassigned_students') {
         for (const stu of unassignedStudents) {
           const id = uuidv4();
-          const serial = `${batchPrefix}${uuidv4().slice(0, 6).toUpperCase()}`;
+          let serial = stu.studentCode ? stu.studentCode.replace(/\D/g, '') : '';
+          if (!serial) {
+            serial = generateSequentialSerial(nextSeq++);
+            await db.students.update(stu.id, {
+              studentCode: serial,
+              updated_at: now,
+              sync_status: 'pending'
+            });
+          }
           generatedCards.push({
             id,
             cardNumber: serial,
@@ -167,6 +226,7 @@ export function QrCardModal({
             status: 'active',
             themeColor,
             centerName,
+            backgroundImage,
             created_at: now,
             updated_at: now,
             sync_status: 'pending'
@@ -388,15 +448,19 @@ export function QrCardModal({
 
                 {/* Auto-generated Serial preview with refresh button */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800 text-xs">
-                  <span className="text-slate-500 dark:text-slate-400">كود البطاقة المولد تلقائياً:</span>
+                  <span className="text-slate-500 dark:text-slate-400">رقم الطالب / كود الباركود (أرقام فقط):</span>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 px-2.5 py-1 rounded border border-slate-200 dark:border-slate-700">
-                      {cardNumber}
-                    </span>
+                    <input
+                      type="text"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, ''))}
+                      className="font-mono font-bold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 px-2.5 py-1 rounded border border-slate-200 dark:border-slate-700 w-24 text-center text-xs"
+                      placeholder="0001"
+                    />
                     <button
                       type="button"
                       onClick={handleRegenerateCode}
-                      title="توليد كود جديد"
+                      title="توليد رقم تسلسلي جديد"
                       className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
@@ -556,7 +620,41 @@ export function QrCardModal({
                     ملصق باركود مدمج (Sticker)
                   </button>
                 </div>
+              
               </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-2">
+                <Image className="w-4 h-4 text-slate-400" />
+                صورة خلفية مخصصة (اختياري)
+              </label>
+              <input 
+                type="file" 
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setBackgroundImage(reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  } else {
+                    setBackgroundImage('');
+                  }
+                }}
+                className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              {backgroundImage && (
+                <button 
+                  type="button" 
+                  onClick={() => setBackgroundImage('')}
+                  className="text-xs text-red-500 hover:text-red-700 mt-2 block"
+                >
+                  إزالة الخلفية
+                </button>
+              )}
             </div>
 
             {/* Practical Summary Box */}
@@ -606,8 +704,8 @@ export function QrCardModal({
             {/* Preview Card */}
             <div className="w-full flex items-center justify-center py-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
               <QrCardBadge
-                cardNumber={mode === 'single_student' ? cardNumber : `${batchPrefix}SAMPLE`}
-                qrCodeData={mode === 'single_student' ? cardNumber : `${batchPrefix}SAMPLE`}
+                cardNumber={mode === 'single_student' ? (cardNumber.replace(/\D/g, '') || '0001') : generateSequentialSerial(getNextSequenceStart())}
+                qrCodeData={mode === 'single_student' ? (cardNumber.replace(/\D/g, '') || '0001') : generateSequentialSerial(getNextSequenceStart())}
                 studentName={
                   mode === 'single_student'
                     ? selectedStudent?.name || 'اسم الطالب'
@@ -643,6 +741,7 @@ export function QrCardModal({
                 showCenterName={true}
                 showCardNumber={true}
                 size={cardSize}
+                backgroundImage={backgroundImage}
               />
             </div>
 

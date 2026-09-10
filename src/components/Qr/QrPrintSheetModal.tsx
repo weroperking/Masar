@@ -1,5 +1,8 @@
 import React from 'react';
 import { X, Printer, Layers } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { Download } from 'lucide-react';
 import { QrCard, Student } from '../../types';
 import { QrCardBadge, CardThemeColor } from './QrCardBadge';
 
@@ -26,6 +29,55 @@ export function QrPrintSheetModal({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const [isExporting, setIsExporting] = React.useState(false);
+
+  const handleDownloadPdf = async () => {
+    setIsExporting(true);
+    try {
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4' // or 'id-1' for single cards
+      });
+
+      const cardsContainer = document.getElementById('qr-cards-print-container');
+      if (!cardsContainer) return;
+
+      const cardElements = cardsContainer.querySelectorAll('.qr-print-card');
+      
+      for (let i = 0; i < cardElements.length; i++) {
+        const el = cardElements[i] as HTMLElement;
+        const canvas = await html2canvas(el, { scale: 3, useCORS: true });
+        const imgData = canvas.toDataURL('image/png');
+        
+        // A standard CR80 card is 85.6mm x 53.98mm
+        const cardWidth = 85.6;
+        const cardHeight = 54.0;
+        
+        // Add a new page for each card after the first
+        if (i > 0) {
+          pdf.addPage([cardWidth, cardHeight], 'landscape');
+        } else {
+          // Resize the first page to card dimensions
+          pdf.deletePage(1);
+          pdf.addPage([cardWidth, cardHeight], 'landscape');
+        }
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, cardWidth, cardHeight);
+      }
+      
+      pdf.save(`Masar_Cards_${new Date().getTime()}.pdf`);
+      
+      if (onConfirmPrinted) {
+        await onConfirmPrinted();
+      }
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -92,8 +144,8 @@ export function QrPrintSheetModal({
                   className="relative p-2 rounded-lg bg-white border border-dashed border-slate-300 dark:border-slate-700 shadow-xs print:shadow-none print:border-slate-300 print:break-inside-avoid print:p-1"
                 >
                   <QrCardBadge
-                    cardNumber={card.cardNumber || 'MSR-SAMPLE'}
-                    qrCodeData={card.qrCodeData || card.cardNumber}
+                    cardNumber={card.cardNumber || '0001'}
+                    qrCodeData={card.qrCodeData || card.cardNumber || '0001'}
                     studentName={student?.name}
                     studentPhone={student?.phone}
                     studentGrade={student?.gradeLevel}

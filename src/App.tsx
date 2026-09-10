@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { SignIn, OrganizationList, useAuth, useOrganization } from '@clerk/clerk-react';
-import { seedDatabaseIfEmpty } from './db/seed';
+import { seedDatabaseIfEmpty, sanitizeNumericCodes } from './db/seed';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Students } from './pages/Students/Students';
@@ -39,6 +39,9 @@ import { QrCards } from './pages/Admin/QrCards';
 
 import { PublicBooking } from './pages/PublicBooking';
 
+import { CustomAuth } from './pages/Auth/CustomAuth';
+import { CustomOrganizationList } from './pages/Auth/CustomOrganizationList';
+
 function AuthGate() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { isLoaded: isOrgLoaded, organization } = useOrganization();
@@ -46,7 +49,7 @@ function AuthGate() {
   // 1. Loading State
   if (!isAuthLoaded || (isSignedIn && !isOrgLoaded)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
           <p className="text-slate-500 text-sm font-medium">جاري التحقق من الجلسة...</p>
@@ -55,30 +58,16 @@ function AuthGate() {
     );
   }
 
-  // 2. Not authenticated at all -> Show Clerk SignIn
+  // 2. Not authenticated at all -> Show Custom Auth
   if (!isSignedIn) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" dir="rtl">
-        <SignIn routing="hash" />
-      </div>
-    );
+    return <CustomAuth />;
   }
 
   // 3. Authenticated, but no active organization
   if (!organization) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" dir="rtl">
-        <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 p-8 flex flex-col items-center">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">مرحباً بك!</h2>
-            <p className="text-slate-500 text-sm mt-1">يرجى اختيار أو إنشاء أكاديميتك للمتابعة</p>
-          </div>
-          <OrganizationList 
-            hidePersonal={true}
-            afterSelectOrganizationUrl="/"
-            afterCreateOrganizationUrl="/"
-          />
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4" dir="rtl">
+        <CustomOrganizationList />
       </div>
     );
   }
@@ -119,7 +108,9 @@ function AuthGate() {
 
 export default function App() {
   useEffect(() => {
-    seedDatabaseIfEmpty();
+    seedDatabaseIfEmpty().then(() => {
+      sanitizeNumericCodes();
+    });
   }, []);
 
   return (

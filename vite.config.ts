@@ -14,6 +14,9 @@ export default defineConfig(() => {
         devOptions: {
           enabled: true
         },
+        workbox: {
+          maximumFileSizeToCacheInBytes: 5000000
+        },
         manifest: {
           name: 'مسار - Masar',
           short_name: 'مسار',

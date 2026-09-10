@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { UserButton, useAuth, useClerk } from '@clerk/clerk-react';
+import { useAuth, useClerk } from '@clerk/clerk-react';
+import { CustomUserButton } from './CustomUserButton';
 import { 
   Users, BookOpen, CreditCard, LayoutDashboard, Settings, 
   UserCheck, Calendar, FileText, Library, Wallet, 
@@ -115,7 +116,6 @@ export function Layout() {
   useEffect(() => {
     // Attempt sync on load
     performSync();
-    
     // Periodic sync every 30 seconds
     const interval = setInterval(() => {
       performSync();
@@ -282,16 +282,7 @@ export function Layout() {
 
             {/* User Profile & Signout */}
             <div className="flex items-center gap-2 mr-1">
-              <button
-                type="button"
-                onClick={() => clerk.signOut()}
-                title="تسجيل الخروج"
-                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors flex items-center gap-1 text-xs"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">خروج</span>
-              </button>
-              <UserButton afterSignOutUrl="/" />
+              <CustomUserButton />
             </div>
           </div>
         </header>

@@ -177,10 +177,10 @@ export function Assessments() {
                           <GraduationCap className="w-3.5 h-3.5 ml-1" />
                           رصد الدرجات
                         </button>
-                        <button onClick={() => openEdit(assessment)} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                        <button onClick={() => openEdit(assessment)} className="p-1.5 text-slate-400 hover:text-blue-600 cursor-pointer transition-colors rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(assessment.id)} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
+                        <button onClick={() => handleDelete(assessment.id)} className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
