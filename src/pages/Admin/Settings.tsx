@@ -1,13 +1,16 @@
-import { Save, Sun, Moon, Monitor, Keyboard } from 'lucide-react';
+import { Save, Sun, Moon, Monitor, Keyboard, Trash2, AlertTriangle, Database, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { db } from '../../db/db';
 import { Settings as SettingsType } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useConfirm } from '../../context/ConfirmContext';
+import { clearAllData } from '../../db/seed';
 
 export function Settings() {
   const toast = useToast();
   const { theme, setTheme } = useTheme();
+  const { confirm } = useConfirm();
 
   const [settings, setSettings] = useState<Partial<SettingsType>>({
     autoStartEndSessions: false,
@@ -17,6 +20,8 @@ export function Settings() {
     assignmentGradingMethod: 'numeric',
     numericMaxGrade: 100
   });
+
+  const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
     // Load from db.settings if available
@@ -214,6 +219,53 @@ export function Settings() {
               />
             </div>
           )}
+        </section>
+
+        {/* Data Management Section */}
+        <section className="pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2 mb-2 text-red-600 dark:text-red-400">
+            <Database className="w-5 h-5" />
+            <h2 className="text-base font-bold">إدارة قاعدة البيانات وتفريغ الحساب</h2>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+            تحكم كامل في سجلات حسابك. تم إيقاف توليد البيانات التجريبية نهائياً لضمان بقاء حسابك نظيفاً ومخصصاً لطلابك ومجموعاتك الحقيقية فقط.
+          </p>
+
+          <div className="p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xs font-bold text-red-900 dark:text-red-200">مسح وتصفير كافة سجلات البيانات</h3>
+              <p className="text-[11px] text-red-700/80 dark:text-red-300/80 mt-0.5">
+                حذف جميع الطلاب، المجموعات، الكورسات، الحصص، المدفوعات، والمنتجات الحالية للبدء من الصفر تماماً. لن يتم إنشاء أي بيانات وهمية تلقائياً بعد الآن.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={isClearing}
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'تأكيد تصفير البيانات بالكامل',
+                  message: 'هل أنت متأكد من رغبتك في مسح كافة الطلاب والمجموعات والكورسات والبيانات؟ هذا الإجراء لا يمكن التراجع عنه وسيبدأ الحساب نظيفاً وفارغاً بنسبة 100%.',
+                  confirmText: 'نعم، امسح كل شيء',
+                  cancelText: 'إلغاء'
+                });
+                if (ok) {
+                  try {
+                    setIsClearing(true);
+                    await clearAllData();
+                    toast.success('تم مسح جميع البيانات بنجاح، الحساب الآن فارغ وجاهز لبياناتك الحقيقية.');
+                  } catch (e) {
+                    toast.error('حدث خطأ أثناء مسح البيانات');
+                  } finally {
+                    setIsClearing(false);
+                  }
+                }
+              }}
+              className="shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>{isClearing ? 'جارِ المسح...' : 'مسح كافة البيانات'}</span>
+            </button>
+          </div>
         </section>
 
         <div className="pt-4 flex justify-end">

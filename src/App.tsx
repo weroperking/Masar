@@ -38,6 +38,7 @@ import { Settings } from './pages/Admin/Settings';
 import { QrCards } from './pages/Admin/QrCards';
 
 import { PublicBooking } from './pages/PublicBooking';
+import { PublicStudentLookup } from './pages/PublicStudentLookup';
 
 import { CustomAuth } from './pages/Auth/CustomAuth';
 import { CustomOrganizationList } from './pages/Auth/CustomOrganizationList';
@@ -108,9 +109,12 @@ function AuthGate() {
 
 export default function App() {
   useEffect(() => {
-    seedDatabaseIfEmpty().then(() => {
-      sanitizeNumericCodes();
-    });
+    // Standalone public routes must NOT trigger any Dexie/IndexedDB operations
+    if (!window.location.pathname.startsWith('/s/')) {
+      seedDatabaseIfEmpty().then(() => {
+        sanitizeNumericCodes();
+      });
+    }
   }, []);
 
   return (
@@ -119,6 +123,7 @@ export default function App() {
         <ConfirmProvider>
           <BrowserRouter>
             <Routes>
+              <Route path="/s/:token" element={<PublicStudentLookup />} />
               <Route path="/book" element={<PublicBooking />} />
               <Route path="*" element={<AuthGate />} />
             </Routes>

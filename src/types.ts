@@ -8,6 +8,7 @@ export interface BaseRecord {
 
 export interface Student extends BaseRecord {
   studentCode?: string;
+  public_lookup_token?: string;
   name: string;
   phone: string;
   school?: string;
@@ -221,4 +222,34 @@ export interface QrCard extends BaseRecord {
 export interface SyncMeta {
   id: string; // e.g. 'last_sync'
   timestamp: number;
+}
+
+export interface PublicLookupData {
+  student: {
+    id: string;
+    name: string;
+    studentCode?: string;
+    gradeLevel?: string;
+    school?: string;
+  };
+  attendance: {
+    attended: number;
+    missed: number;
+    total: number;
+    rate?: number;
+  };
+  exams: Array<{
+    id: string;
+    name: string;
+    grade: number | string;
+    maxGrade?: number;
+    date?: string;
+  }>;
+  subscription: {
+    status: 'paid' | 'partial' | 'overdue' | 'no_record';
+    month?: number;
+    year?: number;
+    amountTotal?: number;
+    amountPaid?: number;
+  };
 }

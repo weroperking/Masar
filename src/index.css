@@ -12,6 +12,26 @@ body {
   @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
 }
 
+@keyframes drawStroke {
+  from {
+    stroke-dashoffset: 60;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-draw path,
+.animate-draw circle,
+.animate-draw rect,
+.animate-draw line,
+.animate-draw polyline,
+.animate-draw polygon {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: drawStroke 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 button, a, [role="button"] {
   cursor: pointer;
 }

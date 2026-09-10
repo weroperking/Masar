@@ -1,3 +1,4 @@
+import React, { useState, useEffect, ComponentType } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, useClerk } from '@clerk/clerk-react';
 import { CustomUserButton } from './CustomUserButton';
@@ -6,10 +7,10 @@ import {
   UserCheck, Calendar, FileText, Library, Wallet, 
   FileSpreadsheet, Globe, Package, 
   BarChart3, UserCog, MessageSquare, QrCode, LogOut,
-  Search, Sun, Moon, Plus, Keyboard, RefreshCw, CheckCircle2, WifiOff
+  Search, Sun, Moon, Plus, Keyboard, RefreshCw, CheckCircle2, WifiOff, Menu, X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { syncService, TABLES } from '../services/syncService';
 import { useTheme } from '../context/ThemeContext';
 import { CommandPalette } from './CommandPalette';
@@ -71,6 +72,68 @@ const navigationGroups = [
   }
 ];
 
+interface SidebarNavItemProps {
+  item: {
+    name: string;
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+  };
+  isActive: boolean;
+  onItemClick?: () => void;
+}
+
+const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, isActive, onItemClick }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const Icon = item.icon;
+
+  return (
+    <Link
+      to={item.href}
+      onClick={onItemClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={cn(
+        isActive
+          ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/70 dark:text-blue-400 font-bold shadow-xs'
+          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80',
+        'group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150 relative active:scale-[0.98]'
+      )}
+    >
+      <div className="ml-3 shrink-0 h-5 w-5 flex items-center justify-center relative overflow-hidden">
+        <AnimatePresence mode="popLayout" initial={false}>
+          {isActive || isHovered ? (
+            <motion.div
+              key="drawing"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute inset-0 flex items-center justify-center text-blue-600 dark:text-blue-400 animate-draw"
+            >
+              <Icon className="h-5 w-5" />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="static"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500"
+            >
+              <Icon className="h-5 w-5" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      <span className="truncate">{item.name}</span>
+      {isActive && (
+        <div className="absolute right-0 top-2 bottom-2 w-1 bg-blue-600 dark:bg-blue-400 rounded-l-full" />
+      )}
+    </Link>
+  );
+};
+
 export function Layout() {
   const location = useLocation();
   const { getToken } = useAuth();
@@ -81,48 +144,49 @@ export function Layout() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isQuickNewOpen, setIsQuickNewOpen] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   // Auto-sync when going online
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      performSync();
+      toast.success('تم استعادة الاتصال بالإنترنت! جاري مزامنة البيانات...');
+      syncService.syncPendingData(getToken).catch(err => {
+        console.error('Auto sync failed:', err);
+      });
     };
-    const handleOffline = () => setIsOnline(false);
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.warning('أنت تعمل الآن في وضع عدم الاتصال بالإنترنت. سيتم حفظ التغييرات محلياً.');
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    // Listen to sync events
+    const handleSyncStart = () => setIsSyncing(true);
+    const handleSyncEnd = () => setIsSyncing(false);
+
+    window.addEventListener('sync-start', handleSyncStart);
+    window.addEventListener('sync-end', handleSyncEnd);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('sync-start', handleSyncStart);
+      window.removeEventListener('sync-end', handleSyncEnd);
     };
-  }, []);
+  }, [toast]);
 
-  const performSync = async () => {
-    if (!navigator.onLine) return;
-    setIsSyncing(true);
-    try {
-      await syncService.syncPendingData(getToken);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  useEffect(() => {
-    // Attempt sync on load
-    performSync();
-    // Periodic sync every 30 seconds
-    const interval = setInterval(() => {
-      performSync();
-    }, 30 * 1000);
-    return () => clearInterval(interval);
-  }, [getToken]);
-
+  // Get total pending sync counts reactively
   const pendingCount = useLiveQuery(async () => {
     let total = 0;
     for (const table of TABLES) {
@@ -171,84 +235,119 @@ export function Layout() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [theme, toggleTheme, toast]);
 
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 dark:bg-slate-950 flex transition-colors duration-150">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col hidden md:flex shrink-0 sticky top-0 h-screen">
-        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-700 shrink-0">
-          <h1 className="text-2xl font-black text-blue-600 dark:text-blue-400 font-brand tracking-tight">
-            مسار
-          </h1>
-        </div>
-
-        <nav className="flex-1 px-4 py-4 overflow-y-auto space-y-6 scrollbar-thin">
-          {navigationGroups.map((group) => (
-            <div key={group.title}>
-              <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3">
-                {group.title}
-              </h2>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      className={cn(
-                        isActive
-                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/70 dark:text-blue-400 font-bold'
-                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-800/60',
-                        'group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors'
-                      )}
-                    >
-                      <item.icon
-                        className={cn(
-                          isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-300',
-                          'ml-3 shrink-0 h-5 w-5'
-                        )}
-                        aria-hidden="true"
-                      />
-                      {item.name}
-                    </Link>
-                  );
-                })}
-              </div>
+  const renderNavContent = (onItemClick?: () => void) => (
+    <>
+      <nav className="flex-1 px-4 py-4 overflow-y-auto space-y-6 scrollbar-thin">
+        {navigationGroups.map((group) => (
+          <div key={group.title}>
+            <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3">
+              {group.title}
+            </h2>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const isActive =
+                  location.pathname === item.href ||
+                  (item.href !== '/' && location.pathname.startsWith(item.href));
+                return (
+                  <SidebarNavItem
+                    key={item.name}
+                    item={item}
+                    isActive={isActive}
+                    onItemClick={onItemClick}
+                  />
+                );
+              })}
             </div>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0">
-          <div className="flex flex-col text-xs">
-            {isSyncing ? (
-              <div className="flex items-center space-x-2 space-x-reverse text-blue-500">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>جاري المزامنة...</span>
-              </div>
-            ) : !isOnline ? (
-              <div className="flex items-center space-x-2 space-x-reverse text-rose-500">
-                <WifiOff className="w-3.5 h-3.5" />
-                <span>غير متصل ({pendingCount} معلق)</span>
-              </div>
-            ) : pendingCount > 0 ? (
-               <div className="flex items-center space-x-2 space-x-reverse text-amber-500">
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>{pendingCount} بانتظار المزامنة</span>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2 space-x-reverse text-emerald-500">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>متزامن</span>
-              </div>
-            )}
           </div>
+        ))}
+      </nav>
+
+      <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+        <div className="flex flex-col text-xs">
+          {isSyncing ? (
+            <div className="flex items-center space-x-2 space-x-reverse text-blue-500">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>جاري المزامنة...</span>
+            </div>
+          ) : !isOnline ? (
+            <div className="flex items-center space-x-2 space-x-reverse text-rose-500">
+              <WifiOff className="w-3.5 h-3.5" />
+              <span>غير متصل ({pendingCount} معلق)</span>
+            </div>
+          ) : pendingCount > 0 ? (
+            <div className="flex items-center space-x-2 space-x-reverse text-amber-500">
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>{pendingCount} بانتظار المزامنة</span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2 space-x-reverse text-emerald-500">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>متزامن</span>
+            </div>
+          )}
         </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 dark:bg-slate-950 flex transition-colors duration-150 animate-fade-in">
+      {/* Desktop Sidebar */}
+      <aside className="w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col hidden md:flex shrink-0">
+        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-700 shrink-0">
+          <Link to="/" className="flex items-center gap-2 group">
+            <h1 className="text-2xl font-black text-blue-600 dark:text-blue-400 font-brand tracking-tight group-hover:opacity-90 transition-opacity">
+              مسار
+            </h1>
+          </Link>
+        </div>
+
+        {renderNavContent()}
       </aside>
 
+      {/* Mobile Slide-over Drawer */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          {/* Backdrop */}
+          <div
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200"
+          />
+
+          {/* Drawer Content */}
+          <aside className="relative mr-auto w-72 max-w-[80vw] h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col z-10 shadow-2xl transition-transform duration-200">
+            <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-700 shrink-0">
+              <h1 className="text-2xl font-black text-blue-600 dark:text-blue-400 font-brand tracking-tight">
+                مسار
+              </h1>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                aria-label="إغلاق القائمة"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {renderNavContent(() => setIsMobileMenuOpen(false))}
+          </aside>
+        </div>
+      )}
+
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 w-full min-h-screen">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Top Header Bar (Desktop & Mobile) */}
-        <header className="bg-white dark:bg-slate-900 h-16 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 md:px-8 shrink-0 sticky top-0 z-20">
+        <header className="bg-white dark:bg-slate-900 h-16 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 md:px-8 shrink-0">
           <div className="flex items-center gap-3">
+            {/* Mobile Hamburger Menu Toggle */}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              aria-label="فتح القائمة الرئيسية"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
             {/* Mobile logo */}
             <h1 className="md:hidden text-xl font-black text-blue-600 dark:text-blue-400 font-brand">
               مسار
@@ -274,7 +373,7 @@ export function Layout() {
             {/* Mobile search button */}
             <button
               onClick={() => setIsCommandPaletteOpen(true)}
-              className="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              className="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
               title="بحث سريع"
             >
               <Search className="w-4 h-4" />
@@ -288,8 +387,8 @@ export function Layout() {
         </header>
         
         {/* Page Content */}
-        <div className="flex-1 w-full min-h-full p-4 md:p-6 lg:p-8 bg-slate-50 dark:bg-slate-900 dark:bg-slate-950 transition-colors duration-150 flex flex-col">
-          <div className="w-full flex-1 flex flex-col pb-12">
+        <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-50 dark:bg-slate-900 dark:bg-slate-950 transition-colors duration-150">
+          <div className="mx-auto max-w-7xl pb-12">
             <Outlet />
           </div>
         </div>

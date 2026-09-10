@@ -96,9 +96,10 @@ Before finishing any task, always verify:
 ## 6. Offline Data & Persistence Patterns
 
 - Database tables are defined in `src/db/db.ts`:
-  - `students`, `courses`, `groups`, `attendanceSessions`, `attendanceRecords`, `payments`, `products`, `sales`, `ledger`, `qrCards`, `assessments`, `studentGrades`, `users`, `messageTemplates`, `settings`, `syncMeta`.
+  - `students`, `courses`, `groups`, `enrollments`, `attendanceSessions`, `attendanceRecords`, `sessionPayments`, `monthlySubscriptions`, `products`, `courseProducts`, `productSales`, `ledgerEntries`, `qrCards`, `assessments`, `assessmentGrades`, `users`, `messageTemplates`, `settings`, `bookingRequests`, `events`, `syncMeta`.
 - Use `useLiveQuery` from `dexie-react-hooks` for reactive, automatic UI updates upon IndexedDB changes.
-- Never write database operations that assume cloud-only latency; keep queries indexed by compound keys or indexed fields defined in the schema.
+- **NO AUTOMATIC FAKE/MOCK SEEDING**: Never generate dummy students or demo ledger data automatically. All educational data is user-managed.
+- See `/MEMORY.md` for the full comprehensive project knowledge base and invariants.
 
 ---
 

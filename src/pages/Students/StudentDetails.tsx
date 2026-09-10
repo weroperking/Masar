@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
+import QRCode from 'qrcode';
 import { 
   ArrowRight, User, BookOpen, Clock, Calendar, Wallet, 
   QrCode, Printer, RefreshCw, Sparkles, CheckCircle2, ShieldAlert, Palette,
-  GraduationCap, Edit2, Check, X, MessageCircle
+  GraduationCap, Edit2, Check, X, MessageCircle, Globe, Copy, ExternalLink,
+  Share2, AlertTriangle, ShieldCheck
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -24,6 +26,12 @@ export function StudentDetails() {
 
   const [isEditingCardNumber, setIsEditingCardNumber] = useState(false);
   const [newCardNumberInput, setNewCardNumberInput] = useState('');
+  
+  // Public Lookup Token & QR Code State
+  const [serverLookupToken, setServerLookupToken] = useState<string | null>(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+  const [isGeneratingToken, setIsGeneratingToken] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const student = useLiveQuery(() => db.students.get(id as string), [id]);
   const settings = useLiveQuery(() => db.settings.toArray(), []);
@@ -68,6 +76,63 @@ export function StudentDetails() {
     [id]
   );
 
+  const activeLookupToken = student?.public_lookup_token || serverLookupToken;
+
+  // Sync token from backend on mount
+  useEffect(() => {
+    if (!id) return;
+    let isMounted = true;
+
+    async function syncTokenFromBackend() {
+      try {
+        let res = await fetch(`/api/students/${id}`);
+        if (!res.ok) {
+          res = await fetch(`/students/${id}`);
+        }
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.public_lookup_token && isMounted) {
+            setServerLookupToken(data.public_lookup_token);
+            if (student && !student.public_lookup_token) {
+              await db.students.update(student.id, { 
+                public_lookup_token: data.public_lookup_token,
+                updated_at: Date.now()
+              });
+            }
+          }
+        }
+      } catch (err) {
+        // Silent fallback to local storage
+      }
+    }
+
+    syncTokenFromBackend();
+    return () => {
+      isMounted = false;
+    };
+  }, [id, student?.id, student?.public_lookup_token]);
+
+  // Generate QR Code data URL whenever activeLookupToken changes
+  useEffect(() => {
+    if (activeLookupToken) {
+      const fullUrl = `${window.location.origin}/s/${activeLookupToken}`;
+      QRCode.toDataURL(fullUrl, {
+        width: 256,
+        margin: 1,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff'
+        }
+      })
+      .then(url => setQrCodeDataUrl(url))
+      .catch(err => {
+        console.error('Failed to generate QR code data URL', err);
+      });
+    } else {
+      setQrCodeDataUrl('');
+    }
+  }, [activeLookupToken]);
+
   if (!student) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -77,6 +142,135 @@ export function StudentDetails() {
   }
 
   const activeEnrollments = enrollments?.filter(e => e.status === 'active') || [];
+
+  // Generate or Regenerate Public Lookup Token
+  const handleGenerateLookupToken = async (isRegenerate: boolean) => {
+    if (!student) return;
+
+    if (isRegenerate) {
+      const isConfirmed = await confirm({
+        title: 'إعادة توليد رابط الاستعلام العام',
+        message: 'هل أنت متأكد من إعادة توليد رابط الاستعلام العام للطالب؟',
+        description: 'تحذير: سيتم إبطال الرابط القديم ورمز QR السابق فوراً، ولن يعمل الرابط أو الكود المطبوع/المشارك مسبقاً بعد الآن.',
+        confirmText: 'نعم، إعادة التوليد',
+        cancelText: 'إلغاء',
+        variant: 'warning'
+      });
+
+      if (!isConfirmed) return;
+    }
+
+    setIsGeneratingToken(true);
+
+    try {
+      // Calculate live attendance
+      const attendedCount = attendanceRecords?.filter(a => a.status === 'present').length || 0;
+      const missedCount = attendanceRecords?.filter(a => a.status === 'absent').length || 0;
+      const totalSessions = attendedCount + missedCount;
+      const attendanceRate = totalSessions > 0 ? Math.round((attendedCount / totalSessions) * 100) : 100;
+
+      // Calculate exams
+      const examsList = (studentGrades || []).map(g => {
+        const assessment = (allAssessments || []).find(a => a.id === g.assessmentId);
+        return {
+          id: g.id,
+          name: assessment?.name || 'اختبار تقييمي',
+          grade: g.grade,
+          maxGrade: assessment?.maxGrade || 100,
+          date: assessment?.date ? format(new Date(assessment.date), 'yyyy-MM-dd') : undefined
+        };
+      });
+
+      // Calculate current subscription status
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+      const currentSub = monthlySubscriptions?.find(s => s.month === currentMonth && s.year === currentYear);
+
+      let subStatus: 'paid' | 'partial' | 'overdue' | 'no_record' = 'no_record';
+      if (currentSub) {
+        if (currentSub.status === 'paid' || (currentSub.amountPaid >= currentSub.amountTotal && currentSub.amountTotal > 0)) {
+          subStatus = 'paid';
+        } else if (currentSub.amountPaid > 0) {
+          subStatus = 'partial';
+        } else {
+          subStatus = 'overdue';
+        }
+      }
+
+      const payload = {
+        student: {
+          id: student.id,
+          name: student.name,
+          studentCode: student.studentCode || '',
+          gradeLevel: student.gradeLevel || '',
+          school: student.school || ''
+        },
+        attendance: {
+          attended: attendedCount,
+          missed: missedCount,
+          total: totalSessions,
+          rate: attendanceRate
+        },
+        exams: examsList,
+        subscription: {
+          status: subStatus,
+          month: currentMonth,
+          year: currentYear,
+          amountTotal: currentSub?.amountTotal || 0,
+          amountPaid: currentSub?.amountPaid || 0
+        }
+      };
+
+      let res = await fetch(`/api/students/${student.id}/lookup-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        res = await fetch(`/students/${student.id}/lookup-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (!res.ok) {
+        throw new Error('Server returned error status');
+      }
+
+      const result = await res.json();
+      const newToken = result.token || result.public_lookup_token;
+
+      // Update student in local Dexie database
+      await db.students.update(student.id, {
+        public_lookup_token: newToken,
+        updated_at: Date.now()
+      });
+
+      setServerLookupToken(newToken);
+
+      toast.success(
+        isRegenerate 
+          ? 'تمت إعادة توليد رابط الاستعلام بنجاح وإبطال الرابط السابق' 
+          : 'تم توليد رابط الاستعلام العام بنجاح'
+      );
+    } catch (err) {
+      console.error('Error generating lookup token:', err);
+      toast.error('حدث خطأ أثناء توليد رابط الاستعلام، يرجى المحاولة مرة أخرى');
+    } finally {
+      setIsGeneratingToken(false);
+    }
+  };
+
+  const handleCopyLookupLink = () => {
+    if (!activeLookupToken) return;
+    const fullUrl = `${window.location.origin}/s/${activeLookupToken}`;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedLink(true);
+    toast.success('تم نسخ رابط الاستعلام إلى الحافظة بنجاح');
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
 
   // Issue new card for the student
   const handleIssueCard = async () => {
@@ -434,6 +628,153 @@ export function StudentDetails() {
                 </button>
               )}
             </div>
+          </div>
+
+          {/* 4. Public Student Lookup Link & Live Report Card */}
+          <div className="md:col-span-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <span>رابط الاستعلام العام المباشر ورمز QR</span>
+                    {activeLookupToken ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                        <CheckCircle2 className="w-3 h-3" />
+                        مفعل ومتاح للمعاينة
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                        غير مولد
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    رابط عام مستقل ومباشر يمكّن ولي الأمر والطالب من استعراض الحضور، الدرجات، وحالة الاشتراك فوراً بدون تسجيل دخول.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                {activeLookupToken ? (
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateLookupToken(true)}
+                    disabled={isGeneratingToken}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingToken ? 'animate-spin' : ''}`} />
+                    <span>إعادة توليد الرابط (إبطال القديم)</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateLookupToken(false)}
+                    disabled={isGeneratingToken}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${isGeneratingToken ? 'animate-spin' : ''}`} />
+                    <span>توليد رابط الاستعلام العام</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {activeLookupToken ? (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-5 items-center">
+                {/* Left: Token & Link controls */}
+                <div className="md:col-span-2 space-y-3.5">
+                  <div>
+                    <span className="block text-[11px] font-medium text-slate-500 mb-1">
+                      رمز الاستعلام الفريد (Token):
+                    </span>
+                    <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700 font-mono text-xs text-slate-800 dark:text-slate-200 select-all">
+                      {activeLookupToken}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="block text-[11px] font-medium text-slate-500 mb-1">
+                      الرابط العام المباشر:
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        dir="ltr"
+                        value={`${window.location.origin}/s/${activeLookupToken}`}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 select-all outline-none"
+                      />
+                      
+                      <button
+                        type="button"
+                        onClick={handleCopyLookupLink}
+                        title="نسخ الرابط"
+                        className="inline-flex items-center gap-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold transition-colors shrink-0 cursor-pointer"
+                      >
+                        {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedLink ? 'تم النسخ' : 'نسخ'}</span>
+                      </button>
+
+                      <a
+                        href={`/s/${activeLookupToken}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="فتح الرابط في تبويب جديد"
+                        className="inline-flex items-center gap-1 px-3 py-2 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg text-xs font-bold transition-colors shrink-0"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>معاينة</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    <span>
+                      <strong>ملاحظة أمان:</strong> إعادة توليد الرابط تبطل هذا الكود ورمز QR فوراً وتمنع أي شخص يمتلك الرابط القديم من الوصول لبيانات الطالب.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right: QR Code Visual Preview */}
+                <div className="flex flex-col items-center justify-center p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-800 text-center">
+                  {qrCodeDataUrl ? (
+                    <div className="space-y-2">
+                      <img 
+                        src={qrCodeDataUrl} 
+                        alt="QR Code" 
+                        className="w-32 h-32 mx-auto rounded-lg bg-white p-1.5 shadow-2xs border border-slate-200 dark:border-slate-700" 
+                      />
+                      <span className="block text-[10px] text-slate-500 font-medium">
+                        مسح مباشر عبر كاميرا هاتف ولي الأمر
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="w-32 h-32 flex items-center justify-center border border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 text-xs">
+                      جاري إنشاء الرمز...
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
+                <p className="text-xs text-slate-500">
+                  لم يتم إنشاء رابط استعلام عام لهذا الطالب بعد. اضغط على "توليد رابط الاستعلام العام" لتمكين المتابعة المباشرة.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleGenerateLookupToken(false)}
+                  disabled={isGeneratingToken}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors shrink-0 shadow-2xs cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>توليد الرابط الآن</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

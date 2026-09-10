@@ -20,12 +20,7 @@ createRoot(document.getElementById('root')!).render(
         <App />
       </ClerkProvider>
     ) : (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-center p-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">Clerk Setup Required</h1>
-          <p className="text-slate-600">Please add VITE_CLERK_PUBLISHABLE_KEY to your environment variables to enable multi-tenant authentication.</p>
-        </div>
-      </div>
+      <App />
     )}
   </StrictMode>,
 );
