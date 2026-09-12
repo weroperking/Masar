@@ -1,6 +1,6 @@
 {
   "name": "Masar",
-  "description": "منصة مسار لإدارة المراكز التعليمية",
+  "description": "مسار — حصصك من غير دوشة",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

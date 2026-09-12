@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 76" fill="none" dir="rtl">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Readex+Pro:wght@800&amp;display=swap');
+      .brand-text {
+        font-family: 'Readex Pro', 'Cairo', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-weight: 800;
+        font-size: 38px;
+        fill: #0e1322;
+      }
+      .brand-icon {
+        fill: #0e1322;
+      }
+      @media (prefers-color-scheme: dark) {
+        .brand-text-dark-adaptive {
+          fill: #f1f5f9;
+        }
+        .brand-icon-dark-adaptive {
+          fill: #f1f5f9;
+        }
+      }
+    </style>
+  </defs>
+
+  <!-- 1. Icon Emblem (Right side in RTL) -->
+  <g transform="translate(195, 38) rotate(9.5)">
+    <path
+      class="brand-icon"
+      fill-rule="evenodd"
+      clip-rule="evenodd"
+      d="M -9.5 -23 L 9.5 -23 C 18 -23 23 -18 23 -9.5 L 23 9.5 C 23 18 18 23 9.5 23 L -9.5 23 C -18 23 -23 18 -23 9.5 L -23 -9.5 C -23 -18 -18 -23 -9.5 -23 Z M 0 -8.2 C 4.53 -8.2 8.2 -4.53 8.2 0 C 8.2 4.53 4.53 8.2 0 8.2 C -4.53 8.2 -8.2 4.53 -8.2 0 C -8.2 -4.53 -4.53 -8.2 0 -8.2 Z"
+    />
+  </g>
+
+  <!-- 2. Arabic Wordmark (Left side) -->
+  <text
+    x="155"
+    y="51"
+    text-anchor="end"
+    class="brand-text"
+    letter-spacing="-0.5"
+  >مسار</text>
+</svg>

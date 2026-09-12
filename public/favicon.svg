@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <g transform="translate(32, 32) rotate(9.5)">
+    <path
+      fill="#0e1322"
+      fill-rule="evenodd"
+      clip-rule="evenodd"
+      d="M -9.5 -23 L 9.5 -23 C 18 -23 23 -18 23 -9.5 L 23 9.5 C 23 18 18 23 9.5 23 L -9.5 23 C -18 23 -23 18 -23 9.5 L -23 -9.5 C -23 -18 -18 -23 -9.5 -23 Z M 0 -8.2 C 4.53 -8.2 8.2 -4.53 8.2 0 C 8.2 4.53 4.53 8.2 0 8.2 C -4.53 8.2 -8.2 4.53 -8.2 0 C -8.2 -4.53 -4.53 -8.2 0 -8.2 Z"
+    />
+  </g>
+</svg>

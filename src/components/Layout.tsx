@@ -19,6 +19,7 @@ import { ShortcutsHelpModal } from './ShortcutsHelpModal';
 import { useToast } from '../context/ToastContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
+import { MasarLogo } from './MasarLogo';
 
 const navigationGroups = [
   {
@@ -294,11 +295,12 @@ export function Layout() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 dark:bg-slate-950 flex transition-colors duration-150 animate-fade-in">
       {/* Desktop Sidebar */}
       <aside className="w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col hidden md:flex shrink-0">
-        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-700 shrink-0">
-          <Link to="/" className="flex items-center gap-2 group">
-            <h1 className="text-2xl font-black text-blue-600 dark:text-blue-400 font-brand tracking-tight group-hover:opacity-90 transition-opacity">
-              مسار
-            </h1>
+        <div className="py-5 px-6 flex flex-col items-center justify-center border-b border-slate-200 dark:border-slate-700 shrink-0 gap-2">
+          <Link to="/" className="flex flex-col items-center gap-1.5 group">
+            <MasarLogo size="md" className="transition-transform duration-300 group-hover:scale-105" />
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 tracking-tight animate-slogan-glow text-center select-none">
+              مسار — حصصك من غير دوشة
+            </span>
           </Link>
         </div>
 
@@ -316,17 +318,20 @@ export function Layout() {
 
           {/* Drawer Content */}
           <aside className="relative mr-auto w-72 max-w-[80vw] h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col z-10 shadow-2xl transition-transform duration-200">
-            <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-700 shrink-0">
-              <h1 className="text-2xl font-black text-blue-600 dark:text-blue-400 font-brand tracking-tight">
-                مسار
-              </h1>
+            <div className="py-4 px-6 border-b border-slate-200 dark:border-slate-700 flex flex-col items-center relative shrink-0">
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="absolute left-4 top-4 p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 aria-label="إغلاق القائمة"
               >
                 <X className="w-5 h-5" />
               </button>
+              <Link to="/" className="flex flex-col items-center gap-1 mt-2 group">
+                <MasarLogo size="sm" className="transition-transform duration-300 group-hover:scale-105" />
+                <span className="text-[10px] font-bold text-slate-900 dark:text-slate-100 tracking-tight animate-slogan-glow text-center select-none">
+                  مسار — حصصك من غير دوشة
+                </span>
+              </Link>
             </div>
 
             {renderNavContent(() => setIsMobileMenuOpen(false))}
@@ -349,9 +354,9 @@ export function Layout() {
             </button>
 
             {/* Mobile logo */}
-            <h1 className="md:hidden text-xl font-black text-blue-600 dark:text-blue-400 font-brand">
-              مسار
-            </h1>
+            <Link to="/" className="md:hidden flex items-center shrink-0">
+              <MasarLogo size="sm" />
+            </Link>
 
             {/* Desktop Quick Search */}
             <div className="hidden md:flex items-center gap-2">
@@ -387,8 +392,8 @@ export function Layout() {
         </header>
         
         {/* Page Content */}
-        <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-50 dark:bg-slate-900 dark:bg-slate-950 transition-colors duration-150">
-          <div className="mx-auto max-w-7xl pb-12">
+        <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-150">
+          <div className="mx-auto w-full h-full min-h-full pb-12">
             <Outlet />
           </div>
         </div>

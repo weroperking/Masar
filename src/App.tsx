@@ -43,18 +43,56 @@ import { PublicStudentLookup } from './pages/PublicStudentLookup';
 import { CustomAuth } from './pages/Auth/CustomAuth';
 import { CustomOrganizationList } from './pages/Auth/CustomOrganizationList';
 
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+
 function AuthGate() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { isLoaded: isOrgLoaded, organization } = useOrganization();
+  const [isAnimationDone, setIsAnimationDone] = useState(false);
+  const [dotLottie, setDotLottie] = useState<any>(null);
+  const [lottieError, setLottieError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fallback in case onComplete doesn't fire for some reason
+    const timer = setTimeout(() => setIsAnimationDone(true), 3500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (dotLottie) {
+      const handleComplete = () => setIsAnimationDone(true);
+      const handleError = (e: any) => setLottieError(e?.error?.message || 'Unknown Lottie load error');
+      
+      dotLottie.addEventListener('complete', handleComplete);
+      dotLottie.addEventListener('loadError', handleError);
+      dotLottie.addEventListener('renderError', handleError);
+      
+      return () => {
+        dotLottie.removeEventListener('complete', handleComplete);
+        dotLottie.removeEventListener('loadError', handleError);
+        dotLottie.removeEventListener('renderError', handleError);
+      };
+    }
+  }, [dotLottie]);
 
   // 1. Loading State
-  if (!isAuthLoaded || (isSignedIn && !isOrgLoaded)) {
+  if (!isAuthLoaded || (isSignedIn && !isOrgLoaded) || !isAnimationDone) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-500 text-sm font-medium">جاري التحقق من الجلسة...</p>
-        </div>
+      <div className="fixed inset-0 w-full h-full z-50 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 overflow-hidden">
+        {lottieError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-red-50 text-red-600 text-xs text-center p-4 border border-red-200 rounded-lg">
+            Lottie Error: {lottieError}
+          </div>
+        )}
+        <DotLottieReact 
+          src="/masar-loader.json"
+          autoplay
+          loop={false}
+          layout={{ fit: 'cover' }}
+          className="w-full h-full"
+          style={{ width: '100%', height: '100%', opacity: lottieError ? 0 : 1 }}
+          dotLottieRefCallback={setDotLottie}
+        />
       </div>
     );
   }

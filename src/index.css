@@ -36,6 +36,40 @@ button, a, [role="button"] {
   cursor: pointer;
 }
 
+@keyframes pulseGlow {
+  0%, 100% {
+    text-shadow: 0 0 4px rgba(14, 19, 34, 0.1);
+    opacity: 0.85;
+    transform: scale(0.99);
+  }
+  50% {
+    text-shadow: 0 0 10px rgba(14, 19, 34, 0.4);
+    opacity: 1;
+    transform: scale(1.01);
+  }
+}
+
+.dark .animate-slogan-glow {
+  animation: pulseGlowDark 4s ease-in-out infinite;
+}
+
+@keyframes pulseGlowDark {
+  0%, 100% {
+    text-shadow: 0 0 4px rgba(241, 245, 249, 0.15);
+    opacity: 0.85;
+    transform: scale(0.99);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(241, 245, 249, 0.5);
+    opacity: 1;
+    transform: scale(1.01);
+  }
+}
+
+.animate-slogan-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
 .dark {
   --color-slate-50: #f0f6fc;
   --color-slate-100: #c9d1d9;
