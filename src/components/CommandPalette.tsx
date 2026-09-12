@@ -88,17 +88,6 @@ export function CommandPalette({
       }
     },
     {
-      id: 'act-toggle-theme',
-      title: theme === 'dark' ? 'التحويل للمظهر الفاتح' : 'التحويل للمظهر الداكن',
-      subtitle: `الوضع الحالي: ${theme === 'dark' ? 'داكن' : 'فاتح'}`,
-      category: 'إجراءات سريعة',
-      icon: theme === 'dark' ? Sun : Moon,
-      action: () => {
-        toggleTheme();
-        toast.info(theme === 'dark' ? 'تم التبديل إلى الوضع الفاتح' : 'تم التبديل إلى الوضع الداكن');
-      }
-    },
-    {
       id: 'act-new-student',
       title: 'إضافة طالب جديد',
       subtitle: 'الانتقال لصفحة الطلاب وفتح نموذج التسجيل',

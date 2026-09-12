@@ -219,12 +219,6 @@ export function Layout() {
         e.preventDefault();
         setIsQuickNewOpen(prev => !prev);
       }
-      // Ctrl+J or Cmd+J -> Toggle Theme
-      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
-        e.preventDefault();
-        toggleTheme();
-        toast.info(theme === 'dark' ? 'تم التبديل إلى الوضع الفاتح' : 'تم التبديل إلى الوضع الداكن');
-      }
       // '?' key when not in an input -> Shortcuts Help
       else if (e.key === '?' && !isInput) {
         e.preventDefault();

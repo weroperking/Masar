@@ -23,6 +23,7 @@ This document serves as the guide for AI coding agents and human developers coll
 ## 2. Technology Stack & Architecture
 
 - **Frontend**: React 19, TypeScript, Vite 5, Tailwind CSS v4 (with `@custom-variant dark`), Lucide React icons, Motion, Recharts.
+- **Splash & Loading Transition**: `@lottiefiles/dotlottie-react` rendering `/public/masar-loader.json` fullscreen (`fixed inset-0`) with `layout={{ fit: 'cover' }}` so that dark-wipe transitions cover the entire viewport cleanly.
 - **Persistence**: Local-first offline storage using **Dexie.js** (IndexedDB) with `dexie-react-hooks` (`useLiveQuery`).
 - **Database Name**: `MasarDB` (instantiated in `src/db/db.ts`).
 - **Authentication**: Clerk React (`@clerk/clerk-react`) paired with a custom localized Arabic auth screen (`src/pages/Auth/CustomAuth.tsx`).
@@ -57,6 +58,7 @@ Before finishing any task, always verify:
 1. Run `lint` (`tsc --noEmit`) to verify zero TypeScript errors.
 2. Run `build` to verify successful client Vite bundling and server packaging in `dist/`.
 3. If dependencies change or dev scripts are modified, restart the dev server.
+4. **Deployment Invariant**: Ensure `.gitignore` does not ignore `dist/`, as the platform artifact upload requires compiled assets to be present.
 
 ---
 

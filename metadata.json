@@ -1,5 +1,5 @@
 {
-  "name": "Masar",
+  "name": "مسار — حصصك من غير دوشة",
   "description": "مسار — حصصك من غير دوشة",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

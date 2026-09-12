@@ -44,6 +44,65 @@ import { CustomAuth } from './pages/Auth/CustomAuth';
 import { CustomOrganizationList } from './pages/Auth/CustomOrganizationList';
 
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { syncService } from './services/syncService';
+
+function CheckUpdate() {
+  const { getToken } = useAuth();
+  
+  useEffect(() => {
+    let isChecking = false;
+    const checkForUpdates = async () => {
+      if (isChecking) return;
+      isChecking = true;
+      try {
+        const response = await fetch('/index.html?nocache=' + Date.now(), { cache: 'no-store' });
+        const htmlText = await response.text();
+        
+        const currentScript = Array.from(document.scripts).find(s => s.src.includes('/assets/index-'));
+        if (currentScript) {
+          const scriptPath = new URL(currentScript.src).pathname;
+          
+          // If the new HTML doesn't contain our current bundle's path, there's a new version
+          if (!htmlText.includes(scriptPath)) {
+            console.log('Update detected! Triggering auto-sync before hard refresh...');
+            
+            // Attempt to sync pending data to server
+            try {
+              await syncService.syncPendingData(getToken);
+            } catch (err) {
+              console.error('Auto sync before update failed:', err);
+            }
+            
+            // Clear browser caches
+            if ('caches' in window) {
+              const cacheNames = await caches.keys();
+              for (const name of cacheNames) {
+                await caches.delete(name);
+              }
+            }
+            
+            // Unregister Service Workers
+            if ('serviceWorker' in navigator) {
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              for (const registration of registrations) {
+                await registration.unregister();
+              }
+            }
+            
+            // Force a hard reload
+            window.location.reload();
+          }
+        }
+      } catch (e) {
+        console.error('Update check failed:', e);
+      }
+    };
+    
+    checkForUpdates();
+  }, [getToken]);
+
+  return null;
+}
 
 function AuthGate() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
@@ -113,10 +172,12 @@ function AuthGate() {
 
   // 4. Authenticated -> Render Full Application Routes!
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<Dashboard />} />
-        <Route path="students" element={<Students />} />
+    <>
+      <CheckUpdate />
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="students" element={<Students />} />
         <Route path="students/:id" element={<StudentDetails />} />
         <Route path="courses" element={<Courses />} />
         <Route path="payments" element={<MonthlySubscriptions />} />
@@ -142,6 +203,7 @@ function AuthGate() {
         <Route path="qrcards" element={<QrCards />} />
       </Route>
     </Routes>
+    </>
   );
 }
 

@@ -17,6 +17,7 @@ This file provides full context and architectural knowledge for AI coding agents
 - **Icons**: `lucide-react` strictly.
 - **Persistence**: **Dexie.js (IndexedDB)** with `dexie-react-hooks` (`useLiveQuery`). Database name: `MasarDB` (`src/db/db.ts`).
 - **Authentication**: Clerk React (`@clerk/clerk-react`) with localized Arabic fallback auth (`src/pages/Auth/CustomAuth.tsx`).
+- **Splash & Loading Transition**: `@lottiefiles/dotlottie-react` with native dotLottie/Lottie animation (`/public/masar-loader.json`) rendered fullscreen (`fixed inset-0`) with `layout={{ fit: 'cover' }}` to ensure complete viewport coverage during the zoom-out dark wipe transition.
 - **Server**: Express backend with Vite middleware in development, bundled with `esbuild` for production on port `3000` (`0.0.0.0:3000`).
 
 ---
@@ -37,6 +38,12 @@ This file provides full context and architectural knowledge for AI coding agents
 ### 🔢 Student Codes & QR Cards
 - Student codes (`studentCode`) are clean sequential numeric strings (e.g. `0001`, `0002`, `0003`).
 - QR card data (`cardNumber` and `qrCodeData`) strictly match the student's numeric `studentCode`.
+
+### 🖥️ Layout & Viewport Sizing
+- The main page container in `src/components/Layout.tsx` spans `w-full h-full min-h-full` without restrictive max-width constraints (avoiding arbitrary `max-w-7xl` clamps on dashboard/academic views) so that high-density tables and schedules adapt fluidly to screen dimensions before introducing vertical scrollbars.
+
+### 📦 Production Build & Deployment Artifacts
+- **CRITICAL**: The `.gitignore` must **NOT** ignore `dist/`. The Cloud Run artifact upload relies on compiled production output in `dist/` (client Vite files + bundled `dist/server.cjs`). If `dist/` is ignored in `.gitignore`, deployment artifact upload fails with "Build artifacts are empty".
 
 ---
 
