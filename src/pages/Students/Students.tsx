@@ -5,11 +5,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { Search, Plus, X, Trash2, Edit2, BookOpen, Users as UsersIcon, Check, MessageCircle } from 'lucide-react';
 import { Student } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useSubscription } from '../../context/SubscriptionContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { Link } from 'react-router-dom';
 import { getWhatsAppUrl } from '../../utils/phone';
 
 export function Students() {
+  const { subscription } = useSubscription();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -81,13 +83,22 @@ export function Students() {
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">إدارة الطلاب</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">تسجيل بيانات الطلاب، تسكين المجموعات والكورسات، ومتابعة أولياء الأمور</p>
         </div>
-        <button 
-          onClick={() => { setEditingStudent(null); setIsModalOpen(true); }}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-xs text-xs font-bold"
-        >
-          <Plus className="w-3.5 h-3.5 ml-1.5" />
-          إضافة طالب جديد
-        </button>
+        
+        {subscription?.limits?.max_students !== undefined && (students?.length || 0) >= subscription.limits.max_students ? (
+          <div className="flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-lg border border-amber-200 dark:border-amber-800">
+            <span>تجاوزت الحد الأقصى للطلاب. يرجى الترقية للإضافة.</span>
+            <a href="https://masar.top/pricing" target="_blank" rel="noopener noreferrer" className="underline font-bold text-amber-700 dark:text-amber-400">ترقية</a>
+          </div>
+        ) : (
+          <button 
+            onClick={() => { setEditingStudent(null); setIsModalOpen(true); }}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-xs text-xs font-bold"
+          >
+            <Plus className="w-3.5 h-3.5 ml-1.5" />
+            إضافة طالب جديد
+          </button>
+        )}
+
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">

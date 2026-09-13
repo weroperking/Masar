@@ -51,6 +51,28 @@ async function startServer() {
     res.json({ status: 'ok' });
   });
 
+  // Center SaaS subscription status endpoint
+  const handleSubscriptionStatus = (req: express.Request, res: express.Response) => {
+    const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    res.status(200).json({
+      plan: 'trial',
+      status: 'trialing',
+      trial_ends_at: trialEnds,
+      days_remaining: 14,
+      limits: {
+        max_branches: 5,
+        max_students: 1000,
+        inventory_sales: true,
+        combined_packages: true,
+        advanced_analytics: true,
+        api_access: true,
+      },
+    });
+  };
+
+  app.get('/api/me/subscription-status', handleSubscriptionStatus);
+  app.get('/me/subscription-status', handleSubscriptionStatus);
+
   // Public Student Lookup endpoint (accessible with zero authentication)
   const handlePublicLookup = (req: express.Request, res: express.Response) => {
     const { token } = req.params;

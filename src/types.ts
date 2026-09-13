@@ -253,3 +253,25 @@ export interface PublicLookupData {
     amountPaid?: number;
   };
 }
+
+export interface SubscriptionLimits {
+  max_branches: number;
+  max_students: number;
+  inventory_sales: boolean;
+  combined_packages: boolean;
+  advanced_analytics: boolean;
+  api_access: boolean;
+}
+
+export interface SubscriptionStatus {
+  plan: string;
+  status: string;
+  trial_ends_at: string | null;
+  days_remaining: number;
+  limits: SubscriptionLimits;
+}
+
+export interface SubscriptionCache extends SubscriptionStatus {
+  id: string; // usually 'singleton'
+  checked_at: number;
+}

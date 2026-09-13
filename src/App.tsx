@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { SignIn, OrganizationList, useAuth, useOrganization } from '@clerk/clerk-react';
+import { SignIn, OrganizationList, useAuth, useOrganization, useClerk } from '@clerk/clerk-react';
 import { seedDatabaseIfEmpty, sanitizeNumericCodes } from './db/seed';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
@@ -30,6 +30,7 @@ import { Reports } from './pages/Reports/Reports';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { ConfirmProvider } from './context/ConfirmContext';
+import { SubscriptionProvider } from './context/SubscriptionContext';
 
 // Admin
 import { Users } from './pages/Admin/Users';
@@ -42,6 +43,7 @@ import { PublicStudentLookup } from './pages/PublicStudentLookup';
 
 import { CustomAuth } from './pages/Auth/CustomAuth';
 import { CustomOrganizationList } from './pages/Auth/CustomOrganizationList';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { syncService } from './services/syncService';
@@ -105,11 +107,27 @@ function CheckUpdate() {
 }
 
 function AuthGate() {
-  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const { isLoaded: isAuthLoaded, isSignedIn, userId } = useAuth({ treatPendingAsSignedOut: false });
   const { isLoaded: isOrgLoaded, organization } = useOrganization();
+  const clerk = useClerk();
   const [isAnimationDone, setIsAnimationDone] = useState(false);
   const [dotLottie, setDotLottie] = useState<any>(null);
   const [lottieError, setLottieError] = useState<string | null>(null);
+
+  // Consider authenticated if isSignedIn is true, or userId exists, or clerk client has existing sessions
+  const hasSession = Boolean(
+    isSignedIn || 
+    userId || 
+    (clerk.loaded && clerk.client?.sessions && clerk.client.sessions.length > 0)
+  );
+
+  // Auto-activate session if clerk client has a session that isn't set as active yet
+  useEffect(() => {
+    if (clerk.loaded && !clerk.session && clerk.client?.sessions && clerk.client.sessions.length > 0) {
+      const firstSession = clerk.client.sessions[0];
+      clerk.setActive({ session: firstSession.id }).catch(console.error);
+    }
+  }, [clerk.loaded, clerk.session, clerk.client?.sessions]);
 
   useEffect(() => {
     // Fallback in case onComplete doesn't fire for some reason
@@ -135,7 +153,7 @@ function AuthGate() {
   }, [dotLottie]);
 
   // 1. Loading State
-  if (!isAuthLoaded || (isSignedIn && !isOrgLoaded) || !isAnimationDone) {
+  if (!isAuthLoaded || !clerk.loaded || (hasSession && !isOrgLoaded) || !isAnimationDone) {
     return (
       <div className="fixed inset-0 w-full h-full z-50 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 overflow-hidden">
         {lottieError && (
@@ -157,14 +175,14 @@ function AuthGate() {
   }
 
   // 2. Not authenticated at all -> Show Custom Auth
-  if (!isSignedIn) {
+  if (!hasSession) {
     return <CustomAuth />;
   }
 
   // 3. Authenticated, but no active organization
   if (!organization) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4" dir="rtl">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-950 px-4 py-12 sm:px-6 lg:px-8" dir="rtl">
         <CustomOrganizationList />
       </div>
     );
@@ -172,38 +190,40 @@ function AuthGate() {
 
   // 4. Authenticated -> Render Full Application Routes!
   return (
-    <>
-      <CheckUpdate />
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="students" element={<Students />} />
-        <Route path="students/:id" element={<StudentDetails />} />
-        <Route path="courses" element={<Courses />} />
-        <Route path="payments" element={<MonthlySubscriptions />} />
-        
-        <Route path="groups" element={<Groups />} />
-        <Route path="groups/:id" element={<GroupDetails />} />
-        <Route path="attendance" element={<Attendance />} />
-        <Route path="schedule" element={<Schedule />} />
-        <Route path="assessments" element={<Assessments />} />
-        <Route path="course-products" element={<CourseProducts />} />
-        
-        <Route path="session-payments" element={<SessionPayments />} />
-        <Route path="ledgers" element={<Ledgers />} />
-        <Route path="dues" element={<Dues />} />
-        <Route path="booking" element={<Booking />} />
-        
-        <Route path="inventory" element={<Inventory />} />
-        <Route path="reports" element={<Reports />} />
-        
-        <Route path="users" element={<Users />} />
-        <Route path="messaging" element={<Messaging />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="qrcards" element={<QrCards />} />
-      </Route>
-    </Routes>
-    </>
+    <ErrorBoundary>
+      <SubscriptionProvider>
+        <CheckUpdate />
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="students" element={<Students />} />
+          <Route path="students/:id" element={<StudentDetails />} />
+          <Route path="courses" element={<Courses />} />
+          <Route path="payments" element={<MonthlySubscriptions />} />
+          
+          <Route path="groups" element={<Groups />} />
+          <Route path="groups/:id" element={<GroupDetails />} />
+          <Route path="attendance" element={<Attendance />} />
+          <Route path="schedule" element={<Schedule />} />
+          <Route path="assessments" element={<Assessments />} />
+          <Route path="course-products" element={<CourseProducts />} />
+          
+          <Route path="session-payments" element={<SessionPayments />} />
+          <Route path="ledgers" element={<Ledgers />} />
+          <Route path="dues" element={<Dues />} />
+          <Route path="booking" element={<Booking />} />
+          
+          <Route path="inventory" element={<Inventory />} />
+          <Route path="reports" element={<Reports />} />
+          
+          <Route path="users" element={<Users />} />
+          <Route path="messaging" element={<Messaging />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="qrcards" element={<QrCards />} />
+        </Route>
+      </Routes>
+      </SubscriptionProvider>
+    </ErrorBoundary>
   );
 }
 

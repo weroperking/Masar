@@ -4,9 +4,11 @@ import { db } from '../../db/db';
 import { Download, Users, BookOpen, Package, DollarSign, TrendingUp, BarChart3, PieChart } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { toMajorUnits } from '../../utils/currency';
+import { useSubscription } from '../../context/SubscriptionContext';
 
 export function Reports() {
-  const [activeTab, setActiveTab] = useState<'financials' | 'students' | 'courses' | 'products'>('financials');
+  const [activeTab, setActiveTab] = useState<'financials' | 'students' | 'courses' | 'products' | 'advanced'>('financials');
+  const { subscription } = useSubscription();
 
   const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
   const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at).toArray(), []);
@@ -117,8 +119,9 @@ export function Reports() {
             { id: 'financials', label: 'الأداء المالي والتدفقات' },
             { id: 'students', label: 'الطلاب ومصادر التسجيل' },
             { id: 'courses', label: 'الكورسات والاشتراكات' },
-            { id: 'products', label: 'المخزون والمبيعات' },
-          ].map((tab) => (
+            ...(subscription?.limits?.inventory_sales !== false ? [{ id: 'products', label: 'المخزون والمبيعات' }] : []),
+            ...(subscription?.limits?.advanced_analytics ? [{ id: 'advanced', label: 'تحليلات متقدمة' }] : []),
+          ].map((tab: any) => (
             <button 
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)} 

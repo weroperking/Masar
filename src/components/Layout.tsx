@@ -13,6 +13,7 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { syncService, TABLES } from '../services/syncService';
 import { useTheme } from '../context/ThemeContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { CommandPalette } from './CommandPalette';
 import { QuickNewModal } from './QuickNewModal';
 import { ShortcutsHelpModal } from './ShortcutsHelpModal';
@@ -21,57 +22,60 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { MasarLogo } from './MasarLogo';
 
-const navigationGroups = [
-  {
-    title: 'رئيسي',
-    items: [
-      { name: 'لوحة التحكم', href: '/', icon: LayoutDashboard },
-    ]
-  },
-  {
-    title: 'أكاديمي',
-    items: [
-      { name: 'الطلاب', href: '/students', icon: Users },
-      { name: 'الكورسات', href: '/courses', icon: BookOpen },
-      { name: 'المجموعات', href: '/groups', icon: Users },
-      { name: 'الحضور والغياب', href: '/attendance', icon: UserCheck },
-      { name: 'الجدول الزمني', href: '/schedule', icon: Calendar },
-      { name: 'الاختبارات والواجبات', href: '/assessments', icon: FileText },
-      { name: 'الكتب التعليمية', href: '/course-products', icon: Library },
-    ]
-  },
-  {
-    title: 'المالية',
-    items: [
-      { name: 'الاشتراكات الشهرية', href: '/payments', icon: CreditCard },
-      { name: 'مدفوعات الحصص', href: '/session-payments', icon: Wallet },
-      { name: 'السجلات المالية', href: '/ledgers', icon: FileSpreadsheet },
-      { name: 'المستحقات', href: '/dues', icon: FileSpreadsheet },
-      { name: 'الحجز الأونلاين', href: '/booking', icon: Globe },
-    ]
-  },
-  {
-    title: 'المخزون',
-    items: [
-      { name: 'المنتجات والمبيعات', href: '/inventory', icon: Package },
-    ]
-  },
-  {
-    title: 'التقارير',
-    items: [
-      { name: 'التقارير', href: '/reports', icon: BarChart3 },
-    ]
-  },
-  {
-    title: 'الإدارة',
-    items: [
-      { name: 'المستخدمين', href: '/users', icon: UserCog },
-      { name: 'المراسلات', href: '/messaging', icon: MessageSquare },
-      { name: 'الإعدادات', href: '/settings', icon: Settings },
-      { name: 'بطاقات QR', href: '/qrcards', icon: QrCode },
-    ]
-  }
-];
+// Base navigation groups (we will filter them inside the component)
+const getNavigationGroups = (limits: any) => {
+  return [
+    {
+      title: 'رئيسي',
+      items: [
+        { name: 'لوحة التحكم', href: '/', icon: LayoutDashboard },
+      ]
+    },
+    {
+      title: 'أكاديمي',
+      items: [
+        { name: 'الطلاب', href: '/students', icon: Users },
+        { name: 'الكورسات', href: '/courses', icon: BookOpen },
+        { name: 'المجموعات', href: '/groups', icon: Users },
+        { name: 'الحضور والغياب', href: '/attendance', icon: UserCheck },
+        { name: 'الجدول الزمني', href: '/schedule', icon: Calendar },
+        { name: 'الاختبارات والواجبات', href: '/assessments', icon: FileText },
+        { name: 'الكتب التعليمية', href: '/course-products', icon: Library },
+      ]
+    },
+    {
+      title: 'المالية',
+      items: [
+        { name: 'الاشتراكات الشهرية', href: '/payments', icon: CreditCard },
+        { name: 'مدفوعات الحصص', href: '/session-payments', icon: Wallet },
+        { name: 'السجلات المالية', href: '/ledgers', icon: FileSpreadsheet },
+        { name: 'المستحقات', href: '/dues', icon: FileSpreadsheet },
+        { name: 'الحجز الأونلاين', href: '/booking', icon: Globe },
+      ]
+    },
+    ...(limits?.inventory_sales !== false ? [{
+      title: 'المخزون',
+      items: [
+        { name: 'المنتجات والمبيعات', href: '/inventory', icon: Package },
+      ]
+    }] : []),
+    {
+      title: 'التقارير',
+      items: [
+        { name: 'التقارير', href: '/reports', icon: BarChart3 },
+      ]
+    },
+    {
+      title: 'الإدارة',
+      items: [
+        { name: 'المستخدمين', href: '/users', icon: UserCog },
+        { name: 'المراسلات', href: '/messaging', icon: MessageSquare },
+        { name: 'الإعدادات', href: '/settings', icon: Settings },
+        { name: 'بطاقات QR', href: '/qrcards', icon: QrCode },
+      ]
+    }
+  ];
+};
 
 interface SidebarNavItemProps {
   item: {
@@ -149,6 +153,9 @@ export function Layout() {
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [hideTrialBanner, setHideTrialBanner] = useState(false);
+  const { subscription } = useSubscription();
+  const navigationGroups = getNavigationGroups(subscription?.limits);
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -384,6 +391,43 @@ export function Layout() {
             </div>
           </div>
         </header>
+        
+        {/* Trial Countdown Banner */}
+        {!hideTrialBanner && subscription?.status === 'trialing' && (
+          <div className={cn(
+            "shrink-0 flex items-center justify-between px-4 py-2 border-b",
+            subscription.days_remaining <= 3 
+              ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
+              : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400"
+          )}>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium">
+                {subscription.days_remaining <= 3 
+                  ? `باقي ${subscription.days_remaining} أيام فقط على انتهاء فترتك التجريبية`
+                  : `باقي ${subscription.days_remaining} يوماً في فترتك التجريبية`}
+              </span>
+              <a 
+                href="https://masar.top/pricing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "text-xs font-bold px-3 py-1 rounded-full transition-colors",
+                  subscription.days_remaining <= 3 
+                    ? "bg-red-600 hover:bg-red-700 text-white" 
+                    : "bg-amber-600 hover:bg-amber-700 text-white"
+                )}
+              >
+                الترقية الآن
+              </a>
+            </div>
+            <button 
+              onClick={() => setHideTrialBanner(true)}
+              className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         
         {/* Page Content */}
         <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-150">

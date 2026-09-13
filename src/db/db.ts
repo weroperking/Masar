@@ -3,7 +3,7 @@ import {
   Student, Course, Group, MonthlySubscription, AttendanceSession, AttendanceRecord, 
   Assessment, AssessmentGrade, Product, CourseProduct, SessionPayment, 
   LedgerEntry, BookingRequest, ProductSale, Event, User, MessageTemplate, 
-  Settings, QrCard, SyncMeta, Enrollment
+  Settings, QrCard, SyncMeta, Enrollment, SubscriptionCache
 } from '../types';
 
 export class AppDatabase extends Dexie {
@@ -28,6 +28,7 @@ export class AppDatabase extends Dexie {
   settings!: Table<Settings>;
   qrCards!: Table<QrCard>;
   syncMeta!: Table<SyncMeta>;
+  subscriptionCache!: Table<SubscriptionCache>;
 
   constructor() {
     super('MasarDB');
@@ -74,6 +75,10 @@ export class AppDatabase extends Dexie {
       payments: null, // Drop old table
       monthlySubscriptions: 'id, studentId, courseId, [month+year], status, sync_status',
       enrollments: 'id, studentId, groupId, courseId, status, sync_status'
+    });
+
+    this.version(6).stores({
+      subscriptionCache: 'id'
     });
   }
 }

@@ -5,10 +5,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { Plus, X, Trash2, BookOpen, Edit2, Search } from 'lucide-react';
 import { Course } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useSubscription } from '../../context/SubscriptionContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 
 export function Courses() {
+  const { subscription } = useSubscription();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const toast = useToast();
@@ -125,6 +127,7 @@ export function Courses() {
 }
 
 function CourseFormModal({ onClose, initialData }: { onClose: () => void, initialData?: Course | null }) {
+  const { subscription } = useSubscription();
   const toast = useToast();
   const [formData, setFormData] = useState({
     name: initialData?.name || '', 
@@ -214,7 +217,7 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
               onChange={e => setFormData({...formData, paymentType: e.target.value as any})}
             >
               <option value="monthly">شهري (تجديد كل شهر)</option>
-              <option value="package">باقة كاملة (ترم أو كورس كامل)</option>
+              {subscription?.limits?.combined_packages !== false && <option value="package">باقة كاملة (ترم أو كورس كامل)</option>}
             </select>
           </div>
 
