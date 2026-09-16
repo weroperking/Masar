@@ -6,7 +6,7 @@ import {
   Image
 } from 'lucide-react';
 import { Student, QrCard } from '../../types';
-import { db } from '../../db/db';
+import { useApiMutation } from '../../config/queryHooks';
 import { QrCardBadge, CardThemeColor } from './QrCardBadge';
 
 interface QrCardModalProps {
@@ -28,6 +28,7 @@ export function QrCardModal({
   defaultCenterName = 'أكاديمية مسار التعليمية',
   onSaveCards
 }: QrCardModalProps) {
+  const { update: updateStudent } = useApiMutation<Student>('students');
   const [mode, setMode] = useState<Mode>('single_student');
   
   // Customization state
@@ -146,10 +147,9 @@ export function QrCardModal({
 
         // Keep studentCode in students table 100% matched with the barcode number
         if (selectedStudent && (!selectedStudent.studentCode || selectedStudent.studentCode !== serial)) {
-          await db.students.update(selectedStudent.id, {
-            studentCode: serial,
-            updated_at: now,
-            sync_status: 'pending'
+          updateStudent.mutate({
+            id: selectedStudent.id,
+            data: { studentCode: serial }
           });
         }
 
@@ -210,10 +210,9 @@ export function QrCardModal({
           let serial = stu.studentCode ? stu.studentCode.replace(/\D/g, '') : '';
           if (!serial) {
             serial = generateSequentialSerial(nextSeq++);
-            await db.students.update(stu.id, {
-              studentCode: serial,
-              updated_at: now,
-              sync_status: 'pending'
+            updateStudent.mutate({
+              id: stu.id,
+              data: { studentCode: serial }
             });
           }
           generatedCards.push({

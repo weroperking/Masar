@@ -1,34 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
-import { v4 as uuidv4 } from 'uuid';
-import { Search, Plus, X, Trash2, Edit2, BookOpen, Users as UsersIcon, Check, MessageCircle } from 'lucide-react';
-import { Student } from '../../types';
+import { Search, Plus, X, Trash2, Edit2, BookOpen, Users as UsersIcon, Check, MessageCircle, Eye, DollarSign, Tag, QrCode } from 'lucide-react';
+import { Student, Enrollment } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { useConfirm } from '../../context/ConfirmContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getWhatsAppUrl } from '../../utils/phone';
+import { toMajorUnits, toMinorUnits } from '../../utils/currency';
+import { EditPricingModal } from './StudentDetails';
+import { syncStudentMonthlySubscriptions } from '../../utils/pricing';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
+import { useAuth } from '@clerk/clerk-react';
 
 export function Students() {
+  const navigate = useNavigate();
   const { subscription } = useSubscription();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [pricingEnrollmentData, setPricingEnrollmentData] = useState<{
+    enrollment: Enrollment;
+    course: any;
+  } | null>(null);
+  const [studentPricingSelector, setStudentPricingSelector] = useState<{
+    student: Student;
+    enrollments: Enrollment[];
+  } | null>(null);
+
   const toast = useToast();
   const { confirm } = useConfirm();
   
-  const students = useLiveQuery(
-    () => db.students
-      .filter(s => !s.deleted_at && (s.name.includes(searchTerm) || s.phone.includes(searchTerm)))
-      .reverse()
-      .toArray(),
-    [searchTerm]
-  );
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const students = allStudents.filter(s => s.name.includes(searchTerm) || s.phone.includes(searchTerm)).reverse();
+  const { data: enrollments = [] } = useApiQuery<Enrollment>('enrollments', 2 * 60 * 1000);
+  const { data: groups = [] } = useApiQuery<any>('groups', 2 * 60 * 1000);
+  const { data: courses = [] } = useApiQuery<any>('courses', 2 * 60 * 1000);
 
-  const enrollments = useLiveQuery(() => db.enrollments.toArray(), []);
-  const groups = useLiveQuery(() => db.groups.toArray(), []);
-  const courses = useLiveQuery(() => db.courses.toArray(), []);
+  const { remove: removeStudent, update: updateStudent } = useApiMutation<Student>('students');
+
+
+  const handleOpenStudentPricing = (student: Student, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const studentActiveEnrollments = enrollments?.filter(en => en.studentId === student.id && en.status === 'active') || [];
+    if (studentActiveEnrollments.length === 0) {
+      toast.info('الطالب غير مسجل في أي مجموعة بعد. انقر على تعديل الطالب لتسكينه في مجموعة أولاً.');
+      return;
+    }
+    if (studentActiveEnrollments.length === 1) {
+      const en = studentActiveEnrollments[0];
+      const crs = courses?.find(c => c.id === en.courseId);
+      setPricingEnrollmentData({ enrollment: en, course: crs });
+    } else {
+      setStudentPricingSelector({ student, enrollments: studentActiveEnrollments });
+    }
+  };
 
   const handleDelete = async (id: string, name: string) => {
     const isConfirmed = await confirm({
@@ -41,29 +66,18 @@ export function Students() {
     });
 
     if (isConfirmed) {
-      try {
-        await db.students.update(id, { 
-          deleted_at: Date.now(), 
-          sync_status: 'pending' 
-        });
-        toast.success(`تم حذف الطالب (${name}) بنجاح`);
-      } catch (err) {
-        toast.error('فشل حذف الطالب، يرجى المحاولة لاحقاً');
-      }
+      removeStudent.mutate(id, {
+        onSuccess: () => toast.success(`تم حذف الطالب (${name}) بنجاح`),
+        onError: () => toast.error('فشل حذف الطالب، يرجى المحاولة لاحقاً')
+      });
     }
   };
 
   const handleToggleStatus = async (student: Student) => {
-    try {
-      await db.students.update(student.id, { 
-        isActive: !student.isActive, 
-        updated_at: Date.now(),
-        sync_status: 'pending'
-      });
-      toast.success(`تم تحديث حالة الطالب بنجاح`);
-    } catch (err) {
-      toast.error('فشل تحديث الحالة');
-    }
+    updateStudent.mutate({ id: student.id, data: { isActive: !student.isActive } }, {
+      onSuccess: () => toast.success(`تم تحديث حالة الطالب بنجاح`),
+      onError: () => toast.error('فشل تحديث الحالة')
+    });
   };
 
   const handleEdit = (student: Student) => {
@@ -84,20 +98,31 @@ export function Students() {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">تسجيل بيانات الطلاب، تسكين المجموعات والكورسات، ومتابعة أولياء الأمور</p>
         </div>
         
-        {subscription?.limits?.max_students !== undefined && (students?.length || 0) >= subscription.limits.max_students ? (
-          <div className="flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-lg border border-amber-200 dark:border-amber-800">
-            <span>تجاوزت الحد الأقصى للطلاب. يرجى الترقية للإضافة.</span>
-            <a href="https://masar.top/pricing" target="_blank" rel="noopener noreferrer" className="underline font-bold text-amber-700 dark:text-amber-400">ترقية</a>
-          </div>
-        ) : (
-          <button 
-            onClick={() => { setEditingStudent(null); setIsModalOpen(true); }}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-xs text-xs font-bold"
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/qrcards"
+            className="flex items-center px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+            title="طباعة وإدارة بطاقات وكروت الباركود والـ QR للطلاب"
           >
-            <Plus className="w-3.5 h-3.5 ml-1.5" />
-            إضافة طالب جديد
-          </button>
-        )}
+            <QrCode className="w-3.5 h-3.5 ml-1.5 text-blue-600 dark:text-blue-400" />
+            <span>بطاقات وكروت الـ QR</span>
+          </Link>
+
+          {subscription?.limits?.max_students !== undefined && (students?.length || 0) >= subscription.limits.max_students ? (
+            <div className="flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-lg border border-amber-200 dark:border-amber-800">
+              <span>تجاوزت الحد الأقصى للطلاب. يرجى الترقية للإضافة.</span>
+              <a href="https://masar.top/pricing" target="_blank" rel="noopener noreferrer" className="underline font-bold text-amber-700 dark:text-amber-400">ترقية</a>
+            </div>
+          ) : (
+            <button 
+              onClick={() => { setEditingStudent(null); setIsModalOpen(true); }}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-xs text-xs font-bold"
+            >
+              <Plus className="w-3.5 h-3.5 ml-1.5" />
+              إضافة طالب جديد
+            </button>
+          )}
+        </div>
 
       </div>
 
@@ -139,7 +164,11 @@ export function Students() {
                   const studentGroups = studentActiveEnrollments.map(e => groups?.find(g => g.id === e.groupId)).filter(Boolean);
 
                   return (
-                    <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr 
+                      key={student.id} 
+                      onClick={() => navigate(`/students/${student.id}`)}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group/row"
+                    >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {student.studentCode && (
@@ -147,12 +176,12 @@ export function Students() {
                               #{student.studentCode}
                             </span>
                           )}
-                          <Link to={`/students/${student.id}`} className="font-semibold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100 group-hover/row:text-blue-600 dark:group-hover/row:text-blue-400 transition-colors">
                             {student.name}
-                          </Link>
+                          </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5" dir="ltr">
                           <span className="font-mono">{student.phone}</span>
                           {student.phone && getWhatsAppUrl(student.phone) && (
@@ -169,16 +198,35 @@ export function Students() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        {studentGroups.length === 0 ? (
+                        {studentActiveEnrollments.length === 0 ? (
                           <span className="text-[11px] text-slate-400">غير مسجل بمجموعة</span>
                         ) : (
-                          <div className="flex flex-wrap gap-1 max-w-xs">
-                            {studentGroups.map(grp => (
-                              <span key={grp!.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40 rounded text-[10px] font-medium">
-                                <UsersIcon className="w-2.5 h-2.5" />
-                                {grp!.name}
-                              </span>
-                            ))}
+                          <div className="flex flex-wrap gap-1.5 max-w-xs">
+                            {studentActiveEnrollments.map(en => {
+                              const grp = groups?.find(g => g.id === en.groupId);
+                              if (!grp) return null;
+                              return (
+                                <span key={en.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40 rounded text-[10px] font-medium">
+                                  <UsersIcon className="w-2.5 h-2.5" />
+                                  <span>{grp.name}</span>
+                                  {en.pricingMode === 'free' && (
+                                    <span className="px-1 py-0.2 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-bold">
+                                      مجاني
+                                    </span>
+                                  )}
+                                  {en.pricingMode === 'discount' && (
+                                    <span className="px-1 py-0.2 bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 rounded text-[9px] font-bold">
+                                      خصم {en.discountPercentage ? `${en.discountPercentage}%` : ''}
+                                    </span>
+                                  )}
+                                  {en.pricingMode === 'custom' && (
+                                    <span className="px-1 py-0.2 bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 rounded text-[9px] font-bold">
+                                      {toMajorUnits(en.customPrice || 0)} ج.م
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                       </td>
@@ -188,7 +236,7 @@ export function Students() {
                           <div className="text-[10px] text-slate-400 font-medium">{student.gradeLevel}</div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300" onClick={e => e.stopPropagation()}>
                         <div>{student.parentName || '-'}</div>
                         <div className="flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500" dir="ltr">
                           <span className="font-mono">{student.parentPhone}</span>
@@ -205,7 +253,7 @@ export function Students() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => handleToggleStatus(student)}
                           className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold cursor-pointer transition-colors ${
@@ -218,9 +266,34 @@ export function Students() {
                           {student.isActive ? 'نشط' : 'غير نشط'}
                         </button>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
                           <button
+                            type="button"
+                            onClick={() => navigate(`/students/${student.id}`)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 cursor-pointer dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="عرض الملف الشامل للطالب (المجموعات، الحضور، المصاريف)"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/qrcards?studentId=${student.id}`)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 cursor-pointer dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="بطاقة وكود الـ QR للطالب"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleOpenStudentPricing(student, e)}
+                            className="p-1.5 text-emerald-600 hover:text-emerald-700 cursor-pointer dark:text-emerald-400 dark:hover:text-emerald-300 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors"
+                            title="تعديل الرسوم والخصومات (نصف السعر / خصم / إعفاء)"
+                          >
+                            <DollarSign className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleEdit(student)}
                             className="p-1.5 text-slate-400 hover:text-blue-600 cursor-pointer dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             title="تعديل بيانات الطالب"
@@ -228,6 +301,7 @@ export function Students() {
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleDelete(student.id, student.name)}
                             className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer dark:hover:text-red-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             title="حذف الطالب"
@@ -251,14 +325,95 @@ export function Students() {
           existingStudent={editingStudent} 
         />
       )}
+
+      {pricingEnrollmentData && (
+        <EditPricingModal
+          enrollment={pricingEnrollmentData.enrollment}
+          course={pricingEnrollmentData.course}
+          onClose={() => setPricingEnrollmentData(null)}
+        />
+      )}
+
+      {studentPricingSelector && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">تعديل رسوم الطالب والخصم</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{studentPricingSelector.student.name}</p>
+              </div>
+              <button
+                onClick={() => setStudentPricingSelector(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              الطالب مسجل في أكثر من كورس/مجموعة. يرجى اختيار الكورس الذي ترغب في تعديل رسومه أو منحه خصماً:
+            </p>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {studentPricingSelector.enrollments.map(en => {
+                const grp = groups?.find(g => g.id === en.groupId);
+                const crs = courses?.find(c => c.id === en.courseId);
+                return (
+                  <button
+                    key={en.id}
+                    onClick={() => {
+                      setPricingEnrollmentData({ enrollment: en, course: crs });
+                      setStudentPricingSelector(null);
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/40 text-right transition-colors cursor-pointer group"
+                  >
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                        {crs?.name || 'كورس'} - {grp?.name || 'مجموعة'}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                          السعر الأساسي: {toMajorUnits(crs?.price || 0)} ج.م
+                        </span>
+                        {en.pricingMode === 'free' && (
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
+                            منحة مجانية
+                          </span>
+                        )}
+                        {en.pricingMode === 'discount' && (
+                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded">
+                            خصم {en.discountPercentage}%
+                          </span>
+                        )}
+                        {en.pricingMode === 'custom' && (
+                          <span className="text-[10px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded">
+                            مخصص {toMajorUnits(en.customPrice || 0)} ج.م
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <DollarSign className="w-4 h-4 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, existingStudent: Student | null }) {
+export function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, existingStudent: Student | null }) {
   const toast = useToast();
-  const courses = useLiveQuery(() => db.courses.toArray(), []);
-  const groups = useLiveQuery(() => db.groups.toArray(), []);
+  const { data: courses = [] } = useApiQuery<any>('courses', 2 * 60 * 1000);
+  const { data: groups = [] } = useApiQuery<any>('groups', 2 * 60 * 1000);
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 2 * 60 * 1000);
+  const { data: enrollments = [] } = useApiQuery<Enrollment>('enrollments', 2 * 60 * 1000);
+  
+  const { create: createStudent, update: updateStudent } = useApiMutation<Student>('students');
+  const { create: createEnrollment, update: updateEnrollment } = useApiMutation<Enrollment>('enrollments');
+  const { getToken } = useAuth();
 
   const [formData, setFormData] = useState({
     studentCode: existingStudent?.studentCode || '',
@@ -272,35 +427,64 @@ function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, e
     isActive: existingStudent ? existingStudent.isActive : true
   });
 
+  interface GroupPricingState {
+    pricingMode: 'default' | 'custom' | 'discount' | 'free';
+    customPriceMajor?: number;
+    discountPercentage?: number;
+  }
+
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [groupPricings, setGroupPricings] = useState<Record<string, GroupPricingState>>({});
 
   useEffect(() => {
     if (existingStudent) {
-      db.enrollments
-        .where('studentId')
-        .equals(existingStudent.id)
-        .toArray()
-        .then(enrolls => {
-          const activeIds = enrolls.filter(e => e.status === 'active').map(e => e.groupId);
-          setSelectedGroupIds(activeIds);
-        });
+      const activeEnrolls = enrollments.filter(e => e.studentId === existingStudent.id && e.status === 'active');
+      setSelectedGroupIds(activeEnrolls.map(e => e.groupId));
+      const pricingMap: Record<string, GroupPricingState> = {};
+      activeEnrolls.forEach(en => {
+        pricingMap[en.groupId] = {
+          pricingMode: en.pricingMode || 'default',
+          customPriceMajor: en.customPrice !== undefined ? toMajorUnits(en.customPrice) : undefined,
+          discountPercentage: en.discountPercentage
+        };
+      });
+      setGroupPricings(pricingMap);
     }
-  }, [existingStudent]);
+  }, [existingStudent, enrollments]);
 
   const toggleGroup = (groupId: string) => {
-    setSelectedGroupIds(prev => 
-      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
-    );
+    setSelectedGroupIds(prev => {
+      const isSelected = prev.includes(groupId);
+      if (isSelected) {
+        return prev.filter(id => id !== groupId);
+      } else {
+        if (!groupPricings[groupId]) {
+          setGroupPricings(current => ({
+            ...current,
+            [groupId]: { pricingMode: 'default' }
+          }));
+        }
+        return [...prev, groupId];
+      }
+    });
+  };
+
+  const updateGroupPricing = (groupId: string, partial: Partial<GroupPricingState>) => {
+    setGroupPricings(prev => ({
+      ...prev,
+      [groupId]: {
+        ...(prev[groupId] || { pricingMode: 'default' }),
+        ...partial
+      }
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const now = Date.now();
       let finalStudentCode = formData.studentCode.trim();
       
       if (!existingStudent && !finalStudentCode) {
-        const allStudents = await db.students.toArray();
         let maxSeq = 0;
         allStudents.forEach(s => {
           if (s.studentCode && /^\d+$/.test(s.studentCode)) {
@@ -316,91 +500,117 @@ function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, e
       const normalizedFormData = {
         ...formData,
         phone: cleanPhone,
-        parentPhone: cleanParentPhone
+        parentPhone: cleanParentPhone,
+        studentCode: finalStudentCode
       };
 
-      await db.transaction('rw', [db.students, db.enrollments], async () => {
-        if (existingStudent) {
-          await db.students.update(existingStudent.id, {
-            ...normalizedFormData,
-            studentCode: finalStudentCode,
-            updated_at: now,
-            sync_status: 'pending'
-          });
+      const token = await getToken();
+      if (!token) throw new Error("No token");
 
-          // Sync enrollments
-          const existingEnrolls = await db.enrollments.where('studentId').equals(existingStudent.id).toArray();
-          
-          // Groups to enroll
-          for (const gId of selectedGroupIds) {
-            const grp = groups?.find(g => g.id === gId);
-            const found = existingEnrolls.find(e => e.groupId === gId);
-            if (!found && grp) {
-              await db.enrollments.add({
-                id: uuidv4(),
-                studentId: existingStudent.id,
-                groupId: gId,
-                courseId: grp.courseId,
-                enrolledAt: new Date().toISOString(),
-                status: 'active',
-                created_at: now,
-                updated_at: now,
-                sync_status: 'pending'
-              });
-            } else if (found && found.status !== 'active') {
-              await db.enrollments.update(found.id, {
-                status: 'active',
-                updated_at: now,
-                sync_status: 'pending'
-              });
-            }
+      if (existingStudent) {
+        await updateStudent.mutateAsync({
+          id: existingStudent.id,
+          data: normalizedFormData
+        });
+
+        const existingEnrolls = enrollments.filter(e => e.studentId === existingStudent.id);
+        
+        for (const gId of selectedGroupIds) {
+          const grp = groups?.find(g => g.id === gId);
+          if (!grp) continue;
+          const crs = courses?.find(c => c.id === grp.courseId);
+          const basePrice = crs?.price || 0;
+          const pricing = groupPricings[gId] || { pricingMode: 'default' };
+
+          let finalCustomPrice: number | undefined = undefined;
+          if (pricing.pricingMode === 'custom') {
+            finalCustomPrice = pricing.customPriceMajor !== undefined ? toMinorUnits(pricing.customPriceMajor) : undefined;
+          } else if (pricing.pricingMode === 'discount') {
+            const disc = pricing.discountPercentage || 0;
+            finalCustomPrice = Math.round(basePrice * (1 - disc / 100));
+          } else if (pricing.pricingMode === 'free') {
+            finalCustomPrice = 0;
           }
 
-          // Groups to withdraw
-          for (const oldEnr of existingEnrolls) {
-            if (!selectedGroupIds.includes(oldEnr.groupId) && oldEnr.status === 'active') {
-              await db.enrollments.update(oldEnr.id, {
-                status: 'withdrawn',
-                updated_at: now,
-                sync_status: 'pending'
-              });
-            }
-          }
-
-          toast.success(`تم تحديث بيانات الطالب (${formData.name}) وتسجيلات المجموعات بنجاح!`);
-        } else {
-          const studentId = uuidv4();
-          const newStudent: Student = {
-            id: studentId,
-            ...normalizedFormData,
-            studentCode: finalStudentCode,
-            created_at: now,
-            updated_at: now,
-            sync_status: 'pending'
-          };
-          await db.students.add(newStudent);
-
-          // Add enrollments
-          for (const gId of selectedGroupIds) {
-            const grp = groups?.find(g => g.id === gId);
-            if (grp) {
-              await db.enrollments.add({
-                id: uuidv4(),
-                studentId: studentId,
-                groupId: gId,
-                courseId: grp.courseId,
-                enrolledAt: new Date().toISOString(),
+          const found = existingEnrolls.find(e => e.groupId === gId);
+          if (!found) {
+            await createEnrollment.mutateAsync({
+              studentId: existingStudent.id,
+              groupId: gId,
+              courseId: grp.courseId,
+              enrolledAt: new Date().toISOString(),
+              status: 'active',
+              pricingMode: pricing.pricingMode,
+              customPrice: finalCustomPrice,
+              discountPercentage: pricing.discountPercentage
+            });
+          } else {
+            await updateEnrollment.mutateAsync({
+              id: found.id,
+              data: {
                 status: 'active',
-                created_at: now,
-                updated_at: now,
-                sync_status: 'pending'
-              });
-            }
+                pricingMode: pricing.pricingMode,
+                customPrice: finalCustomPrice,
+                discountPercentage: pricing.discountPercentage
+              }
+            });
           }
 
-          toast.success(`تم تسجيل الطالب (${formData.name}) في المجموعات المحددة بنجاح!`);
+          const effectiveFee = pricing.pricingMode === 'free'
+            ? 0
+            : finalCustomPrice !== undefined
+              ? finalCustomPrice
+              : basePrice;
+
+          if (existingStudent.id && grp.courseId) {
+            await syncStudentMonthlySubscriptions(existingStudent.id, grp.courseId, effectiveFee, token);
+          }
         }
-      });
+
+        for (const oldEnr of existingEnrolls) {
+          if (!selectedGroupIds.includes(oldEnr.groupId) && oldEnr.status === 'active') {
+            await updateEnrollment.mutateAsync({
+              id: oldEnr.id,
+              data: { status: 'withdrawn' }
+            });
+          }
+        }
+
+        toast.success(`تم تحديث بيانات الطالب (${formData.name}) والرسوم بنجاح!`);
+      } else {
+        const newStudent = await createStudent.mutateAsync(normalizedFormData);
+
+        for (const gId of selectedGroupIds) {
+          const grp = groups?.find(g => g.id === gId);
+          if (!grp) continue;
+          const crs = courses?.find(c => c.id === grp.courseId);
+          const basePrice = crs?.price || 0;
+          const pricing = groupPricings[gId] || { pricingMode: 'default' };
+
+          let finalCustomPrice: number | undefined = undefined;
+          if (pricing.pricingMode === 'custom') {
+            finalCustomPrice = pricing.customPriceMajor !== undefined ? toMinorUnits(pricing.customPriceMajor) : undefined;
+          } else if (pricing.pricingMode === 'discount') {
+            const disc = pricing.discountPercentage || 0;
+            finalCustomPrice = Math.round(basePrice * (1 - disc / 100));
+          } else if (pricing.pricingMode === 'free') {
+            finalCustomPrice = 0;
+          }
+
+          await createEnrollment.mutateAsync({
+            studentId: newStudent.id,
+            groupId: gId,
+            courseId: grp.courseId,
+            enrolledAt: new Date().toISOString(),
+            status: 'active',
+            pricingMode: pricing.pricingMode,
+            customPrice: finalCustomPrice,
+            discountPercentage: pricing.discountPercentage
+          });
+        }
+
+        toast.success(`تم تسجيل الطالب (${formData.name}) في المجموعات وتحديد رسومه بنجاح!`);
+      }
       
       onClose();
     } catch (err) {
@@ -471,6 +681,12 @@ function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, e
                 value={formData.gradeLevel}
                 onChange={e => setFormData({...formData, gradeLevel: e.target.value})}
               >
+                <option value="الصف الأول الابتدائي">الصف الأول الابتدائي</option>
+                <option value="الصف الثاني الابتدائي">الصف الثاني الابتدائي</option>
+                <option value="الصف الثالث الابتدائي">الصف الثالث الابتدائي</option>
+                <option value="الصف الرابع الابتدائي">الصف الرابع الابتدائي</option>
+                <option value="الصف الخامس الابتدائي">الصف الخامس الابتدائي</option>
+                <option value="الصف السادس الابتدائي">الصف السادس الابتدائي</option>
                 <option value="الصف الأول الإعدادي">الصف الأول الإعدادي</option>
                 <option value="الصف الثاني الإعدادي">الصف الثاني الإعدادي</option>
                 <option value="الصف الثالث الإعدادي">الصف الثالث الإعدادي</option>
@@ -600,6 +816,167 @@ function StudentFormModal({ onClose, existingStudent }: { onClose: () => void, e
               </div>
             )}
           </div>
+
+          {/* Group Pricing & Discounts Configuration */}
+          {selectedGroupIds.length > 0 && (
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    تحديد رسوم واشتراكات الطالب والخصومات
+                  </label>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    حدد ما إذا كان الطالب سيدفع كامل المبلغ، أو نصف السعر (خصم 50%)، أو منحة مجانية، أو مبلغ مخصص
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {selectedGroupIds.map(gId => {
+                  const grp = groups?.find(g => g.id === gId);
+                  if (!grp) return null;
+                  const crs = courses?.find(c => c.id === grp.courseId);
+                  const basePrice = crs?.price ? toMajorUnits(crs.price) : 0;
+                  const pricing = groupPricings[gId] || { pricingMode: 'default' };
+
+                  // Calculate effective price
+                  let effectivePrice = basePrice;
+                  if (pricing.pricingMode === 'free') effectivePrice = 0;
+                  else if (pricing.pricingMode === 'discount') {
+                    const disc = pricing.discountPercentage || 0;
+                    effectivePrice = Math.round(basePrice * (1 - disc / 100));
+                  } else if (pricing.pricingMode === 'custom') {
+                    effectivePrice = pricing.customPriceMajor || 0;
+                  }
+
+                  return (
+                    <div key={gId} className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{crs?.name || 'كورس'}</span>
+                          <span className="text-xs text-slate-500 mr-1.5 font-medium">({grp.name})</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] text-slate-500">السعر الأساسي: {basePrice} ج.م</span>
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                            المطلوب: {effectivePrice} ج.م
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Quick preset buttons */}
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => updateGroupPricing(gId, { pricingMode: 'default', discountPercentage: undefined, customPriceMajor: undefined })}
+                          className={`px-2 py-1.5 rounded-md border font-medium text-center transition-colors cursor-pointer ${
+                            pricing.pricingMode === 'default'
+                              ? 'bg-blue-600 border-blue-600 text-white font-bold'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          كامل ({basePrice} ج.م)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateGroupPricing(gId, { 
+                            pricingMode: 'discount', 
+                            discountPercentage: 50, 
+                            customPriceMajor: Math.round(basePrice / 2) 
+                          })}
+                          className={`px-2 py-1.5 rounded-md border font-medium text-center transition-colors cursor-pointer ${
+                            pricing.pricingMode === 'discount' && pricing.discountPercentage === 50
+                              ? 'bg-amber-600 border-amber-600 text-white font-bold'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          نصف السعر (50%)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateGroupPricing(gId, { 
+                            pricingMode: 'discount', 
+                            discountPercentage: 25, 
+                            customPriceMajor: Math.round(basePrice * 0.75) 
+                          })}
+                          className={`px-2 py-1.5 rounded-md border font-medium text-center transition-colors cursor-pointer ${
+                            pricing.pricingMode === 'discount' && pricing.discountPercentage === 25
+                              ? 'bg-amber-600 border-amber-600 text-white font-bold'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          خصم 25%
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateGroupPricing(gId, { pricingMode: 'free', customPriceMajor: 0, discountPercentage: 100 })}
+                          className={`px-2 py-1.5 rounded-md border font-medium text-center transition-colors cursor-pointer ${
+                            pricing.pricingMode === 'free'
+                              ? 'bg-emerald-600 border-emerald-600 text-white font-bold'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          إعفاء مجاني (0)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateGroupPricing(gId, { 
+                            pricingMode: 'custom', 
+                            customPriceMajor: pricing.customPriceMajor !== undefined ? pricing.customPriceMajor : basePrice 
+                          })}
+                          className={`px-2 py-1.5 rounded-md border font-medium text-center transition-colors cursor-pointer ${
+                            pricing.pricingMode === 'custom'
+                              ? 'bg-purple-600 border-purple-600 text-white font-bold'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          سعر مخصص
+                        </button>
+                      </div>
+
+                      {/* Custom inputs if custom or discount */}
+                      {pricing.pricingMode === 'custom' && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <label className="text-xs text-slate-600 dark:text-slate-400">المبلغ الشهري المتفق عليه لهذا الطالب:</label>
+                          <div className="relative w-32">
+                            <input
+                              type="number"
+                              min="0"
+                              value={pricing.customPriceMajor ?? basePrice}
+                              onChange={e => updateGroupPricing(gId, { customPriceMajor: Number(e.target.value) })}
+                              className="w-full px-2.5 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 pl-8 font-bold"
+                            />
+                            <span className="absolute left-2 top-1 text-[10px] text-slate-400">ج.م</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {pricing.pricingMode === 'discount' && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <label className="text-xs text-slate-600 dark:text-slate-400">نسبة الخصم المئوية:</label>
+                          <div className="relative w-24">
+                            <input
+                              type="number"
+                              min="1"
+                              max="99"
+                              value={pricing.discountPercentage ?? 50}
+                              onChange={e => updateGroupPricing(gId, { discountPercentage: Number(e.target.value) })}
+                              className="w-full px-2.5 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 pl-6 font-bold"
+                            />
+                            <span className="absolute left-2 top-1 text-[10px] text-slate-400">%</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           
           <div className="flex items-center pt-1">
             <input 

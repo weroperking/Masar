@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db/db';
+import { useApiQuery } from '../config/queryHooks';
 import { Users, Wallet, CreditCard, TrendingUp, Sparkles, ArrowUpRight, AlertCircle, BarChart3, Filter } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toMajorUnits } from '../utils/currency';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subMonths, isWithinInterval, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { Student, LedgerEntry, MonthlySubscription, SessionPayment } from '../types';
 
 export function Dashboard() {
   const [dateRange, setDateRange] = useState<'today' | 'month' | 'year' | 'last12' | 'custom'>('month');
@@ -44,15 +44,14 @@ export function Dashboard() {
   }
 
   // 1. Total active students
-  const activeStudentsCount = useLiveQuery(
-    () => db.students.filter(s => s.isActive === true && !s.deleted_at).count(), 
-    []
-  );
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const activeStudentsCount = allStudents.filter(s => s.isActive && !s.deleted_at).length;
 
   // Queries for Financials
-  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.filter(e => !e.deleted_at).toArray(), []);
-  const payments = useLiveQuery(() => db.monthlySubscriptions.toArray(), []);
-  const sessionPayments = useLiveQuery(() => db.sessionPayments.toArray(), []);
+  const { data: allLedger = [] } = useApiQuery<LedgerEntry>('ledger-entries', 60 * 1000);
+  const ledgerEntries = allLedger.filter(e => !e.deleted_at);
+  const { data: payments = [] } = useApiQuery<MonthlySubscription>('monthly-subscriptions', 60 * 1000);
+  const { data: sessionPayments = [] } = useApiQuery<SessionPayment>('session-payments', 60 * 1000);
 
   // Compute stats based on Date Range
   const stats = useMemo(() => {

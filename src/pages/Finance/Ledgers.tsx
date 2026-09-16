@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { FileSpreadsheet, Plus, Trash2, ArrowUpRight, ArrowDownLeft, Search, X, Edit2, Wallet } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
 import { LedgerEntry } from '../../types';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { useToast } from '../../context/ToastContext';
@@ -16,15 +14,16 @@ export function Ledgers() {
   const [editingEntry, setEditingEntry] = useState<LedgerEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const entries = useLiveQuery(() => {
-    return db.ledgerEntries.filter(e => {
-      if (e.deleted_at) return false;
-      if (filterType !== 'all' && e.type !== filterType) return false;
-      return true;
-    }).reverse().sortBy('date');
-  }, [filterType]);
+  const { data: allEntriesRaw = [] } = useApiQuery<LedgerEntry>('ledger-entries', 60 * 1000);
+  const allEntries = allEntriesRaw.filter(e => !e.deleted_at);
+  const { remove: removeEntry } = useApiMutation<LedgerEntry>('ledger-entries');
 
-  const allEntries = useLiveQuery(() => db.ledgerEntries.filter(e => !e.deleted_at).toArray(), []);
+  const entries = allEntries.filter(e => {
+    if (filterType !== 'all' && e.type !== filterType) return false;
+    return true;
+  }).sort((a, b) => {
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
 
   const totalRevenue = allEntries
     ?.filter(e => e.type === 'revenue' || e.type === 'income')
@@ -56,11 +55,7 @@ export function Ledgers() {
     });
 
     if (isConfirmed) {
-      await db.ledgerEntries.update(id, {
-        deleted_at: Date.now(),
-        updated_at: Date.now(),
-        sync_status: 'pending'
-      });
+      removeEntry.mutate(id);
       toast.success('تم حذف القيد المالي بنجاح');
     }
   };
@@ -261,13 +256,14 @@ export function Ledgers() {
 
 function LedgerModal({ 
   type, 
-  initialData,
+  initialData, 
   onClose 
 }: { 
   type: 'revenue' | 'expense'; 
   initialData?: LedgerEntry | null;
   onClose: () => void; 
 }) {
+  const { create: createEntry, update: updateEntry } = useApiMutation<LedgerEntry>('ledger-entries');
   const revenueCategories = ['اشتراكات شهرية', 'رسوم حصص', 'مبيعات كتب وملازم', 'حجوزات', 'إيرادات أخرى'];
   const expenseCategories = ['إيجار السنتر', 'رواتب معلمين', 'رواتب موظفين', 'أدوات ومطبوعات', 'فواتير كهرباء ومياه', 'صيانة', 'ضيافة', 'مصروفات أخرى'];
   const categories = type === 'revenue' ? revenueCategories : expenseCategories;
@@ -284,28 +280,24 @@ function LedgerModal({
     const now = Date.now();
     
     if (initialData) {
-      await db.ledgerEntries.update(initialData.id, {
-        category: formData.category,
-        amount: toMinorUnits(Number(formData.amount)),
-        description: formData.description,
-        date: formData.date,
-        updated_at: now,
-        sync_status: 'pending'
+      updateEntry.mutate({
+        id: initialData.id,
+        data: {
+          category: formData.category,
+          amount: toMinorUnits(Number(formData.amount)),
+          description: formData.description,
+          date: formData.date
+        }
       });
     } else {
-      const entry: LedgerEntry = {
-        id: uuidv4(),
+      createEntry.mutate({
         type,
         category: formData.category,
         amount: toMinorUnits(Number(formData.amount)),
         description: formData.description,
         date: formData.date,
-        relatedType: 'manual',
-        created_at: now,
-        updated_at: now,
-        sync_status: 'pending'
-      };
-      await db.ledgerEntries.add(entry);
+        relatedType: 'manual'
+      } as LedgerEntry);
     }
     
     onClose();

@@ -1,14 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   QrCode, Plus, Printer, CheckCircle2, User as UserIcon, 
   Search, Eye, ShieldAlert, Filter, Trash2, 
   UserPlus, Check, Layers
 } from 'lucide-react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
-import { QrCard, Student } from '../../types';
+import { QrCard, Student, Settings } from '../../types';
 import { QrCardModal } from '../../components/Qr/QrCardModal';
 import { QrCardViewModal } from '../../components/Qr/QrCardViewModal';
 import { QrPrintSheetModal } from '../../components/Qr/QrPrintSheetModal';
@@ -21,9 +21,14 @@ export function QrCards() {
   const toast = useToast();
   const { confirm } = useConfirm();
 
-  const cards = useLiveQuery(() => db.qrCards.filter(c => !c.deleted_at).reverse().sortBy('created_at'), []);
-  const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
-  const settings = useLiveQuery(() => db.settings.toArray(), []);
+  const { data: allCards = [] } = useApiQuery<QrCard>('qr-cards', 60 * 1000);
+  const cards = [...allCards].filter(c => !c.deleted_at).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const students = allStudents.filter(s => !s.deleted_at);
+  const { data: settings = [] } = useApiQuery<Settings>('settings', 60 * 1000);
+
+  const { create: createCard, update: updateCard, remove: removeCard } = useApiMutation<QrCard>('qr-cards');
+  const { update: updateStudent } = useApiMutation<Student>('students');
 
   // Modals state
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -31,6 +36,10 @@ export function QrCards() {
   const [isPrintSheetOpen, setIsPrintSheetOpen] = useState(false);
 
   // Search & Filter
+  const [searchParams] = useSearchParams();
+  const queryStudentId = searchParams.get('studentId');
+  const querySearch = searchParams.get('q');
+
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
 
@@ -40,10 +49,23 @@ export function QrCards() {
     return new Map((students || []).map(s => [s.id, s]));
   }, [students]);
 
+  // Handle URL query filters (e.g. from student profile)
+  useEffect(() => {
+    if (queryStudentId && students.length > 0) {
+      const targetStudent = students.find(s => s.id === queryStudentId);
+      if (targetStudent) {
+        setSearchTerm(targetStudent.name);
+        setActiveTab('all');
+      }
+    } else if (querySearch) {
+      setSearchTerm(querySearch);
+    }
+  }, [queryStudentId, querySearch, students]);
+
   // Handle Save from Generator Modal
   const handleSaveCards = async (newCards: Partial<QrCard>[], shouldPrintImmediately: boolean = false) => {
     try {
-      await db.qrCards.bulkAdd(newCards as QrCard[]);
+      await Promise.all(newCards.map(c => createCard.mutateAsync(c as QrCard)));
       toast.success(`تم إنشاء وتخصيص ${newCards.length} بطاقة QR بنجاح`);
 
       if (shouldPrintImmediately && newCards.length > 0) {
@@ -61,10 +83,9 @@ export function QrCards() {
 
   // Mark single card as printed
   const handleMarkPrinted = async (cardId: string) => {
-    await db.qrCards.update(cardId, {
-      printStatus: 'available',
-      updated_at: Date.now(),
-      sync_status: 'pending'
+    updateCard.mutate({
+      id: cardId,
+      data: { printStatus: 'available' }
     });
     toast.success('تم تحديث حالة البطاقة إلى "متاحة وجاهزة"');
   };
@@ -74,23 +95,20 @@ export function QrCards() {
     const queuedCards = cards?.filter(c => c.printStatus === 'queued') || [];
     if (queuedCards.length === 0) return;
 
-    const now = Date.now();
-    for (const card of queuedCards) {
-      await db.qrCards.update(card.id, {
-        printStatus: 'available',
-        updated_at: now,
-        sync_status: 'pending'
-      });
-    }
+    await Promise.all(queuedCards.map(card => 
+      updateCard.mutateAsync({
+        id: card.id,
+        data: { printStatus: 'available' }
+      })
+    ));
     toast.success(`تم تحديث حالة ${queuedCards.length} بطاقة إلى مطبوعة`);
   };
 
   // Toggle card active / revoked status
   const handleToggleStatus = async (cardId: string, newStatus: 'active' | 'revoked') => {
-    await db.qrCards.update(cardId, {
-      status: newStatus,
-      updated_at: Date.now(),
-      sync_status: 'pending'
+    updateCard.mutate({
+      id: cardId,
+      data: { status: newStatus }
     });
 
     if (selectedCardForView?.id === cardId) {
@@ -111,21 +129,21 @@ export function QrCards() {
     if (student?.studentCode && /^\d+$/.test(student.studentCode)) {
       finalCode = student.studentCode;
     } else if (finalCode) {
-      await db.students.update(studentId, {
-        studentCode: finalCode,
-        updated_at: now,
-        sync_status: 'pending'
+      updateStudent.mutate({
+        id: studentId,
+        data: { studentCode: finalCode }
       });
     }
 
-    await db.qrCards.update(cardId, {
-      cardNumber: finalCode,
-      qrCodeData: finalCode,
-      studentId,
-      linkedAt: now,
-      printStatus: 'available',
-      updated_at: now,
-      sync_status: 'pending'
+    updateCard.mutate({
+      id: cardId,
+      data: {
+        cardNumber: finalCode,
+        qrCodeData: finalCode,
+        studentId,
+        linkedAt: now,
+        printStatus: 'available'
+      }
     });
 
     if (selectedCardForView?.id === cardId) {
@@ -150,15 +168,14 @@ export function QrCards() {
     });
 
     if (isConfirmed) {
-      await db.qrCards.update(card.id, {
-        deleted_at: Date.now(),
-        updated_at: Date.now(),
-        sync_status: 'pending'
+      removeCard.mutate(card.id, {
+        onSuccess: () => {
+          if (selectedCardForView?.id === card.id) {
+            setSelectedCardForView(null);
+          }
+          toast.success('تم حذف بطاقة QR بنجاح');
+        }
       });
-      if (selectedCardForView?.id === card.id) {
-        setSelectedCardForView(null);
-      }
-      toast.success('تم حذف بطاقة QR بنجاح');
     }
   };
 

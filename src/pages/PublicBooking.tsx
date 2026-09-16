@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db/db';
-import { v4 as uuidv4 } from 'uuid';
+import { useApiQuery, useApiMutation } from '../config/queryHooks';
 import { CheckCircle2, GraduationCap } from 'lucide-react';
-import { BookingRequest } from '../types';
+import { BookingRequest, Course } from '../types';
 
 export function PublicBooking() {
   const [submitted, setSubmitted] = useState(false);
@@ -13,7 +11,9 @@ export function PublicBooking() {
     courseId: '',
   });
 
-  const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at && c.isActive).toArray(), []);
+  const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const courses = allCourses.filter(c => !c.deleted_at && c.isActive);
+  const { create: createBooking } = useApiMutation<BookingRequest>('booking-requests');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,22 +22,16 @@ export function PublicBooking() {
     const course = courses?.find(c => c.id === formData.courseId);
     if (!course) return;
 
-    const now = Date.now();
-    const newBooking: BookingRequest = {
-      id: uuidv4(),
+    createBooking.mutate({
       name: formData.name,
       phone: formData.phone,
       courseId: formData.courseId,
       declaredAmount: course.price,
       requestDate: new Date().toISOString().split('T')[0],
-      status: 'pending',
-      created_at: now,
-      updated_at: now,
-      sync_status: 'pending'
-    };
-
-    await db.bookingRequests.add(newBooking);
-    setSubmitted(true);
+      status: 'pending'
+    }, {
+      onSuccess: () => setSubmitted(true)
+    });
   };
 
   if (submitted) {

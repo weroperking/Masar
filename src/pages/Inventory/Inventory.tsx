@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
-import { Package, Plus, ShoppingCart, Trash2, Edit2, X, AlertTriangle, BookOpen, Search, Filter } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
-import { Product, ProductSale } from '../../types';
+import { Package, Plus, ShoppingCart, Trash2, Edit2, X, AlertTriangle, BookOpen, Search } from 'lucide-react';
+import { Product, ProductSale, Student } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 
 export function Inventory() {
   const [activeTab, setActiveTab] = useState<'products' | 'sales'>('products');
@@ -19,27 +17,29 @@ export function Inventory() {
   const toast = useToast();
   const { confirm } = useConfirm();
 
-  const products = useLiveQuery(() => db.products.filter(p => !p.deleted_at).toArray(), []);
-  const sales = useLiveQuery(() => db.productSales.filter(s => !s.deleted_at).reverse().sortBy('saleDate'), []);
-  const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
+  const { data: products = [], isLoading: isLoadingProducts } = useApiQuery<Product>('products', 2 * 60 * 1000);
+  const { data: sales = [], isLoading: isLoadingSales } = useApiQuery<ProductSale>('product-sales', 15 * 1000);
+  const { data: students = [] } = useApiQuery<Student>('students', 60 * 1000);
 
-  const productMap = new Map(products?.map(p => [p.id, p]));
+  const { remove: removeProduct } = useApiMutation<Product>('products');
 
-  const filteredProducts = products?.filter(prod => {
+  const productMap = new Map(products.map(p => [p.id, p]));
+
+  const filteredProducts = products.filter(prod => {
     if (searchTerm && !prod.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     if (typeFilter !== 'all' && prod.type !== typeFilter) return false;
     if (lowStockOnly && prod.stockQty >= 5) return false;
     return true;
   });
 
-  const totalSalesRevenue = sales?.reduce((sum, s) => sum + s.total, 0) || 0;
-  const totalQuantitySold = sales?.reduce((sum, s) => sum + s.quantity, 0) || 0;
-  const totalProfit = sales?.reduce((sum, s) => {
+  const totalSalesRevenue = sales.reduce((sum, s) => sum + s.total, 0);
+  const totalQuantitySold = sales.reduce((sum, s) => sum + s.quantity, 0);
+  const totalProfit = sales.reduce((sum, s) => {
     const p = productMap.get(s.productId);
     if (!p) return sum;
     const profitPerItem = p.salePrice - p.costPrice;
     return sum + (profitPerItem * s.quantity);
-  }, 0) || 0;
+  }, 0);
 
   const handleDeleteProduct = async (id: string, name?: string) => {
     const isConfirmed = await confirm({
@@ -52,17 +52,14 @@ export function Inventory() {
     });
 
     if (isConfirmed) {
-      try {
-        const now = Date.now();
-        await db.products.update(id, {
-          deleted_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        });
-        toast.success(`تم حذف المنتج ${name ? `(${name})` : ''} بنجاح`);
-      } catch (err) {
-        toast.error('فشل حذف المنتج');
-      }
+      removeProduct.mutate(id, {
+        onSuccess: () => {
+          toast.success(`تم حذف المنتج ${name ? `(${name})` : ''} بنجاح`);
+        },
+        onError: () => {
+          toast.error('فشل حذف المنتج');
+        }
+      });
     }
   };
 
@@ -99,7 +96,7 @@ export function Inventory() {
               activeTab === 'products' ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
-            المنتجات والمذكرات ({products?.length || 0})
+            المنتجات والمذكرات ({products.length})
           </button>
           <button 
             onClick={() => setActiveTab('sales')} 
@@ -107,7 +104,7 @@ export function Inventory() {
               activeTab === 'sales' ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
-            سجل المبيعات ({sales?.length || 0})
+            سجل المبيعات ({sales.length})
           </button>
         </div>
 
@@ -149,7 +146,9 @@ export function Inventory() {
                 </div>
               </div>
 
-              {filteredProducts?.length === 0 ? (
+              {isLoadingProducts ? (
+                <div className="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">جاري التحميل...</div>
+              ) : filteredProducts.length === 0 ? (
                 <div className="text-center py-12 flex flex-col items-center">
                   <Package className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
                   <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300">
@@ -161,7 +160,7 @@ export function Inventory() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredProducts?.map(prod => {
+                  {filteredProducts.map(prod => {
                     const profitPerUnit = toMajorUnits(prod.salePrice) - toMajorUnits(prod.costPrice);
                     const isLowStock = prod.stockQty < 5;
 
@@ -175,14 +174,16 @@ export function Inventory() {
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => setEditingProduct(prod)}
-                                className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded transition-colors"
+                                disabled={removeProduct.isPending}
+                                className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded transition-colors disabled:opacity-50"
                                 title="تعديل الصنف"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                                className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 p-1 rounded transition-colors"
+                                disabled={removeProduct.isPending}
+                                className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 p-1 rounded transition-colors disabled:opacity-50"
                                 title="حذف الصنف (حذف ناعم)"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -256,7 +257,9 @@ export function Inventory() {
                 </div>
               </div>
 
-              {sales?.length === 0 ? (
+              {isLoadingSales ? (
+                <div className="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">جاري التحميل...</div>
+              ) : sales.length === 0 ? (
                 <div className="text-center py-12 flex flex-col items-center">
                   <ShoppingCart className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
                   <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300">لا توجد عمليات بيع مسجلة بعد</h2>
@@ -278,7 +281,7 @@ export function Inventory() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {sales?.map(sale => {
+                        {sales.map(sale => {
                           const product = productMap.get(sale.productId);
                           return (
                             <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
@@ -315,8 +318,8 @@ export function Inventory() {
       {isSellProductOpen && (
         <SellProductModal 
           onClose={() => setIsSellProductOpen(false)} 
-          products={products || []}
-          students={students || []}
+          products={products}
+          students={students}
         />
       )}
     </div>
@@ -339,43 +342,42 @@ function ProductModal({
     stockQty: product ? product.stockQty.toString() : '25'
   });
 
-  const isEdit = !!product;
+  const { create, update } = useApiMutation<Product>('products');
+  const isPending = create.isPending || update.isPending;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const now = Date.now();
-      if (isEdit) {
-        await db.products.update(product.id, {
-          name: formData.name,
-          type: formData.type,
-          salePrice: toMinorUnits(Number(formData.salePrice)),
-          costPrice: toMinorUnits(Number(formData.costPrice)),
-          stockQty: Number(formData.stockQty),
-          updated_at: now,
-          sync_status: 'pending'
-        });
-        toast.success(`تم تحديث بيانات الصنف (${formData.name}) بنجاح`);
-      } else {
-        const newProduct: Product = {
-          id: uuidv4(),
-          name: formData.name,
-          type: formData.type,
-          salePrice: toMinorUnits(Number(formData.salePrice)),
-          costPrice: toMinorUnits(Number(formData.costPrice)),
-          stockQty: Number(formData.stockQty),
-          soldQty: 0,
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        };
+    const payload = {
+      name: formData.name,
+      type: formData.type,
+      salePrice: toMinorUnits(Number(formData.salePrice)),
+      costPrice: toMinorUnits(Number(formData.costPrice)),
+      stockQty: Number(formData.stockQty),
+    };
 
-        await db.products.add(newProduct);
-        toast.success(`تمت إضافة الصنف (${formData.name}) للمخزن بنجاح`);
-      }
-      onClose();
-    } catch (err) {
-      toast.error('حدث خطأ أثناء حفظ الصنف');
+    if (product) {
+      update.mutate({ id: product.id, data: payload }, {
+        onSuccess: () => {
+          toast.success(`تم تحديث بيانات الصنف (${formData.name}) بنجاح`);
+          onClose();
+        },
+        onError: () => {
+          toast.error('حدث خطأ أثناء حفظ الصنف');
+        }
+      });
+    } else {
+      create.mutate({
+        ...payload,
+        soldQty: 0
+      }, {
+        onSuccess: () => {
+          toast.success(`تمت إضافة الصنف (${formData.name}) للمخزن بنجاح`);
+          onClose();
+        },
+        onError: () => {
+          toast.error('حدث خطأ أثناء حفظ الصنف');
+        }
+      });
     }
   };
 
@@ -384,9 +386,9 @@ function ProductModal({
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col">
         <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-            {isEdit ? 'تعديل بيانات الصنف / المذكرة' : 'إضافة صنف للمخزون'}
+            {product ? 'تعديل بيانات الصنف / المذكرة' : 'إضافة صنف للمخزون'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
+          <button onClick={onClose} disabled={isPending} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md disabled:opacity-50">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -401,6 +403,7 @@ function ProductModal({
               className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
+              disabled={isPending}
             />
           </div>
 
@@ -410,6 +413,7 @@ function ProductModal({
               className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={formData.type}
               onChange={e => setFormData({ ...formData, type: e.target.value as any })}
+              disabled={isPending}
             >
               <option value="book">مذكرة / كتاب تعليمي</option>
               <option value="other">أدوات / أخرى</option>
@@ -427,6 +431,7 @@ function ProductModal({
                 className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 value={formData.salePrice}
                 onChange={e => setFormData({ ...formData, salePrice: e.target.value })}
+                disabled={isPending}
               />
             </div>
             <div>
@@ -438,6 +443,7 @@ function ProductModal({
                 className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 value={formData.costPrice}
                 onChange={e => setFormData({ ...formData, costPrice: e.target.value })}
+                disabled={isPending}
               />
             </div>
           </div>
@@ -451,6 +457,7 @@ function ProductModal({
               className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={formData.stockQty}
               onChange={e => setFormData({ ...formData, stockQty: e.target.value })}
+              disabled={isPending}
             />
           </div>
 
@@ -458,15 +465,17 @@ function ProductModal({
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+              disabled={isPending}
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors disabled:opacity-50"
             >
               إلغاء
             </button>
             <button 
               type="submit" 
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold transition-colors shadow-xs"
+              disabled={isPending}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold transition-colors shadow-xs disabled:opacity-50"
             >
-              {isEdit ? 'حفظ التعديلات' : 'إضافة للمخزن'}
+              {isPending ? 'جاري الحفظ...' : product ? 'حفظ التعديلات' : 'إضافة للمخزن'}
             </button>
           </div>
         </form>
@@ -482,7 +491,7 @@ function SellProductModal({
 }: { 
   onClose: () => void; 
   products: Product[]; 
-  students: any[]; 
+  students: Student[]; 
 }) {
   const toast = useToast();
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
@@ -492,10 +501,14 @@ function SellProductModal({
   const [customerName, setCustomerName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('نقدي');
 
+  const { create: createSale } = useApiMutation<ProductSale>('product-sales');
+  const { update: updateProduct } = useApiMutation<Product>('products');
+  const { create: createRevenue } = useApiMutation<any>('revenue-entries');
+
   const selectedProduct = products.find(p => p.id === selectedProductId);
   const totalAmount = (selectedProduct?.salePrice || 0) * (Number(quantity) || 1);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
 
@@ -506,67 +519,65 @@ function SellProductModal({
       return;
     }
 
-    const now = Date.now();
     const finalCustomerName = customerType === 'student'
       ? students.find(s => s.id === studentId)?.name || 'طالب'
       : customerName || 'عميل نقدي';
 
-    const saleId = uuidv4();
     const receiptNumber = 'REC-' + Math.floor(100000 + Math.random() * 900000);
 
-    const newSale: ProductSale = {
-      id: saleId,
+    const payloadSale = {
       productId: selectedProduct.id,
       quantity: qtyNum,
       customerName: finalCustomerName,
       studentId: customerType === 'student' ? studentId : undefined,
-      discountType: 'none',
+      discountType: 'none' as any,
       discountValue: 0,
       subtotal: totalAmount,
       total: totalAmount,
       paymentMethod,
       saleDate: new Date().toISOString().split('T')[0],
       receiptNumber,
-      created_at: now,
-      updated_at: now,
-      sync_status: 'pending'
     };
 
-    // 1. Record the sale
-    await db.productSales.add(newSale);
+    createSale.mutate(payloadSale, {
+      onSuccess: (saleData) => {
+        // 2. Decrement product stock & increment sold count
+        updateProduct.mutate({
+          id: selectedProduct.id,
+          data: {
+            stockQty: selectedProduct.stockQty - qtyNum,
+            soldQty: (selectedProduct.soldQty || 0) + qtyNum,
+          }
+        });
 
-    // 2. Decrement product stock & increment sold count
-    await db.products.update(selectedProduct.id, {
-      stockQty: selectedProduct.stockQty - qtyNum,
-      soldQty: (selectedProduct.soldQty || 0) + qtyNum,
-      updated_at: now
+        // 3. Record in ledger revenue!
+        createRevenue.mutate({
+          type: 'revenue',
+          category: 'مبيعات كتب وملازم',
+          amount: totalAmount,
+          date: new Date().toISOString().split('T')[0],
+          description: `بيع ${qtyNum} نسخة من (${selectedProduct.name}) إلى ${finalCustomerName}`,
+          relatedType: 'product',
+          relatedId: saleData.id,
+        });
+
+        toast.success(`تم تسجيل عملية البيع بنجاح! إيصال رقم: ${receiptNumber}`);
+        onClose();
+      },
+      onError: () => {
+        toast.error('حدث خطأ أثناء تسجيل عملية البيع. الرجاء المحاولة مجددا.');
+      }
     });
-
-    // 3. Record in ledger revenue!
-    await db.ledgerEntries.add({
-      id: uuidv4(),
-      type: 'revenue',
-      category: 'مبيعات كتب وملازم',
-      amount: totalAmount,
-      date: new Date().toISOString().split('T')[0],
-      description: `بيع ${qtyNum} نسخة من (${selectedProduct.name}) إلى ${finalCustomerName}`,
-      relatedType: 'product',
-      relatedId: saleId,
-      created_at: now,
-      updated_at: now,
-      sync_status: 'pending'
-    });
-
-    toast.success(`تم تسجيل عملية البيع بنجاح! إيصال رقم: ${receiptNumber}`);
-    onClose();
   };
+
+  const isPending = createSale.isPending || updateProduct.isPending || createRevenue.isPending;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col">
         <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">تسجيل عملية بيع منتج</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
+          <button onClick={onClose} disabled={isPending} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md disabled:opacity-50">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -578,6 +589,7 @@ function SellProductModal({
               className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               value={selectedProductId}
               onChange={e => setSelectedProductId(e.target.value)}
+              disabled={isPending}
             >
               {products.map(p => (
                 <option key={p.id} value={p.id}>
@@ -598,6 +610,7 @@ function SellProductModal({
                 className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 value={quantity}
                 onChange={e => setQuantity(e.target.value)}
+                disabled={isPending}
               />
             </div>
             <div>
@@ -606,6 +619,7 @@ function SellProductModal({
                 className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 value={paymentMethod}
                 onChange={e => setPaymentMethod(e.target.value)}
+                disabled={isPending}
               >
                 <option value="نقدي">نقدي (كاش)</option>
                 <option value="فودافون كاش">فودافون كاش / إنستاباي</option>
@@ -624,6 +638,7 @@ function SellProductModal({
                   checked={customerType === 'student'} 
                   onChange={() => setCustomerType('student')}
                   className="ml-1.5 text-emerald-600 focus:ring-emerald-500"
+                  disabled={isPending}
                 />
                 طالب مسجل
               </label>
@@ -634,6 +649,7 @@ function SellProductModal({
                   checked={customerType === 'external'} 
                   onChange={() => setCustomerType('external')}
                   className="ml-1.5 text-emerald-600 focus:ring-emerald-500"
+                  disabled={isPending}
                 />
                 عميل خارجي / نقدي
               </label>
@@ -644,6 +660,7 @@ function SellProductModal({
                 className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 value={studentId}
                 onChange={e => setStudentId(e.target.value)}
+                disabled={isPending}
               >
                 {students.map(s => (
                   <option key={s.id} value={s.id}>{s.name} ({s.phone})</option>
@@ -656,6 +673,7 @@ function SellProductModal({
                 className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
+                disabled={isPending}
               />
             )}
           </div>
@@ -670,15 +688,17 @@ function SellProductModal({
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+              disabled={isPending}
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors disabled:opacity-50"
             >
               إلغاء
             </button>
             <button 
               type="submit" 
-              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold transition-colors shadow-xs"
+              disabled={isPending}
+              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold transition-colors shadow-xs disabled:opacity-50"
             >
-              تأكيد البيع والتحصيل
+              {isPending ? 'جاري التحصيل...' : 'تأكيد البيع والتحصيل'}
             </button>
           </div>
         </form>

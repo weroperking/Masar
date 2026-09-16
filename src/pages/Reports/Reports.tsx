@@ -1,19 +1,23 @@
 import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
+import { useApiQuery } from '../../config/queryHooks';
 import { Download, Users, BookOpen, Package, DollarSign, TrendingUp, BarChart3, PieChart } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { toMajorUnits } from '../../utils/currency';
 import { useSubscription } from '../../context/SubscriptionContext';
+import { Student, Course, LedgerEntry, Product } from '../../types';
 
 export function Reports() {
   const [activeTab, setActiveTab] = useState<'financials' | 'students' | 'courses' | 'products' | 'advanced'>('financials');
   const { subscription } = useSubscription();
 
-  const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
-  const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at).toArray(), []);
-  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.filter(e => !e.deleted_at).toArray(), []);
-  const products = useLiveQuery(() => db.products.filter(p => !p.deleted_at).toArray(), []);
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const students = allStudents.filter(s => !s.deleted_at);
+  const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const courses = allCourses.filter(c => !c.deleted_at);
+  const { data: allLedger = [] } = useApiQuery<LedgerEntry>('ledger-entries', 60 * 1000);
+  const ledgerEntries = allLedger.filter(e => !e.deleted_at);
+  const { data: allProducts = [] } = useApiQuery<Product>('products', 60 * 1000);
+  const products = allProducts.filter(p => !p.deleted_at);
 
   // Compute total financials
   const totalRevenue = ledgerEntries?.filter(e => e.type === 'revenue').reduce((acc, e) => acc + (e.amount || 0), 0) || 0;

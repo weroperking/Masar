@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
-import { v4 as uuidv4 } from 'uuid';
 import { Link } from 'react-router-dom';
 import { Plus, X, Calendar, Clock, Users, Trash2, Edit2 } from 'lucide-react';
 import { Group } from '../../types';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useToast } from '../../context/ToastContext';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 
 export function Groups() {
   const [activeTab, setActiveTab] = useState<'in_progress' | 'scheduled' | 'finished'>('in_progress');
@@ -16,11 +14,11 @@ export function Groups() {
   const { confirm } = useConfirm();
   const toast = useToast();
   
-  const groups = useLiveQuery(
-    () => db.groups.filter(g => g.status === activeTab && !g.deleted_at).toArray(),
-    [activeTab]
-  );
-  const courses = useLiveQuery(() => db.courses.toArray(), []);
+  const { data: allGroups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+  const groups = allGroups.filter(g => g.status === activeTab);
+  
+  const { data: courses = [] } = useApiQuery<any>('courses', 2 * 60 * 1000);
+  const { remove: removeGroup } = useApiMutation<Group>('groups');
 
   const handleDelete = async (id: string, name: string) => {
     const isConfirmed = await confirm({
@@ -33,21 +31,10 @@ export function Groups() {
     });
 
     if (isConfirmed) {
-      try {
-        await db.transaction('rw', [db.groups, db.enrollments, db.attendanceSessions, db.attendanceRecords], async () => {
-          await db.groups.delete(id);
-          await db.enrollments.where('groupId').equals(id).delete();
-          const sessions = await db.attendanceSessions.where('groupId').equals(id).toArray();
-          for (const session of sessions) {
-            await db.attendanceRecords.where('sessionId').equals(session.id).delete();
-          }
-          await db.attendanceSessions.where('groupId').equals(id).delete();
-        });
-        toast.success(`تم حذف مجموعة "${name}" بنجاح`);
-      } catch (err) {
-        console.error(err);
-        toast.error('فشل حذف المجموعة');
-      }
+      removeGroup.mutate(id, {
+        onSuccess: () => toast.success(`تم حذف مجموعة "${name}" بنجاح`),
+        onError: () => toast.error('فشل حذف المجموعة')
+      });
     }
   };
 
@@ -198,6 +185,7 @@ export function Groups() {
 
 function GroupFormModal({ onClose, courses, initialData }: { onClose: () => void, courses: any[], initialData?: Group | null }) {
   const toast = useToast();
+  const { create: createGroup, update: updateGroup } = useApiMutation<Group>('groups');
   const [formData, setFormData] = useState({
     courseId: initialData?.courseId || '', 
     name: initialData?.name || '', 
@@ -227,29 +215,28 @@ function GroupFormModal({ onClose, courses, initialData }: { onClose: () => void
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const now = Date.now();
     try {
       if (initialData) {
-        await db.groups.update(initialData.id, {
-          courseId: formData.courseId,
-          name: formData.name,
-          type: formData.type as any,
-          daysOfWeek: formData.daysOfWeek,
-          startTime: formData.startTime,
-          endTime: formData.endTime,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          sessionCount: formData.sessionCount ? Number(formData.sessionCount) : undefined,
-          maxStudents: formData.maxStudents ? Number(formData.maxStudents) : undefined,
-          room: formData.room,
-          status: formData.status as any,
-          updated_at: now,
-          sync_status: 'pending'
+        await updateGroup.mutateAsync({
+          id: initialData.id,
+          data: {
+            courseId: formData.courseId,
+            name: formData.name,
+            type: formData.type as any,
+            daysOfWeek: formData.daysOfWeek,
+            startTime: formData.startTime,
+            endTime: formData.endTime,
+            startDate: formData.startDate,
+            endDate: formData.endDate,
+            sessionCount: formData.sessionCount ? Number(formData.sessionCount) : undefined,
+            maxStudents: formData.maxStudents ? Number(formData.maxStudents) : undefined,
+            room: formData.room,
+            status: formData.status as any
+          }
         });
         toast.success(`تم تعديل المجموعة (${formData.name}) بنجاح!`);
       } else {
-        const newGroup: Group = {
-          id: uuidv4(),
+        await createGroup.mutateAsync({
           courseId: formData.courseId,
           name: formData.name,
           type: formData.type as any,
@@ -261,12 +248,8 @@ function GroupFormModal({ onClose, courses, initialData }: { onClose: () => void
           sessionCount: formData.sessionCount ? Number(formData.sessionCount) : undefined,
           maxStudents: formData.maxStudents ? Number(formData.maxStudents) : undefined,
           room: formData.room,
-          status: formData.status as any,
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        };
-        await db.groups.add(newGroup);
+          status: formData.status as any
+        });
         toast.success(`تمت إضافة مجموعة (${formData.name}) بنجاح!`);
       }
       onClose();

@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
+import { useAuth } from '@clerk/clerk-react';
 import { MonthlySubscription, Course, Student, Enrollment, Group } from '../../types';
-import { Search, Plus, Edit2, AlertTriangle, X, MessageCircle, Check } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
+import { Search, Plus, Edit2, AlertTriangle, X, MessageCircle, Check, DollarSign, CheckCircle2 } from 'lucide-react';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { getWhatsAppUrl, formatPhoneDisplay } from '../../utils/phone';
 import { useToast } from '../../context/ToastContext';
+import { calculateEnrollmentFee, recordLedgerRevenue } from '../../utils/pricing';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 
 export function MonthlySubscriptions() {
   const currentDate = new Date();
@@ -22,12 +22,24 @@ export function MonthlySubscriptions() {
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   
   const toast = useToast();
+  const { getToken } = useAuth();
 
-  const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at && c.paymentType === 'monthly').toArray(), []);
-  const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
-  const groups = useLiveQuery(() => db.groups.filter(g => !g.deleted_at).toArray(), []);
-  const enrollments = useLiveQuery(() => db.enrollments.filter(e => !e.deleted_at && e.status === 'active').toArray(), []);
-  const subscriptions = useLiveQuery(() => db.monthlySubscriptions.filter(s => !s.deleted_at && s.month === selectedMonth && s.year === selectedYear).toArray(), [selectedMonth, selectedYear]);
+  const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const courses = allCourses.filter(c => c.paymentType === 'monthly');
+  
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const students = allStudents.filter(s => !s.deleted_at);
+  
+  const { data: allGroups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+  const groups = allGroups.filter(g => !g.deleted_at);
+  
+  const { data: allEnrollments = [] } = useApiQuery<Enrollment>('enrollments', 60 * 1000);
+  const enrollments = allEnrollments.filter(e => e.status === 'active');
+  
+  const { data: allSubscriptions = [] } = useApiQuery<MonthlySubscription>('monthly-subscriptions', 60 * 1000);
+  const subscriptions = allSubscriptions.filter(s => s.month === selectedMonth && s.year === selectedYear);
+
+  const { create: createSubscription, update: updateSubscription } = useApiMutation<MonthlySubscription>('monthly-subscriptions');
 
   const courseMap = useMemo(() => new Map(courses?.map(c => [c.id, c])), [courses]);
   const studentMap = useMemo(() => new Map(students?.map(s => [s.id, s])), [students]);
@@ -47,18 +59,32 @@ export function MonthlySubscriptions() {
         const course = courseMap.get(enrollment.courseId);
         const group = groupMap.get(enrollment.groupId);
         
-        // Find if record exists
+        // Accurate fee calculation taking into account discount / custom / free scholarships
+        const calculatedFee = calculateEnrollmentFee(course?.price || 0, enrollment);
+
+        // Find if record exists in monthlySubscriptions
         const existingSub = subscriptions.find(s => 
           s.studentId === enrollment.studentId && 
           s.courseId === enrollment.courseId
         );
 
-        const amountTotal = existingSub ? existingSub.amountTotal : (course?.price || 0);
+        // If existing record has no payment and doesn't match the new pricing, prioritize calculatedFee
+        let amountTotal = calculatedFee;
+        if (existingSub) {
+          if (existingSub.amountPaid > 0) {
+            amountTotal = existingSub.amountTotal;
+          } else {
+            amountTotal = calculatedFee;
+          }
+        }
+
         const amountPaid = existingSub ? existingSub.amountPaid : 0;
         const dueDate = existingSub?.dueDate || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-05`;
         
         let status = 'no_record';
-        if (existingSub) {
+        if (calculatedFee === 0 && enrollment.pricingMode === 'free') {
+          status = 'paid';
+        } else if (existingSub) {
           if (existingSub.status === 'rejected') {
             status = 'rejected';
           } else if (amountPaid >= amountTotal && amountTotal > 0) {
@@ -66,14 +92,13 @@ export function MonthlySubscriptions() {
           } else if (amountPaid > 0 && amountPaid < amountTotal) {
             status = 'partial';
           } else {
-            // Check overdue
             const isOverdue = new Date(dueDate) < new Date(new Date().toDateString());
             status = isOverdue ? 'overdue' : 'pending';
           }
         }
 
         return {
-          id: existingSub?.id || null, // null if no record
+          id: existingSub?.id || null,
           enrollmentId: enrollment.id,
           studentId: enrollment.studentId,
           courseId: enrollment.courseId,
@@ -83,6 +108,10 @@ export function MonthlySubscriptions() {
           parentPhone: student?.parentPhone || '',
           courseName: course?.name || 'غير معروف',
           groupName: group?.name || 'مجموعة غير معروفة',
+          basePrice: course?.price || 0,
+          pricingMode: enrollment.pricingMode || 'default',
+          discountPercentage: enrollment.discountPercentage,
+          customPrice: enrollment.customPrice,
           amountTotal,
           amountPaid,
           dueDate,
@@ -104,6 +133,12 @@ export function MonthlySubscriptions() {
     return true;
   });
 
+  // KPI Metrics Calculation
+  const totalExpected = filteredSubs.reduce((acc, s) => acc + s.amountTotal, 0);
+  const totalCollected = filteredSubs.reduce((acc, s) => acc + s.amountPaid, 0);
+  const totalRemaining = Math.max(0, totalExpected - totalCollected);
+  const collectionRate = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 100;
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'paid': return <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded text-[10px] font-semibold">خالص</span>;
@@ -121,6 +156,56 @@ export function MonthlySubscriptions() {
     setIsPaymentModalOpen(true);
   };
 
+  const handleQuickFullSettle = async (sub: any) => {
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("No token");
+      const remainingMinor = Math.max(0, sub.amountTotal - sub.amountPaid);
+      if (remainingMinor <= 0) {
+        toast.info('الاشتراك مسدد بالكامل بالفعل');
+        return;
+      }
+
+      let subId = sub.id;
+      if (subId) {
+        await updateSubscription.mutateAsync({
+          id: subId,
+          data: {
+            amountPaid: sub.amountTotal,
+            status: 'paid'
+          }
+        });
+      } else {
+        const newSub = await createSubscription.mutateAsync({
+          studentId: sub.studentId,
+          courseId: sub.courseId,
+          month: selectedMonth,
+          year: selectedYear,
+          amountPaid: sub.amountTotal,
+          amountTotal: sub.amountTotal,
+          dueDate: sub.dueDate,
+          notes: 'سداد سريع كامل',
+          status: 'paid'
+        });
+        subId = newSub.id;
+      }
+
+      // Record to Ledger
+      await recordLedgerRevenue({
+        relatedType: 'subscription',
+        relatedId: subId,
+        amountMinor: remainingMinor,
+        description: `سداد كامل اشتراك شهر ${selectedMonth}/${selectedYear} للطالب ${sub.studentName} (${sub.courseName})`,
+        token
+      });
+
+      toast.success(`تم سداد كامل اشتراك ${sub.studentName} بقيمة ${toMajorUnits(remainingMinor)} ج.م وتسجيله بالإيرادات`);
+    } catch (err) {
+      console.error(err);
+      toast.error('حدث خطأ أثناء السداد السريع');
+    }
+  };
+
   const handleOpenReminder = (sub: any) => {
     setReminderSub(sub);
     setIsReminderModalOpen(true);
@@ -131,12 +216,51 @@ export function MonthlySubscriptions() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">الاشتراكات الشهرية</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">متابعة وتسجيل سداد اشتراكات الكورسات الشهرية</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">متابعة وتسجيل سداد اشتراكات الكورسات الشهرية وحساب الخصومات والإعفاءات</p>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">إجمالي المطلوب للشهر</span>
+          <p className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1 font-mono">
+            {toMajorUnits(totalExpected).toLocaleString()} ج.م
+          </p>
+          <span className="text-[11px] text-slate-400 mt-0.5 block">بعد احتساب الخصومات والمنح</span>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">المحصل الفعلي</span>
+          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+            {toMajorUnits(totalCollected).toLocaleString()} ج.م
+          </p>
+          <span className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-0.5 block font-medium">
+            نسبة التحصيل: {collectionRate}%
+          </span>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">المتبقي / المتأخرات</span>
+          <p className="text-lg font-bold text-red-600 dark:text-red-400 mt-1 font-mono">
+            {toMajorUnits(totalRemaining).toLocaleString()} ج.م
+          </p>
+          <span className="text-[11px] text-red-500/80 mt-0.5 block">مبالغ قيد الانتظار</span>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">عدد الاشتراكات المقيدة</span>
+          <p className="text-lg font-bold text-blue-600 dark:text-blue-400 mt-1 font-mono">
+            {filteredSubs.length} طالب
+          </p>
+          <span className="text-[11px] text-slate-400 mt-0.5 block">
+            المسددين: {filteredSubs.filter(s => s.status === 'paid').length}
+          </span>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-800 flex flex-wrap gap-3 items-center">
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap gap-3 items-center">
         <div className="w-full sm:w-auto flex-1 min-w-[200px]">
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
@@ -183,12 +307,12 @@ export function MonthlySubscriptions() {
       </div>
 
       {/* Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
               <tr>
-                <th className="px-4 py-2.5 font-semibold">الطالب</th>
+                <th className="px-4 py-2.5 font-semibold">الطالب ونظام التسعير</th>
                 <th className="px-4 py-2.5 font-semibold">الكورس والمجموعة</th>
                 <th className="px-4 py-2.5 font-semibold text-center">المطلوب</th>
                 <th className="px-4 py-2.5 font-semibold text-center">المدفوع</th>
@@ -207,27 +331,69 @@ export function MonthlySubscriptions() {
               ) : (
                 filteredSubs.map((sub, idx) => (
                   <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{sub.studentName}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <span>{sub.studentName}</span>
+                        {sub.pricingMode === 'discount' && (
+                          <span className="text-[10px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                            خصم {sub.discountPercentage || 50}%
+                          </span>
+                        )}
+                        {sub.pricingMode === 'free' && (
+                          <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                            منحة 100%
+                          </span>
+                        )}
+                        {sub.pricingMode === 'custom' && (
+                          <span className="text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800">
+                            سعر خاص
+                          </span>
+                        )}
+                      </div>
+                      {sub.studentPhone && (
+                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">{sub.studentPhone}</div>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="text-slate-900 dark:text-slate-100 font-medium">{sub.courseName}</div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{sub.groupName}</div>
                     </td>
-                    <td className="px-4 py-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">{toMajorUnits(sub.amountTotal)} ج.م</td>
-                    <td className="px-4 py-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">{toMajorUnits(sub.amountPaid)} ج.م</td>
+                    <td className="px-4 py-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                      {toMajorUnits(sub.amountTotal)} ج.م
+                      {sub.pricingMode !== 'default' && sub.amountTotal !== sub.basePrice && (
+                        <span className="block text-[10px] text-slate-400 line-through font-normal">
+                          {toMajorUnits(sub.basePrice)} ج.م
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      {toMajorUnits(sub.amountPaid)} ج.م
+                    </td>
                     <td className="px-4 py-3 text-center text-slate-500 font-mono text-[11px]">{sub.dueDate}</td>
                     <td className="px-4 py-3 text-center">{getStatusBadge(sub.status)}</td>
                     <td className="px-4 py-3 text-center">
-                      <div className="flex justify-center gap-1.5">
+                      <div className="flex justify-center items-center gap-1.5">
+                        {sub.status !== 'paid' && sub.amountTotal > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleQuickFullSettle(sub)}
+                            className="inline-flex items-center px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold shadow-xs transition-colors"
+                            title="سداد كامل المبلغ المتبقي وتسجيله بالإيرادات"
+                          >
+                            <DollarSign className="w-3 h-3 ml-0.5" />
+                            سداد كامل
+                          </button>
+                        )}
                         <button 
                           onClick={() => handleOpenPayment(sub)}
-                          className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           title="تسجيل دفعة / تعديل"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button 
                           onClick={() => handleOpenReminder(sub)}
-                          className="p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           title="إرسال تذكير عبر واتساب"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
@@ -265,15 +431,19 @@ export function MonthlySubscriptions() {
 
 function PaymentModal({ sub, month, year, onClose }: { sub: any, month: number, year: number, onClose: () => void }) {
   const toast = useToast();
-  const [paidAmount, setPaidAmount] = useState(toMajorUnits(sub.amountPaid).toString());
-  const [amountTotal, setAmountTotal] = useState(toMajorUnits(sub.amountTotal).toString());
-  const [dueDate, setDueDate] = useState(sub.dueDate);
-  const [notes, setNotes] = useState(sub.notes);
-  const [isRejected, setIsRejected] = useState(sub.status === 'rejected');
+  const { getToken } = useAuth();
+  const { create: createSubscription, update: updateSubscription } = useApiMutation<MonthlySubscription>('monthly-subscriptions');
+  const [paidAmount, setPaidAmount] = useState<string>(toMajorUnits(sub.amountPaid).toString());
+  const [amountTotal, setAmountTotal] = useState<string>(toMajorUnits(sub.amountTotal).toString());
+  const [dueDate, setDueDate] = useState<string>(sub.dueDate);
+  const [notes, setNotes] = useState<string>(sub.notes || '');
+  const [isRejected, setIsRejected] = useState<boolean>(sub.status === 'rejected');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const token = await getToken();
+      if (!token) throw new Error("No token");
       const pAmtMinor = toMinorUnits(Number(paidAmount));
       const tAmtMinor = toMinorUnits(Number(amountTotal));
       
@@ -289,24 +459,27 @@ function PaymentModal({ sub, month, year, onClose }: { sub: any, month: number, 
         derivedStatus = isOverdue ? 'overdue' : 'pending';
       }
 
-      const now = Date.now();
+      const previousPaidMinor = sub.amountPaid || 0;
+      const paymentDiffMinor = pAmtMinor - previousPaidMinor;
 
-      if (sub.id) {
+      let subId = sub.id;
+
+      if (subId) {
         // Update existing record
-        await db.monthlySubscriptions.update(sub.id, {
-          amountPaid: pAmtMinor,
-          amountTotal: tAmtMinor,
-          dueDate,
-          notes,
-          status: derivedStatus as any,
-          updated_at: now,
-          sync_status: 'pending'
+        await updateSubscription.mutateAsync({
+          id: subId,
+          data: {
+            amountPaid: pAmtMinor,
+            amountTotal: tAmtMinor,
+            dueDate,
+            notes,
+            status: derivedStatus as any
+          }
         });
-        toast.success('تم التحديث بنجاح');
+        toast.success('تم تحديث الاشتراك بنجاح');
       } else {
         // Create new record
-        const newSub: MonthlySubscription = {
-          id: uuidv4(),
+        const newSub = await createSubscription.mutateAsync({
           studentId: sub.studentId,
           courseId: sub.courseId,
           month,
@@ -315,16 +488,26 @@ function PaymentModal({ sub, month, year, onClose }: { sub: any, month: number, 
           amountTotal: tAmtMinor,
           dueDate,
           notes,
-          status: derivedStatus as any,
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        };
-        await db.monthlySubscriptions.add(newSub);
+          status: derivedStatus as any
+        });
+        subId = newSub.id;
         toast.success('تم تسجيل الاشتراك بنجاح');
       }
+
+      // Record any incremental payment to Ledger entries
+      if (paymentDiffMinor > 0) {
+        await recordLedgerRevenue({
+          relatedType: 'subscription',
+          relatedId: subId,
+          amountMinor: paymentDiffMinor,
+          description: `سداد اشتراك شهر ${month}/${year} للطالب ${sub.studentName} (${sub.courseName})`,
+          token
+        });
+      }
+
       onClose();
     } catch (err) {
+      console.error(err);
       toast.error('حدث خطأ أثناء الحفظ');
     }
   };
@@ -509,7 +692,7 @@ function ReminderModal({ sub, month, year, onClose }: { sub: any, month: number,
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">معاينة الرسالة</label>
-            <textarea
+            <textarea 
               rows={5}
               className="w-full p-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-lg text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-sans focus:outline-none focus:ring-1 focus:ring-emerald-500"
               value={preview}

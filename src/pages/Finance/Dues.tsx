@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { AlertCircle, MessageCircle, DollarSign, X, CheckCircle2 } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { getWhatsAppUrl } from '../../utils/phone';
+import { Student, Course, MonthlySubscription, SessionPayment, LedgerEntry } from '../../types';
 
 export function Dues() {
   const [settlingDue, setSettlingDue] = useState<any | null>(null);
 
-  const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
-  const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at).toArray(), []);
-  const monthlySubscriptions = useLiveQuery(() => db.monthlySubscriptions.filter(s => !s.deleted_at).toArray(), []);
-  const sessionPayments = useLiveQuery(() => db.sessionPayments.filter(s => !s.deleted_at).toArray(), []);
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const students = allStudents.filter(s => !s.deleted_at);
+  const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const courses = allCourses.filter(c => !c.deleted_at);
+  const { data: allMonthlySubscriptions = [] } = useApiQuery<MonthlySubscription>('monthly-subscriptions', 60 * 1000);
+  const monthlySubscriptions = allMonthlySubscriptions.filter(s => !s.deleted_at);
+  const { data: allSessionPayments = [] } = useApiQuery<SessionPayment>('session-payments', 60 * 1000);
+  const sessionPayments = allSessionPayments.filter(s => !s.deleted_at);
 
   const studentMap = new Map(students?.map(s => [s.id, s]));
   const courseMap = new Map(courses?.map(c => [c.id, c.name]));
@@ -184,6 +187,9 @@ export function Dues() {
 }
 
 function SettleDueModal({ due, onClose }: { due: any; onClose: () => void }) {
+  const { update: updateSubscription } = useApiMutation<MonthlySubscription>('monthly-subscriptions');
+  const { update: updateSessionPayment } = useApiMutation<SessionPayment>('session-payments');
+  const { create: createLedgerEntry } = useApiMutation<LedgerEntry>('ledger-entries');
   const [payAmount, setPayAmount] = useState(toMajorUnits(due.remaining).toString());
 
   const handleSettle = async (e: React.FormEvent) => {
@@ -202,39 +208,37 @@ function SettleDueModal({ due, onClose }: { due: any; onClose: () => void }) {
         newStatus = isOverdue ? 'overdue' : 'partial';
       }
       
-      await db.monthlySubscriptions.update(due.id, {
-        amountPaid: newPaidTotal,
-        status: newStatus,
-        updated_at: now,
-        sync_status: 'pending'
+      updateSubscription.mutate({
+        id: due.id,
+        data: {
+          amountPaid: newPaidTotal,
+          status: newStatus
+        }
       });
     } else {
       let newStatus: 'paid' | 'partial' | 'unpaid' = 'paid';
       if (!isFullyPaid && newPaidTotal > 0) newStatus = 'partial';
       else if (!isFullyPaid) newStatus = 'unpaid';
 
-      await db.sessionPayments.update(due.id, {
-        paidAmount: newPaidTotal,
-        status: newStatus,
-        updated_at: now,
-        sync_status: 'pending'
+      updateSessionPayment.mutate({
+        id: due.id,
+        data: {
+          paidAmount: newPaidTotal,
+          status: newStatus
+        }
       });
     }
 
-    // Add to ledger revenue
-    await db.ledgerEntries.add({
-      id: uuidv4(),
+    // Add to ledger revenue using centralized helper
+    createLedgerEntry.mutate({
       type: 'revenue',
       category: 'تحصيل متأخرات',
       amount: payNum,
       date: new Date().toISOString().split('T')[0],
       description: `تحصيل متأخرات الطالب ${due.studentName} (${due.title})`,
       relatedType: due.source === 'monthly' ? 'subscription' : 'session',
-      relatedId: due.id,
-      created_at: now,
-      updated_at: now,
-      sync_status: 'pending'
-    });
+      relatedId: due.id
+    } as LedgerEntry);
 
     onClose();
   };

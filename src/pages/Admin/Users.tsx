@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { UserCog, Plus, Edit2, Trash2, Shield, User as UserIcon, Mail, Phone, BookOpen, Users as UsersIcon, X, Check } from 'lucide-react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
-import { User } from '../../types';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
+import { User, Course, Group } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
-import { v4 as uuidv4 } from 'uuid';
 
 export function Users() {
-  const users = useLiveQuery(() => db.users.filter(u => !u.deleted_at).toArray(), []);
-  const courses = useLiveQuery(() => db.courses.toArray(), []);
-  const groups = useLiveQuery(() => db.groups.toArray(), []);
+  const { data: allUsers = [] } = useApiQuery<User>('users', 60 * 1000);
+  const users = allUsers.filter(u => !u.deleted_at);
+  const { data: courses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const { data: groups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+  const { remove: removeUser } = useApiMutation<User>('users');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -28,8 +28,9 @@ export function Users() {
     });
 
     if (isConfirmed) {
-      await db.users.update(id, { deleted_at: Date.now(), sync_status: 'pending' });
-      toast.success('تم حذف المستخدم بنجاح');
+      removeUser.mutate(id, {
+        onSuccess: () => toast.success('تم حذف المستخدم بنجاح')
+      });
     }
   };
 
@@ -235,6 +236,8 @@ function UserModal({
   groups: any[]; 
   onClose: () => void; 
 }) {
+  const toast = useToast();
+  const { create: createUser, update: updateUser } = useApiMutation<User>('users');
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -246,8 +249,6 @@ function UserModal({
   
   const [assignedCourseIds, setAssignedCourseIds] = useState<string[]>(user?.assignedCourseIds || []);
   const [assignedGroupIds, setAssignedGroupIds] = useState<string[]>(user?.assignedGroupIds || []);
-
-  const toast = useToast();
 
   const toggleCourse = (courseId: string) => {
     setAssignedCourseIds(prev => {
@@ -293,28 +294,31 @@ function UserModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const now = Date.now();
 
     try {
       if (user) {
-        await db.users.update(user.id, {
-          name,
-          email,
-          phone,
-          role,
-          subject,
-          branch,
-          status,
-          notes,
-          assignedCourseIds,
-          assignedGroupIds,
-          updated_at: now,
-          sync_status: 'pending'
+        updateUser.mutate({
+          id: user.id,
+          data: {
+            name,
+            email,
+            phone,
+            role,
+            subject,
+            branch,
+            status,
+            notes,
+            assignedCourseIds,
+            assignedGroupIds
+          }
+        }, {
+          onSuccess: () => {
+            toast.success('تم تحديث بيانات المستخدم بنجاح');
+            onClose();
+          }
         });
-        toast.success('تم تحديث بيانات المستخدم بنجاح');
       } else {
-        const newUser: User = {
-          id: uuidv4(),
+        createUser.mutate({
           name,
           email,
           phone,
@@ -324,15 +328,14 @@ function UserModal({
           status,
           notes,
           assignedCourseIds,
-          assignedGroupIds,
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        };
-        await db.users.add(newUser);
-        toast.success('تم إضافة المستخدم وتعيين الكورسات والمجموعات بنجاح');
+          assignedGroupIds
+        }, {
+          onSuccess: () => {
+            toast.success('تم إضافة المستخدم وتعيين الكورسات والمجموعات بنجاح');
+            onClose();
+          }
+        });
       }
-      onClose();
     } catch (error) {
       console.error(error);
       toast.error('حدث خطأ أثناء حفظ بيانات المستخدم');

@@ -1,40 +1,41 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
-import { v4 as uuidv4 } from 'uuid';
-import { Plus, X, Trash2, BookOpen, Edit2, Search } from 'lucide-react';
+import { Plus, X, Trash2, BookOpen, Edit2 } from 'lucide-react';
 import { Course } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 
 export function Courses() {
-  const { subscription } = useSubscription();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const toast = useToast();
   const { confirm } = useConfirm();
   
-  const courses = useLiveQuery(() => db.courses.toArray(), []);
+  // Courses are reference data, use 2 min stale time
+  const { data: courses = [], isLoading } = useApiQuery<Course>('courses', 2 * 60 * 1000);
+  const { remove } = useApiMutation<Course>('courses');
 
   const handleDelete = async (id: string, name: string) => {
     const isConfirmed = await confirm({
       title: 'حذف المادة التعليمية',
       message: `هل أنت متأكد من حذف كورس (${name})؟`,
-      description: 'سيتم إزالة الكورس نهائياً من قاعدة البيانات المحلية.',
+      description: 'سيتم إزالة الكورس نهائياً من قاعدة البيانات.',
       confirmText: 'نعم، احذف الكورس',
       cancelText: 'إلغاء',
       variant: 'danger',
     });
 
     if (isConfirmed) {
-      try {
-        await db.courses.delete(id);
-        toast.success(`تم حذف كورس (${name}) بنجاح`);
-      } catch (err) {
-        toast.error('فشل حذف الكورس');
-      }
+      remove.mutate(id, {
+        onSuccess: () => {
+          toast.success(`تم حذف كورس (${name}) بنجاح`);
+        },
+        onError: () => {
+          toast.error('فشل حذف الكورس');
+        }
+      });
     }
   };
 
@@ -56,10 +57,12 @@ export function Courses() {
 
       <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {courses?.length === 0 ? (
+          {isLoading ? (
+            <div className="col-span-full py-12 text-center text-slate-400 dark:text-slate-500 text-xs">جاري التحميل...</div>
+          ) : courses.length === 0 ? (
             <div className="col-span-full py-12 text-center text-slate-400 dark:text-slate-500 text-xs">لا توجد كورسات مضافة بعد</div>
           ) : (
-            courses?.map(course => (
+            courses.map(course => (
               <div key={course.id} className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-lg p-4 hover:border-slate-300 dark:hover:border-slate-700 transition-colors flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-2">
@@ -94,14 +97,16 @@ export function Courses() {
                       setEditingCourse(course);
                       setIsModalOpen(true);
                     }}
-                    className="p-1.5 text-slate-400 hover:text-blue-600 cursor-pointer rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    disabled={remove.isPending}
+                    className="p-1.5 text-slate-400 hover:text-blue-600 cursor-pointer rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
                     title="تعديل الكورس"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => handleDelete(course.id, course.name)}
-                    className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    disabled={remove.isPending}
+                    className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
                     title="حذف الكورس"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -136,40 +141,41 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
     isActive: initialData?.isActive ?? true
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { create, update } = useApiMutation<Course>('courses');
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const now = Date.now();
-      
-      if (initialData) {
-        await db.courses.update(initialData.id, {
-          name: formData.name,
-          price: toMinorUnits(Number(formData.price)),
-          paymentType: formData.paymentType as any,
-          isActive: formData.isActive,
-          updated_at: now,
-          sync_status: 'pending'
-        });
-        toast.success(`تم تعديل الكورس (${formData.name}) بنجاح!`);
-      } else {
-        const newCourse: Course = {
-          id: uuidv4(),
-          name: formData.name,
-          price: toMinorUnits(Number(formData.price)),
-          paymentType: formData.paymentType as any,
-          isActive: formData.isActive,
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        };
-        await db.courses.add(newCourse);
-        toast.success(`تمت إضافة كورس (${formData.name}) بنجاح!`);
-      }
-      onClose();
-    } catch (err) {
-      toast.error('حدث خطأ أثناء حفظ الكورس');
+    const payload = {
+      name: formData.name,
+      price: toMinorUnits(Number(formData.price)),
+      paymentType: formData.paymentType as any,
+      isActive: formData.isActive,
+    };
+
+    if (initialData) {
+      update.mutate({ id: initialData.id, data: payload }, {
+        onSuccess: () => {
+          toast.success(`تم تعديل الكورس (${formData.name}) بنجاح!`);
+          onClose();
+        },
+        onError: () => {
+          toast.error('حدث خطأ أثناء حفظ الكورس - يرجى المحاولة مرة أخرى');
+        }
+      });
+    } else {
+      create.mutate(payload, {
+        onSuccess: () => {
+          toast.success(`تمت إضافة كورس (${formData.name}) بنجاح!`);
+          onClose();
+        },
+        onError: () => {
+          toast.error('حدث خطأ أثناء إضافة الكورس - يرجى المحاولة مرة أخرى');
+        }
+      });
     }
   };
+
+  const isPending = create.isPending || update.isPending;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
@@ -178,7 +184,7 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
           <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
             {initialData ? 'تعديل الكورس' : 'إضافة كورس جديد'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
+          <button onClick={onClose} disabled={isPending} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md disabled:opacity-50">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -193,6 +199,7 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
               className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
               value={formData.name} 
               onChange={e => setFormData({...formData, name: e.target.value})} 
+              disabled={isPending}
             />
           </div>
 
@@ -206,6 +213,7 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
               className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono"
               value={formData.price} 
               onChange={e => setFormData({...formData, price: e.target.value})} 
+              disabled={isPending}
             />
           </div>
 
@@ -215,6 +223,7 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
               className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
               value={formData.paymentType} 
               onChange={e => setFormData({...formData, paymentType: e.target.value as any})}
+              disabled={isPending}
             >
               <option value="monthly">شهري (تجديد كل شهر)</option>
               {subscription?.limits?.combined_packages !== false && <option value="package">باقة كاملة (ترم أو كورس كامل)</option>}
@@ -228,6 +237,7 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
               className="rounded text-blue-600 focus:ring-blue-500 ml-2 w-3.5 h-3.5" 
               checked={formData.isActive} 
               onChange={e => setFormData({...formData, isActive: e.target.checked})} 
+              disabled={isPending}
             />
             <label htmlFor="courseActive" className="text-xs font-medium text-slate-700 dark:text-slate-300">
               كورس متاح للتسجيل (نشط)
@@ -238,15 +248,17 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+              disabled={isPending}
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors disabled:opacity-50"
             >
               إلغاء
             </button>
             <button 
               type="submit" 
-              className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs"
+              disabled={isPending}
+              className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs disabled:opacity-50"
             >
-              {initialData ? 'حفظ التعديلات' : 'حفظ الكورس'}
+              {isPending ? 'جاري الحفظ...' : initialData ? 'حفظ التعديلات' : 'حفظ الكورس'}
             </button>
           </div>
         </form>

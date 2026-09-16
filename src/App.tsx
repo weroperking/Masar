@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { SignIn, OrganizationList, useAuth, useOrganization, useClerk } from '@clerk/clerk-react';
 import { seedDatabaseIfEmpty, sanitizeNumericCodes } from './db/seed';
 import { Layout } from './components/Layout';
@@ -34,30 +34,38 @@ import { SubscriptionProvider } from './context/SubscriptionContext';
 
 // Admin
 import { Users } from './pages/Admin/Users';
-import { Messaging } from './pages/Admin/Messaging';
 import { Settings } from './pages/Admin/Settings';
 import { QrCards } from './pages/Admin/QrCards';
+import { Upgrade } from './pages/Upgrade/Upgrade';
 
 import { PublicBooking } from './pages/PublicBooking';
 import { PublicStudentLookup } from './pages/PublicStudentLookup';
 
 import { CustomAuth } from './pages/Auth/CustomAuth';
 import { CustomOrganizationList } from './pages/Auth/CustomOrganizationList';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './config/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
-import { syncService } from './services/syncService';
+
 
 function CheckUpdate() {
   const { getToken } = useAuth();
   
   useEffect(() => {
+    // Only run update check in production mode and when online
+    if (process.env.NODE_ENV !== 'production' && !import.meta.env.PROD) {
+      return;
+    }
+
     let isChecking = false;
     const checkForUpdates = async () => {
-      if (isChecking) return;
+      if (isChecking || !navigator.onLine) return;
       isChecking = true;
       try {
         const response = await fetch('/index.html?nocache=' + Date.now(), { cache: 'no-store' });
+        if (!response.ok) return;
         const htmlText = await response.text();
         
         const currentScript = Array.from(document.scripts).find(s => s.src.includes('/assets/index-'));
@@ -69,11 +77,7 @@ function CheckUpdate() {
             console.log('Update detected! Triggering auto-sync before hard refresh...');
             
             // Attempt to sync pending data to server
-            try {
-              await syncService.syncPendingData(getToken);
-            } catch (err) {
-              console.error('Auto sync before update failed:', err);
-            }
+            // Migration: We don't have pending data offline anymore, so nothing to sync.
             
             // Clear browser caches
             if ('caches' in window) {
@@ -96,7 +100,8 @@ function CheckUpdate() {
           }
         }
       } catch (e) {
-        console.error('Update check failed:', e);
+        // Soft warning for background network checks instead of loud errors
+        console.warn('Background update check failed (likely transient network or offline state):', e);
       }
     };
     
@@ -138,7 +143,10 @@ function AuthGate() {
   useEffect(() => {
     if (dotLottie) {
       const handleComplete = () => setIsAnimationDone(true);
-      const handleError = (e: any) => setLottieError(e?.error?.message || 'Unknown Lottie load error');
+      const handleError = (e: any) => {
+        console.warn('Lottie splash animation failed to render, bypassing splash screen:', e);
+        setIsAnimationDone(true);
+      };
       
       dotLottie.addEventListener('complete', handleComplete);
       dotLottie.addEventListener('loadError', handleError);
@@ -182,7 +190,7 @@ function AuthGate() {
   // 3. Authenticated, but no active organization
   if (!organization) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-950 px-4 py-12 sm:px-6 lg:px-8" dir="rtl">
+      <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950 flex flex-col" dir="rtl">
         <CustomOrganizationList />
       </div>
     );
@@ -217,9 +225,10 @@ function AuthGate() {
           <Route path="reports" element={<Reports />} />
           
           <Route path="users" element={<Users />} />
-          <Route path="messaging" element={<Messaging />} />
+          <Route path="messaging" element={<Navigate to="/students" replace />} />
           <Route path="settings" element={<Settings />} />
           <Route path="qrcards" element={<QrCards />} />
+          <Route path="upgrade" element={<Upgrade />} />
         </Route>
       </Routes>
       </SubscriptionProvider>
@@ -241,13 +250,15 @@ export default function App() {
     <ThemeProvider>
       <ToastProvider>
         <ConfirmProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/s/:token" element={<PublicStudentLookup />} />
-              <Route path="/book" element={<PublicBooking />} />
-              <Route path="*" element={<AuthGate />} />
-            </Routes>
-          </BrowserRouter>
+          <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/s/:token" element={<PublicStudentLookup />} />
+                <Route path="/book" element={<PublicBooking />} />
+                <Route path="*" element={<AuthGate />} />
+              </Routes>
+            </BrowserRouter>
+          </QueryClientProvider>
         </ConfirmProvider>
       </ToastProvider>
     </ThemeProvider>

@@ -3,47 +3,75 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
 import { 
   Play, CheckCircle, Clock, X, Users, MessageCircle, StopCircle, Calendar, 
-  AlertTriangle, QrCode, Check, Search, Sparkles, UserCheck, UserX, Trash2, ArrowRight
+  AlertTriangle, QrCode, Check, Search, Sparkles, UserCheck, UserX, Trash2, ArrowRight, RefreshCw, Zap
 } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
-import { AttendanceSession, Student } from '../../types';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
+import { AttendanceSession, Student, Group, Course, AttendanceRecord } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { getWhatsAppUrl } from '../../utils/phone';
+import { autoScheduleService } from '../../services/autoScheduleService';
 
 export function Attendance() {
   const toast = useToast();
   const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'live' | 'upcoming' | 'history' | 'absent'>('live');
   const [markingSession, setMarkingSession] = useState<AttendanceSession | null>(null);
-  const groups = useLiveQuery(() => db.groups.toArray(), []);
-  const courses = useLiveQuery(() => db.courses.toArray(), []);
+  const [isAutoChecking, setIsAutoChecking] = useState(false);
+  const { data: groups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+  const { data: courses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+
+  // Periodic auto-check when on attendance page
+  useEffect(() => {
+    autoScheduleService.checkAndRunSchedules();
+    const timer = setInterval(() => {
+      autoScheduleService.checkAndRunSchedules();
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleManualAutoCheck = async () => {
+    setIsAutoChecking(true);
+    try {
+      const res = await autoScheduleService.checkAndRunSchedules();
+      if (res.started > 0) {
+        toast.success(`تم بدء ${res.started} حصة تلقائياً وفقاً للجدول الزمني!`);
+      } else {
+        toast.info('تم فحص الجدول: لا توجد حصص جديدة حان موعد بدئها الآن.');
+      }
+    } catch (e) {
+      toast.error('حدث خطأ أثناء فحص الحصص المجدولة');
+    } finally {
+      setIsAutoChecking(false);
+    }
+  };
   
-  const activeSessions = useLiveQuery(() => db.attendanceSessions.where('status').equals('live').toArray(), []);
-  const completedSessions = useLiveQuery(() => db.attendanceSessions.where('status').equals('completed').toArray(), []);
-  const allRecords = useLiveQuery(() => db.attendanceRecords.toArray(), []);
-  const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
+  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendance-sessions', 30 * 1000);
+  const activeSessions = allSessions.filter(s => s.status === 'live');
+  const completedSessions = allSessions.filter(s => s.status === 'completed');
   
+  const { data: allRecords = [] } = useApiQuery<AttendanceRecord>('attendance-records', 30 * 1000);
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const students = allStudents.filter(s => !s.deleted_at);
+  
+  const { create: createSession, update: updateSession } = useApiMutation<AttendanceSession>('attendance-sessions');
+
   const courseMap = new Map(courses?.map(c => [c.id, c.name]));
   const groupMap = new Map(groups?.map(g => [g.id, g]));
 
   const handleStartSession = async (groupId: string, courseId: string, isTrial: boolean = false) => {
-    const now = Date.now();
-    await db.attendanceSessions.add({
-      id: uuidv4(),
+    createSession.mutate({
       groupId,
       courseId,
       isTrial,
-      startedAt: now,
+      startedAt: Date.now(),
       endedAt: null,
-      status: 'live',
-      created_at: now,
-      updated_at: now,
-      sync_status: 'pending'
+      status: 'live'
+    }, {
+      onSuccess: () => toast.success(isTrial ? 'تم بدء حصة تجريبية بنجاح!' : 'تم بدء الحصة بنجاح!')
     });
-    toast.success(isTrial ? 'تم بدء حصة تجريبية بنجاح!' : 'تم بدء الحصة بنجاح!');
   };
 
   const handleEndSession = async (sessionId: string) => {
@@ -57,16 +85,20 @@ export function Attendance() {
     });
 
     if (isConfirmed) {
-      await db.attendanceSessions.update(sessionId, {
-        endedAt: Date.now(),
-        status: 'completed',
-        updated_at: Date.now(),
-        sync_status: 'pending'
+      updateSession.mutate({
+        id: sessionId,
+        data: {
+          endedAt: Date.now(),
+          status: 'completed'
+        }
+      }, {
+        onSuccess: () => {
+          if (markingSession?.id === sessionId) {
+            setMarkingSession(null);
+          }
+          toast.success('تم إنهاء الحصة وتوثيق الحضور.');
+        }
       });
-      if (markingSession?.id === sessionId) {
-        setMarkingSession(null);
-      }
-      toast.success('تم إنهاء الحصة وتوثيق الحضور.');
     }
   };
 
@@ -80,10 +112,31 @@ export function Attendance() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">الحضور والغياب</h1>
           <p className="text-xs text-slate-500 mt-0.5">اليوم: {todayName}، {format(new Date(), 'dd MMMM yyyy', { locale: ar })}</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <Zap className="w-3.5 h-3.5 ml-1" />
+            <span>البدء التلقائي للحصص: نشط</span>
+          </div>
+
+          <button
+            onClick={handleManualAutoCheck}
+            disabled={isAutoChecking}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+            title="فحص الجدول وبدء الحصص التي حان موعدها فوراً"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isAutoChecking ? 'animate-spin' : ''}`} />
+            <span>فحص الجدول الآن</span>
+          </button>
         </div>
       </div>
 
@@ -373,62 +426,43 @@ function AttendanceModal({
 }) {
   const toast = useToast();
   
-  const groupEnrollments = useLiveQuery(
-    () => db.enrollments.where('groupId').equals(session.groupId).toArray(),
-    [session.groupId]
-  );
+  const { data: allEnrollments = [] } = useApiQuery<any>('enrollments', 30 * 1000);
+  const groupEnrollments = allEnrollments.filter((e: any) => e.groupId === session.groupId);
+  const activeStudentIds = groupEnrollments.filter((e: any) => e.status === 'active').map((e: any) => e.studentId);
   
-  const activeStudentIds = groupEnrollments?.filter(e => e.status === 'active').map(e => e.studentId) || [];
-  
-  const allStudents = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
-  const rosterStudents = allStudents?.filter(s => activeStudentIds.includes(s.id)) || [];
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const rosterStudents = allStudents.filter(s => activeStudentIds.includes(s.id) && !s.deleted_at);
 
-  
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
-  const currentSubscriptions = useLiveQuery(() => 
-    db.monthlySubscriptions
-      .where('courseId').equals(session.courseId)
-      .and(sub => sub.month === currentMonth && sub.year === currentYear)
-      .toArray(), 
-  [session.courseId, currentMonth, currentYear]);
+  const { data: allSubscriptions = [] } = useApiQuery<any>('monthly-subscriptions', 60 * 1000);
+  const currentSubscriptions = allSubscriptions.filter((sub: any) => sub.courseId === session.courseId && sub.month === currentMonth && sub.year === currentYear && !sub.deleted_at);
 
-  const existingRecords = useLiveQuery(
-    () => db.attendanceRecords.where('sessionId').equals(session.id).toArray(),
-    [session.id]
-  );
+  const { data: allRecords = [] } = useApiQuery<AttendanceRecord>('attendance-records', 30 * 1000);
+  const existingRecords = allRecords.filter(r => r.sessionId === session.id);
 
-  // Settings for trial session limit
-  const settingsArray = useLiveQuery(() => db.settings.toArray(), []);
-  const settings = settingsArray?.[0];
+  const { data: settingsArray = [] } = useApiQuery<any>('settings', 60 * 1000);
+  const settings = settingsArray[0];
   const freeSessionLimit = settings?.freeSessionLimitPerStudent || 1;
 
-  // Trial limits verification (if session is trial)
-  const allTrialSessions = useLiveQuery(() => 
-    db.attendanceSessions.filter(s => s.isTrial === true).toArray(),
-  []);
-  const trialSessionIds = allTrialSessions?.map(s => s.id) || [];
-  const allTrialRecords = useLiveQuery(() => 
-    db.attendanceRecords.toArray()
-  );
+  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendance-sessions', 30 * 1000);
+  const allTrialSessions = allSessions.filter(s => s.isTrial);
+  const trialSessionIds = allTrialSessions.map(s => s.id);
+  const allTrialRecords = allRecords; // Since allRecords already fetched
   
-  // Previous Session Verification
-  const groupCompletedSessions = useLiveQuery(() => 
-    db.attendanceSessions.where('status').equals('completed').toArray()
-  );
-  const prevSession = groupCompletedSessions?.filter(s => s.groupId === session.groupId)
-                                            .sort((a,b) => b.endedAt! - a.endedAt!)[0];
-  const prevSessionRecords = useLiveQuery(() => 
-    prevSession ? db.attendanceRecords.where('sessionId').equals(prevSession.id).toArray() : []
-  );
+  const groupCompletedSessions = allSessions.filter(s => s.status === 'completed');
+  const prevSession = groupCompletedSessions.filter(s => s.groupId === session.groupId)
+                                            .sort((a,b) => (b.endedAt || 0) - (a.endedAt || 0))[0];
+  const prevSessionRecords = prevSession ? allRecords.filter(r => r.sessionId === prevSession.id) : [];
+  
+  const { create: createRecord, update: updateRecord } = useApiMutation<AttendanceRecord>('attendance-records');
+  const { data: qrCards = [] } = useApiQuery<any>('qr-cards', 60 * 1000);
   
   const [recordMap, setRecordMap] = useState<Record<string, 'present' | 'absent'>>({});
   const [isSaved, setIsSaved] = useState(false);
   const [viewTab, setViewTab] = useState<'attended' | 'absent'>('attended');
   const [extraGuestStudents, setExtraGuestStudents] = useState<Student[]>([]);
   
-  // QR Code Scanner State
-  const qrCards = useLiveQuery(() => db.qrCards.filter(c => !c.deleted_at).toArray(), []);
   const [qrInput, setQrInput] = useState('');
   
   const qrInputRef = useRef<HTMLInputElement>(null);
@@ -639,32 +673,27 @@ function AttendanceModal({
       }
     }
 
-    const now = Date.now();
-    
     for (const student of combinedStudents) {
       const status = recordMap[student.id] || 'absent';
       const existing = existingRecords?.find(r => r.studentId === student.id);
       
       if (existing) {
         if (existing.status !== status) {
-          await db.attendanceRecords.update(existing.id, {
-            status,
-            markedAt: now,
-            updated_at: now,
-            sync_status: 'pending'
+          updateRecord.mutate({
+            id: existing.id,
+            data: {
+              status,
+              markedAt: Date.now()
+            }
           });
         }
       } else {
-        await db.attendanceRecords.add({
-          id: uuidv4(),
+        createRecord.mutate({
           sessionId: session.id,
           studentId: student.id,
           groupId: session.groupId,
           status,
-          markedAt: now,
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
+          markedAt: Date.now()
         });
       }
     }

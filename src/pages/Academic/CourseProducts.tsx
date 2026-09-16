@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { 
   Library, Plus, X, Trash2, Edit2, BookOpen, Printer, Search, 
   Filter, CheckCircle, AlertTriangle, Users, DollarSign, FileText, Check 
 } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
 import { CourseProduct, Course, Product, Group, Enrollment, ProductSale, Student } from '../../types';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { useToast } from '../../context/ToastContext';
@@ -22,13 +20,22 @@ export function CourseProducts() {
   const { confirm } = useConfirm();
 
   // Reactive queries with soft-delete exclusion
-  const courseProducts = useLiveQuery(() => db.courseProducts.filter(cp => !cp.deleted_at).toArray(), []);
-  const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at).toArray(), []);
-  const products = useLiveQuery(() => db.products.filter(p => !p.deleted_at).toArray(), []);
-  const groups = useLiveQuery(() => db.groups.filter(g => !g.deleted_at).toArray(), []);
-  const enrollments = useLiveQuery(() => db.enrollments.filter(e => !e.deleted_at && e.status === 'active').toArray(), []);
-  const sales = useLiveQuery(() => db.productSales.filter(s => !s.deleted_at).toArray(), []);
-  const students = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
+  const { data: allCourseProducts = [] } = useApiQuery<CourseProduct>('course-products', 60 * 1000);
+  const courseProducts = allCourseProducts.filter(cp => !cp.deleted_at);
+  const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const courses = allCourses.filter(c => !c.deleted_at);
+  const { data: allProducts = [] } = useApiQuery<Product>('products', 60 * 1000);
+  const products = allProducts.filter(p => !p.deleted_at);
+  const { data: allGroups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+  const groups = allGroups.filter(g => !g.deleted_at);
+  const { data: allEnrollments = [] } = useApiQuery<Enrollment>('enrollments', 60 * 1000);
+  const enrollments = allEnrollments.filter(e => !e.deleted_at && e.status === 'active');
+  const { data: allSales = [] } = useApiQuery<ProductSale>('product-sales', 60 * 1000);
+  const sales = allSales.filter(s => !s.deleted_at);
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const students = allStudents.filter(s => !s.deleted_at);
+
+  const { remove: removeCourseProduct } = useApiMutation<CourseProduct>('course-products');
 
   const courseMap = new Map(courses?.map(c => [c.id, c]));
   const productMap = new Map(products?.map(p => [p.id, p]));
@@ -46,13 +53,9 @@ export function CourseProducts() {
 
     if (isConfirmed) {
       try {
-        const now = Date.now();
-        await db.courseProducts.update(id, {
-          deleted_at: now,
-          updated_at: now,
-          sync_status: 'pending'
+        removeCourseProduct.mutate(id, {
+          onSuccess: () => toast.success('تم فك ارتباط الكتاب بالكورس بنجاح')
         });
-        toast.success('تم فك ارتباط الكتاب بالكورس بنجاح');
       } catch (err) {
         toast.error('حدث خطأ أثناء فك الارتباط');
       }
@@ -301,6 +304,7 @@ export function CourseProducts() {
           }}
           courses={courses || []}
           products={products || []}
+          allCourseProducts={courseProducts}
         />
       )}
 
@@ -326,14 +330,17 @@ function BindBookModal({
   link,
   onClose, 
   courses, 
-  products 
+  products,
+  allCourseProducts
 }: { 
   link?: CourseProduct | null;
   onClose: () => void; 
   courses: Course[]; 
-  products: Product[]; 
+  products: Product[];
+  allCourseProducts?: CourseProduct[];
 }) {
   const toast = useToast();
+  const { create: createCourseProduct, update: updateCourseProduct } = useApiMutation<CourseProduct>('course-products');
   const isEdit = !!link;
 
   const [formData, setFormData] = useState({
@@ -364,49 +371,46 @@ function BindBookModal({
     }
 
     try {
-      const now = Date.now();
       const calculatedDiscountValue = formData.discountType === 'fixed' 
         ? toMinorUnits(Number(formData.discountValue)) 
         : Number(formData.discountValue);
 
       if (isEdit) {
-        await db.courseProducts.update(link.id, {
-          isMandatory: formData.isMandatory,
-          discountType: formData.discountType,
-          discountValue: calculatedDiscountValue,
-          updated_at: now,
-          sync_status: 'pending'
+        updateCourseProduct.mutate({
+          id: link.id,
+          data: {
+            isMandatory: formData.isMandatory,
+            discountType: formData.discountType,
+            discountValue: calculatedDiscountValue
+          }
+        }, {
+          onSuccess: () => {
+            toast.success('تم تحديث إعدادات ربط الكتاب بنجاح');
+            onClose();
+          }
         });
-        toast.success('تم تحديث إعدادات ربط الكتاب بنجاح');
       } else {
         // Check if already linked
-        const existing = await db.courseProducts
-          .where('courseId')
-          .equals(formData.courseId)
-          .filter(cp => !cp.deleted_at && cp.productId === formData.productId)
-          .first();
+        const existing = allCourseProducts?.find(cp => cp.courseId === formData.courseId && cp.productId === formData.productId);
 
         if (existing) {
           toast.error('هذا الكتاب مربوط بالفعل بهذا الكورس مسبقاً');
           return;
         }
 
-        const newCourseProduct: CourseProduct = {
-          id: uuidv4(),
+        createCourseProduct.mutate({
           courseId: formData.courseId,
           productId: formData.productId,
           isMandatory: formData.isMandatory,
           discountType: formData.discountType,
-          discountValue: calculatedDiscountValue,
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        };
-
-        await db.courseProducts.add(newCourseProduct);
-        toast.success('تم ربط الكتاب بالكورس بنجاح');
+          discountValue: calculatedDiscountValue
+        }, {
+          onSuccess: () => {
+            toast.success('تم ربط الكتاب بالكورس بنجاح');
+            onClose();
+          }
+        });
       }
-      onClose();
     } catch (err) {
       toast.error('حدث خطأ أثناء حفظ البيانات');
     }

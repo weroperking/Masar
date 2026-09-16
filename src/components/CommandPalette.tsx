@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db/db';
+import { useApiQuery } from '../config/queryHooks';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { Student, Course, Product } from '../types';
 import { 
   Search, Users, BookOpen, CreditCard, LayoutDashboard, Settings, 
   UserCheck, Calendar, FileText, Library, Wallet, 
@@ -38,9 +38,10 @@ export function CommandPalette({
   const { theme, toggleTheme } = useTheme();
   const toast = useToast();
 
-  const students = useLiveQuery(() => db.students.limit(100).toArray(), []);
-  const courses = useLiveQuery(() => db.courses.toArray(), []);
-  const products = useLiveQuery(() => db.products.toArray(), []);
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const students = allStudents.slice(0, 100);
+  const { data: courses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const { data: products = [] } = useApiQuery<Product>('products', 60 * 1000);
 
   // Focus input when opened
   useEffect(() => {
@@ -69,7 +70,6 @@ export function CommandPalette({
     { id: 'nav-inventory', title: 'المخزون والمبيعات', subtitle: 'بيع المذكرات وجرد الأصناف', category: 'صفحات', icon: Package, action: () => navigate('/inventory') },
     { id: 'nav-reports', title: 'التقارير والتحليلات', subtitle: 'تصدير التقارير ومؤشرات الأداء', category: 'صفحات', icon: BarChart3, action: () => navigate('/reports') },
     { id: 'nav-users', title: 'المستخدمين والصلاحيات', subtitle: 'إدارة طاقم العمل', category: 'صفحات', icon: UserCog, action: () => navigate('/users') },
-    { id: 'nav-messaging', title: 'المراسلات الجماعية', subtitle: 'إرسال رسائل وتنبيهات', category: 'صفحات', icon: MessageSquare, action: () => navigate('/messaging') },
     { id: 'nav-settings', title: 'الإعدادات العامة', subtitle: 'تخصيص السنتر والعملة', category: 'صفحات', icon: Settings, action: () => navigate('/settings') },
     { id: 'nav-qrcards', title: 'بطاقات QR للطلاب', subtitle: 'طباعة كروت الباركود', category: 'صفحات', icon: QrCode, action: () => navigate('/qrcards') },
   ];

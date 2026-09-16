@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
 import { Globe, Copy, Check, Plus, X, UserCheck, UserX, Trash2, Filter } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
-import { BookingRequest, Student } from '../../types';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
+import { BookingRequest, Student, Course, Group } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 
@@ -15,10 +13,13 @@ export function Booking() {
   const [activeTab, setActiveTab] = useState<'pending' | 'accepted' | 'rejected' | 'all'>('pending');
   const [acceptingBooking, setAcceptingBooking] = useState<BookingRequest | null>(null);
 
-  const allBookings = useLiveQuery(() => db.bookingRequests.filter(b => !b.deleted_at).reverse().sortBy('requestDate'), []);
-  const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at).toArray(), []);
+  const { data: allBookingsData = [] } = useApiQuery<BookingRequest>('booking-requests', 60 * 1000);
+  const allBookings = [...allBookingsData].sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime());
   
-  const courseMap = new Map(courses?.map(c => [c.id, c.name]));
+  const { data: courses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const { update: updateBooking, remove: removeBooking } = useApiMutation<BookingRequest>('booking-requests');
+
+  const courseMap = new Map(courses.map(c => [c.id, c.name]));
   
   // Public booking route
   const bookingLink = `${window.location.origin}/book`;
@@ -34,10 +35,9 @@ export function Booking() {
   };
 
   const handleReject = async (bookingId: string) => {
-    await db.bookingRequests.update(bookingId, {
-      status: 'rejected',
-      updated_at: Date.now(),
-      sync_status: 'pending'
+    updateBooking.mutate({
+      id: bookingId,
+      data: { status: 'rejected' }
     });
   };
 
@@ -52,12 +52,9 @@ export function Booking() {
     });
 
     if (isConfirmed) {
-      await db.bookingRequests.update(bookingId, {
-        deleted_at: Date.now(),
-        updated_at: Date.now(),
-        sync_status: 'pending'
+      removeBooking.mutate(bookingId, {
+        onSuccess: () => toast.success('تم حذف طلب الحجز بنجاح')
       });
-      toast.success('تم حذف طلب الحجز بنجاح');
     }
   };
 
@@ -254,6 +251,7 @@ export function Booking() {
 }
 
 function CreateBookingModal({ onClose, courses }: { onClose: () => void; courses: any[] }) {
+  const { create: createBooking } = useApiMutation<BookingRequest>('booking-requests');
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -263,20 +261,15 @@ function CreateBookingModal({ onClose, courses }: { onClose: () => void; courses
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const now = Date.now();
-    const newBooking: BookingRequest = {
-      id: uuidv4(),
+    createBooking.mutate({
       name: formData.name,
       phone: formData.phone,
       courseId: formData.courseId,
       requestDate: formData.requestDate,
-      status: 'pending',
-      created_at: now,
-      updated_at: now,
-      sync_status: 'pending'
-    };
-    await db.bookingRequests.add(newBooking);
-    onClose();
+      status: 'pending'
+    }, {
+      onSuccess: () => onClose()
+    });
   };
 
   return (
@@ -358,52 +351,48 @@ function CreateBookingModal({ onClose, courses }: { onClose: () => void; courses
 }
 
 function AcceptBookingModal({ booking, onClose }: { booking: BookingRequest; onClose: () => void }) {
-  const groups = useLiveQuery(() => db.groups.filter(g => !g.deleted_at && g.courseId === booking.courseId).toArray(), [booking.courseId]);
+  const { data: allGroups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+  const groups = allGroups.filter(g => g.courseId === booking.courseId);
   const [selectedGroupId, setSelectedGroupId] = useState('');
+  
+  const { create: createStudent } = useApiMutation<Student>('students');
+  const { create: createEnrollment } = useApiMutation<any>('enrollments');
+  const { update: updateBooking } = useApiMutation<BookingRequest>('booking-requests');
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const now = Date.now();
-    
-    // 1. Create a student from the lead
-    const newStudent: Student = {
-      id: uuidv4(),
+    createStudent.mutate({
       name: booking.name,
       phone: booking.phone,
       parentName: 'ولي أمر ' + booking.name,
       parentPhone: booking.phone,
       school: '',
       leadSource: 'حجز أونلاين (الموقع)',
-      isActive: true,
-      created_at: now,
-      updated_at: now,
-      sync_status: 'pending'
-    };
-    await db.students.add(newStudent);
-
-    // 2. Enroll the student in the course/group
-    await db.enrollments.add({
-      id: uuidv4(),
-      studentId: newStudent.id,
-      courseId: booking.courseId,
-      groupId: selectedGroupId,
-      enrolledAt: new Date().toISOString(),
-      status: 'active',
-      created_at: now,
-      updated_at: now,
-      sync_status: 'pending'
+      isActive: true
+    }, {
+      onSuccess: (studentData: Student) => {
+        // Enroll the student
+        createEnrollment.mutate({
+          studentId: studentData.id,
+          courseId: booking.courseId,
+          groupId: selectedGroupId,
+          enrolledAt: new Date().toISOString(),
+          status: 'active'
+        });
+        
+        // Mark booking as accepted
+        updateBooking.mutate({
+          id: booking.id,
+          data: {
+            status: 'accepted',
+            studentId: studentData.id
+          }
+        });
+        
+        onClose();
+      }
     });
-
-    // 3. Mark booking as accepted
-    await db.bookingRequests.update(booking.id, {
-      status: 'accepted',
-      studentId: newStudent.id,
-      updated_at: now,
-      sync_status: 'pending'
-    });
-    
-    onClose();
   };
 
   return (

@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
 import { ArrowRight, Users, UserPlus, Calendar, Clock, X, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
+import { Group, Course, Enrollment, Student } from '../../types';
 
 export function GroupDetails() {
   const { id } = useParams<{ id: string }>();
@@ -16,22 +15,23 @@ export function GroupDetails() {
   const { confirm } = useConfirm();
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
 
-  const group = useLiveQuery(() => db.groups.get(id as string), [id]);
-  const course = useLiveQuery(() => group ? db.courses.get(group.courseId) : undefined, [group]);
+  const { data: allGroups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+  const group = allGroups.find(g => g.id === id);
+  
+  const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const course = allCourses.find(c => c.id === group?.courseId);
   
   // Active Enrollments
-  const enrollments = useLiveQuery(
-    () => db.enrollments.where('groupId').equals(id as string).toArray(),
-    [id]
-  );
+  const { data: allEnrollments = [] } = useApiQuery<Enrollment>('enrollments', 60 * 1000);
+  const enrollments = allEnrollments.filter(e => e.groupId === id);
   const activeEnrollments = enrollments?.filter(e => e.status === 'active') || [];
   const activeStudentIds = activeEnrollments.map(e => e.studentId);
 
   // Get enrolled students details
-  const students = useLiveQuery(
-    () => db.students.filter(s => !s.deleted_at).toArray(), 
-    []
-  );
+  const { data: students = [] } = useApiQuery<Student>('students', 60 * 1000);
+
+  const { remove: removeGroup } = useApiMutation<Group>('groups');
+  const { update: updateEnrollment } = useApiMutation<Enrollment>('enrollments');
 
   const handleDeleteGroup = async () => {
     if (!group) return;
@@ -45,22 +45,13 @@ export function GroupDetails() {
     });
 
     if (isConfirmed) {
-      try {
-        await db.transaction('rw', [db.groups, db.enrollments, db.attendanceSessions, db.attendanceRecords], async () => {
-          await db.groups.delete(group.id);
-          await db.enrollments.where('groupId').equals(group.id).delete();
-          const sessions = await db.attendanceSessions.where('groupId').equals(group.id).toArray();
-          for (const s of sessions) {
-            await db.attendanceRecords.where('sessionId').equals(s.id).delete();
-          }
-          await db.attendanceSessions.where('groupId').equals(group.id).delete();
-        });
-        toast.success(`تم حذف مجموعة "${group.name}" بنجاح`);
-        navigate('/groups');
-      } catch (err) {
-        console.error(err);
-        toast.error('فشل حذف المجموعة');
-      }
+      removeGroup.mutate(group.id, {
+        onSuccess: () => {
+          toast.success(`تم حذف مجموعة "${group.name}" بنجاح`);
+          navigate('/groups');
+        },
+        onError: () => toast.error('فشل حذف المجموعة')
+      });
     }
   };
 
@@ -83,16 +74,10 @@ export function GroupDetails() {
     });
 
     if (isConfirmed) {
-      try {
-        await db.enrollments.update(enrollmentId, {
-          status: 'withdrawn',
-          updated_at: Date.now(),
-          sync_status: 'pending'
-        });
-        toast.success('تم سحب الطالب من المجموعة بنجاح');
-      } catch (err) {
-        toast.error('حدث خطأ أثناء سحب الطالب');
-      }
+      updateEnrollment.mutate({ id: enrollmentId, data: { status: 'withdrawn' } }, {
+        onSuccess: () => toast.success('تم سحب الطالب من المجموعة بنجاح'),
+        onError: () => toast.error('حدث خطأ أثناء سحب الطالب')
+      });
     }
   };
 
@@ -246,34 +231,28 @@ export function GroupDetails() {
 function EnrollStudentModal({ groupId, courseId, existingStudentIds, onClose }: { groupId: string, courseId: string, existingStudentIds: string[], onClose: () => void }) {
   const toast = useToast();
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const { create: createEnrollment } = useApiMutation<Enrollment>('enrollments');
   
-  const students = useLiveQuery(
-    () => db.students.filter(s => s.isActive && !s.deleted_at && !existingStudentIds.includes(s.id)).toArray(),
-    [existingStudentIds]
-  );
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const students = allStudents.filter(s => s.isActive && !existingStudentIds.includes(s.id));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStudentId) return;
 
-    try {
-      const now = Date.now();
-      await db.enrollments.add({
-        id: uuidv4(),
-        studentId: selectedStudentId,
-        groupId,
-        courseId,
-        enrolledAt: new Date().toISOString(),
-        status: 'active',
-        created_at: now,
-        updated_at: now,
-        sync_status: 'pending'
-      });
-      toast.success('تم تسجيل الطالب في المجموعة بنجاح');
-      onClose();
-    } catch (err) {
-      toast.error('حدث خطأ أثناء التسجيل');
-    }
+    createEnrollment.mutate({
+      studentId: selectedStudentId,
+      groupId,
+      courseId,
+      enrolledAt: new Date().toISOString(),
+      status: 'active'
+    }, {
+      onSuccess: () => {
+        toast.success('تم تسجيل الطالب في المجموعة بنجاح');
+        onClose();
+      },
+      onError: () => toast.error('حدث خطأ أثناء التسجيل')
+    });
   };
 
   return (

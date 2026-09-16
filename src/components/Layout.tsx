@@ -7,11 +7,10 @@ import {
   UserCheck, Calendar, FileText, Library, Wallet, 
   FileSpreadsheet, Globe, Package, 
   BarChart3, UserCog, MessageSquare, QrCode, LogOut,
-  Search, Sun, Moon, Plus, Keyboard, RefreshCw, CheckCircle2, WifiOff, Menu, X
+  Search, Sun, Moon, Plus, Keyboard, RefreshCw, CheckCircle2, WifiOff, Menu, X, ArrowUpCircle, AlertCircle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { syncService, TABLES } from '../services/syncService';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { CommandPalette } from './CommandPalette';
@@ -35,6 +34,7 @@ const getNavigationGroups = (limits: any) => {
       title: 'أكاديمي',
       items: [
         { name: 'الطلاب', href: '/students', icon: Users },
+        { name: 'بطاقات وكروت QR', href: '/qrcards', icon: QrCode },
         { name: 'الكورسات', href: '/courses', icon: BookOpen },
         { name: 'المجموعات', href: '/groups', icon: Users },
         { name: 'الحضور والغياب', href: '/attendance', icon: UserCheck },
@@ -69,9 +69,8 @@ const getNavigationGroups = (limits: any) => {
       title: 'الإدارة',
       items: [
         { name: 'المستخدمين', href: '/users', icon: UserCog },
-        { name: 'المراسلات', href: '/messaging', icon: MessageSquare },
         { name: 'الإعدادات', href: '/settings', icon: Settings },
-        { name: 'بطاقات QR', href: '/qrcards', icon: QrCode },
+        { name: 'ترقية الباقة', href: '/upgrade', icon: ArrowUpCircle },
       ]
     }
   ];
@@ -152,59 +151,55 @@ export function Layout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [hideTrialBanner, setHideTrialBanner] = useState(false);
-  const { subscription } = useSubscription();
+  const { subscription, isBlocked } = useSubscription();
   const navigationGroups = getNavigationGroups(subscription?.limits);
+
+  const showNav = true;
 
   // Close mobile drawer on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Auto-sync when going online
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      toast.success('تم استعادة الاتصال بالإنترنت! جاري مزامنة البيانات...');
-      syncService.syncPendingData(getToken).catch(err => {
-        console.error('Auto sync failed:', err);
-      });
+      toast.success('تم استعادة الاتصال بالإنترنت!');
     };
+    
     const handleOffline = () => {
       setIsOnline(false);
-      toast.warning('أنت تعمل الآن في وضع عدم الاتصال بالإنترنت. سيتم حفظ التغييرات محلياً.');
+      toast.warning('أنت تعمل الآن في وضع عدم الاتصال بالإنترنت.');
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Listen to sync events
-    const handleSyncStart = () => setIsSyncing(true);
-    const handleSyncEnd = () => setIsSyncing(false);
-
-    window.addEventListener('sync-start', handleSyncStart);
-    window.addEventListener('sync-end', handleSyncEnd);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('sync-start', handleSyncStart);
-      window.removeEventListener('sync-end', handleSyncEnd);
     };
   }, [toast]);
 
-  // Get total pending sync counts reactively
-  const pendingCount = useLiveQuery(async () => {
-    let total = 0;
-    for (const table of TABLES) {
-      const tableInstance = (db as any)[table];
-      if (tableInstance) {
-        total += await tableInstance.where('sync_status').equals('pending').count();
-      }
-    }
-    return total;
-  }, []) ?? 0;
+  // Periodic automatic attendance session starter
+  useEffect(() => {
+    // Event listener for auto-started session notifications
+    const handleAutoStart = (e: any) => {
+      const detail = e.detail || {};
+      toast.success(
+        `بدأت الحصة تلقائياً: ${detail.groupName || ''} (${detail.courseName || ''}) لحلول موعد البدء (${detail.startTime || ''})`
+      );
+    };
+
+    window.addEventListener('masar-session-auto-started', handleAutoStart);
+
+    return () => {
+      window.removeEventListener('masar-session-auto-started', handleAutoStart);
+    };
+  }, [toast]);
+
+
 
   // Global Keyboard Shortcuts
   useEffect(() => {
@@ -240,51 +235,52 @@ export function Layout() {
   const renderNavContent = (onItemClick?: () => void) => (
     <>
       <nav className="flex-1 px-4 py-4 overflow-y-auto space-y-6 scrollbar-thin">
-        {navigationGroups.map((group) => (
-          <div key={group.title}>
-            <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3">
-              {group.title}
-            </h2>
-            <div className="space-y-1">
-              {group.items.map((item) => {
-                const isActive =
-                  location.pathname === item.href ||
-                  (item.href !== '/' && location.pathname.startsWith(item.href));
-                return (
-                  <SidebarNavItem
-                    key={item.name}
-                    item={item}
-                    isActive={isActive}
-                    onItemClick={onItemClick}
-                  />
-                );
-              })}
+        {navigationGroups.map((group) => {
+          // If blocked, only show groups that have 'upgrade' or 'settings' related items
+          // or just filter the items inside
+          const filteredItems = isBlocked 
+            ? group.items.filter(item => item.href === '/upgrade' || item.href === '/settings')
+            : group.items;
+
+          if (filteredItems.length === 0) return null;
+
+          return (
+            <div key={group.title}>
+              <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3">
+                {group.title}
+              </h2>
+              <div className="space-y-1">
+                {filteredItems.map((item) => {
+                  const isActive =
+                    location.pathname === item.href ||
+                    (item.href !== '/' && location.pathname.startsWith(item.href));
+                  return (
+                    <SidebarNavItem
+                      key={item.name}
+                      item={item}
+                      isActive={isActive}
+                      onItemClick={onItemClick}
+                    />
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
-        <div className="flex flex-col text-xs">
-          {isSyncing ? (
-            <div className="flex items-center space-x-2 space-x-reverse text-blue-500">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>جاري المزامنة...</span>
-            </div>
-          ) : !isOnline ? (
+        <div className="flex flex-col text-xs flex-1 truncate">
+          {!isOnline && (
             <div className="flex items-center space-x-2 space-x-reverse text-rose-500">
               <WifiOff className="w-3.5 h-3.5" />
-              <span>غير متصل ({pendingCount} معلق)</span>
+              <span className="truncate">غير متصل</span>
             </div>
-          ) : pendingCount > 0 ? (
-            <div className="flex items-center space-x-2 space-x-reverse text-amber-500">
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>{pendingCount} بانتظار المزامنة</span>
-            </div>
-          ) : (
+          )}
+          {isOnline && (
             <div className="flex items-center space-x-2 space-x-reverse text-emerald-500">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>متزامن</span>
+              <span className="truncate">متصل</span>
             </div>
           )}
         </div>
@@ -293,23 +289,25 @@ export function Layout() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 dark:bg-slate-950 flex transition-colors duration-150 animate-fade-in">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex overflow-hidden font-cairo" dir="rtl">
       {/* Desktop Sidebar */}
-      <aside className="w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col hidden md:flex shrink-0">
-        <div className="py-5 px-6 flex flex-col items-center justify-center border-b border-slate-200 dark:border-slate-700 shrink-0 gap-2">
-          <Link to="/" className="flex flex-col items-center gap-1.5 group">
-            <MasarLogo size="md" className="transition-transform duration-300 group-hover:scale-105" />
-            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 tracking-tight animate-slogan-glow text-center select-none">
-              مسار — حصصك من غير دوشة
-            </span>
-          </Link>
-        </div>
+      {showNav && (
+        <aside className="w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col hidden md:flex shrink-0">
+          <div className="py-5 px-6 flex flex-col items-center justify-center border-b border-slate-200 dark:border-slate-700 shrink-0 gap-2">
+            <Link to="/" className="flex flex-col items-center gap-1.5 group">
+              <MasarLogo size="md" className="transition-transform duration-300 group-hover:scale-105" />
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 tracking-tight animate-slogan-glow text-center select-none">
+                مسار — حصصك من غير دوشة
+              </span>
+            </Link>
+          </div>
 
-        {renderNavContent()}
-      </aside>
+          {renderNavContent()}
+        </aside>
+      )}
 
       {/* Mobile Slide-over Drawer */}
-      {isMobileMenuOpen && (
+      {showNav && isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           {/* Backdrop */}
           <div
@@ -346,44 +344,50 @@ export function Layout() {
         <header className="bg-white dark:bg-slate-900 h-16 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 md:px-8 shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile Hamburger Menu Toggle */}
-            <button
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="md:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              aria-label="فتح القائمة الرئيسية"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+            {showNav && (
+              <button
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="md:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                aria-label="فتح القائمة الرئيسية"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
 
-            {/* Mobile logo */}
-            <Link to="/" className="md:hidden flex items-center shrink-0">
-              <MasarLogo size="sm" />
+            {/* Mobile logo or Blocked Logo */}
+            <Link to="/" className={cn("flex items-center shrink-0", showNav && "md:hidden")}>
+              <MasarLogo size="sm" showText={!showNav} />
             </Link>
 
             {/* Desktop Quick Search */}
-            <div className="hidden md:flex items-center gap-2">
-              <button
-                onClick={() => setIsCommandPaletteOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg text-xs font-medium transition-colors"
-                title="البحث والأوامر السريعة (Ctrl+K)"
-              >
-                <Search className="w-3.5 h-3.5 text-slate-400" />
-                <span>بحث في مسار...</span>
-                <kbd className="font-mono text-[10px] px-1 py-0.5 bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-700 dark:border-slate-600 mr-1">
-                  Ctrl+K
-                </kbd>
-              </button>
-            </div>
+            {showNav && (
+              <div className="hidden md:flex items-center gap-2">
+                <button
+                  onClick={() => setIsCommandPaletteOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg text-xs font-medium transition-colors"
+                  title="البحث والأوامر السريعة (Ctrl+K)"
+                >
+                  <Search className="w-3.5 h-3.5 text-slate-400" />
+                  <span>بحث في مسار...</span>
+                  <kbd className="font-mono text-[10px] px-1 py-0.5 bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-700 dark:border-slate-600 mr-1">
+                    Ctrl+K
+                  </kbd>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
             {/* Mobile search button */}
-            <button
-              onClick={() => setIsCommandPaletteOpen(true)}
-              className="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              title="بحث سريع"
-            >
-              <Search className="w-4 h-4" />
-            </button>
+            {showNav && (
+              <button
+                onClick={() => setIsCommandPaletteOpen(true)}
+                className="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                title="بحث سريع"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            )}
 
             {/* User Profile & Signout */}
             <div className="flex items-center gap-2 mr-1">
@@ -402,14 +406,16 @@ export function Layout() {
           )}>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">
-                {subscription.days_remaining <= 3 
+                {subscription.days_remaining === 1
+                  ? 'باقي يوم واحد فقط على انتهاء فترتك التجريبية'
+                  : subscription.days_remaining === 2
+                  ? 'باقي يومان فقط على انتهاء فترتك التجريبية'
+                  : subscription.days_remaining <= 10
                   ? `باقي ${subscription.days_remaining} أيام فقط على انتهاء فترتك التجريبية`
                   : `باقي ${subscription.days_remaining} يوماً في فترتك التجريبية`}
               </span>
-              <a 
-                href="https://masar.top/pricing"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                to="/upgrade"
                 className={cn(
                   "text-xs font-bold px-3 py-1 rounded-full transition-colors",
                   subscription.days_remaining <= 3 
@@ -418,7 +424,7 @@ export function Layout() {
                 )}
               >
                 الترقية الآن
-              </a>
+              </Link>
             </div>
             <button 
               onClick={() => setHideTrialBanner(true)}

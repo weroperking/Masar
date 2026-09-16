@@ -1,12 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { 
   FileText, Plus, Search, Edit2, Trash2, X, Users, CheckCircle, 
   GraduationCap, Check, Sparkles, UserPlus, SlidersHorizontal, Calculator 
 } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
-import { Assessment, Student, Course } from '../../types';
+import { Assessment, Student, Course, Group, Enrollment, AssessmentGrade } from '../../types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '../../context/ToastContext';
@@ -20,18 +18,28 @@ export function Assessments() {
   const [editingAssessment, setEditingAssessment] = useState<Assessment | null>(null);
   const [gradingAssessment, setGradingAssessment] = useState<Assessment | null>(null);
 
-  const assessments = useLiveQuery(() => db.assessments.filter(a => !a.deleted_at).toArray(), []);
-  const courses = useLiveQuery(() => db.courses.filter(c => !c.deleted_at).toArray(), []);
-  const groups = useLiveQuery(() => db.groups.filter(g => !g.deleted_at).toArray(), []);
-  const enrollments = useLiveQuery(() => db.enrollments.where('status').equals('active').filter(e => !e.deleted_at).toArray(), []);
-  const allGrades = useLiveQuery(() => db.assessmentGrades.filter(g => !g.deleted_at).toArray(), []);
+  const { data: allAssessments = [] } = useApiQuery<Assessment>('assessments', 60 * 1000);
+  const assessments = allAssessments.filter(a => !a.deleted_at);
+  const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const courses = allCourses.filter(c => !c.deleted_at);
+  const { data: allGroups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+  const groups = allGroups.filter(g => !g.deleted_at);
+  const { data: allEnrollments = [] } = useApiQuery<Enrollment>('enrollments', 60 * 1000);
+  const enrollments = allEnrollments.filter(e => e.status === 'active' && !e.deleted_at);
+  const { data: allStudentsRaw = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const allStudents = allStudentsRaw.filter(s => !s.deleted_at);
+  const { data: allGradesUnfiltered = [] } = useApiQuery<AssessmentGrade>('assessment-grades', 60 * 1000);
+  const allGrades = allGradesUnfiltered.filter(g => !g.deleted_at);
+
+  const { remove: removeAssessment } = useApiMutation<Assessment>('assessments');
+  const { remove: removeGrade } = useApiMutation<AssessmentGrade>('assessment-grades');
 
   const courseMap = new Map(courses?.map(c => [c.id, c.name]));
 
   const filteredAssessments = assessments?.filter(a => 
     a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (courseMap.get(a.courseId) || '').toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a, b) => b.created_at - a.created_at);
+  ).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
 
   const handleDelete = async (id: string) => {
     const isConfirmed = await confirm({
@@ -44,21 +52,10 @@ export function Assessments() {
     });
 
     if (isConfirmed) {
-      const now = Date.now();
-      // Soft-delete the assessment
-      await db.assessments.update(id, {
-        deleted_at: now,
-        updated_at: now,
-        sync_status: 'pending'
-      });
-      // Soft-delete associated grades
-      const gradesToDelete = allGrades?.filter(g => g.assessmentId === id && !g.deleted_at) || [];
+      removeAssessment.mutate(id);
+      const gradesToDelete = allGrades?.filter(g => g.assessmentId === id) || [];
       for (const grade of gradesToDelete) {
-        await db.assessmentGrades.update(grade.id, {
-          deleted_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        });
+        removeGrade.mutate(grade.id);
       }
       toast.success('تم حذف التقييم بنجاح');
     }
@@ -208,6 +205,10 @@ export function Assessments() {
         <GradingModal 
           assessment={gradingAssessment}
           onClose={() => setGradingAssessment(null)}
+          groups={groups}
+          enrollments={enrollments}
+          allStudents={allStudents}
+          existingGrades={allGrades.filter(g => g.assessmentId === gradingAssessment.id)}
         />
       )}
     </div>
@@ -223,6 +224,7 @@ function AssessmentFormModal({
   courses: Course[];
   existingAssessment: Assessment | null;
 }) {
+  const { create: createAssessment, update: updateAssessment } = useApiMutation<Assessment>('assessments');
   const [formData, setFormData] = useState({
     name: existingAssessment?.name || '',
     type: existingAssessment?.type || 'exam',
@@ -236,22 +238,14 @@ function AssessmentFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const now = Date.now();
     
     if (existingAssessment) {
-      await db.assessments.update(existingAssessment.id, {
-        ...formData,
-        updated_at: now,
-        sync_status: 'pending'
+      updateAssessment.mutate({
+        id: existingAssessment.id,
+        data: formData
       });
     } else {
-      await db.assessments.add({
-        id: uuidv4(),
-        ...formData,
-        created_at: now,
-        updated_at: now,
-        sync_status: 'pending'
-      });
+      createAssessment.mutate(formData as unknown as Assessment);
     }
     
     onClose();
@@ -380,15 +374,21 @@ function AssessmentFormModal({
 
 function GradingModal({ 
   assessment, 
-  onClose 
+  onClose,
+  groups,
+  enrollments,
+  allStudents,
+  existingGrades
 }: { 
   assessment: Assessment; 
   onClose: () => void; 
+  groups: Group[];
+  enrollments: Enrollment[];
+  allStudents: Student[];
+  existingGrades: AssessmentGrade[];
 }) {
   const toast = useToast();
-  const groups = useLiveQuery(() => db.groups.toArray(), []);
-  const enrollments = useLiveQuery(() => db.enrollments.where('status').equals('active').toArray(), []);
-  const allStudents = useLiveQuery(() => db.students.filter(s => !s.deleted_at).toArray(), []);
+  const { create: createGrade, update: updateGrade } = useApiMutation<AssessmentGrade>('assessment-grades');
   
   const [scope, setScope] = useState<'course' | 'all'>('course');
   const [searchQuery, setSearchQuery] = useState('');
@@ -435,11 +435,6 @@ function GradingModal({
       (s.phone && s.phone.includes(q))
     );
   }, [activeStudentList, searchQuery]);
-
-  const existingGrades = useLiveQuery(
-    () => db.assessmentGrades.where('assessmentId').equals(assessment.id).filter(g => !g.deleted_at).toArray(),
-    [assessment.id]
-  );
   
   const [gradesMap, setGradesMap] = useState<Record<string, string>>({});
   const [isSaved, setIsSaved] = useState(false);
@@ -501,25 +496,22 @@ function GradingModal({
       
       if (existing) {
         if (existing.grade.toString() !== gradeVal) {
-          await db.assessmentGrades.update(existing.id, {
-            grade: parsedGrade,
-            gradedAt: now,
-            updated_at: now,
-            sync_status: 'pending'
+          updateGrade.mutate({
+            id: existing.id,
+            data: {
+              grade: parsedGrade,
+              gradedAt: now
+            }
           });
           savedCount++;
         }
       } else {
-        await db.assessmentGrades.add({
-          id: uuidv4(),
+        createGrade.mutate({
           assessmentId: assessment.id,
           studentId: student.id,
           grade: parsedGrade,
-          gradedAt: now,
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        });
+          gradedAt: now
+        } as AssessmentGrade);
         savedCount++;
       }
     }

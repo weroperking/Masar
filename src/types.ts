@@ -63,6 +63,9 @@ export interface Enrollment extends BaseRecord {
   courseId: string;
   enrolledAt: string;
   status: 'active' | 'withdrawn' | 'completed';
+  pricingMode?: 'default' | 'custom' | 'discount' | 'free';
+  customPrice?: number;
+  discountPercentage?: number;
 }
 
 export interface AttendanceSession extends BaseRecord {

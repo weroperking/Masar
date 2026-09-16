@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { Wallet, Search, Plus, X, Trash2, CheckCircle2, Edit2 } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
-import { SessionPayment } from '../../types';
+import { SessionPayment, Student, Course, AttendanceSession, LedgerEntry } from '../../types';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
@@ -16,17 +14,23 @@ export function SessionPayments() {
   const [editingPayment, setEditingPayment] = useState<SessionPayment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const payments = useLiveQuery(() => {
-    return db.sessionPayments.filter(p => {
-      if (p.deleted_at) return false;
-      if (activeTab !== 'all' && p.type !== activeTab) return false;
-      return true;
-    }).toArray();
-  }, [activeTab]);
+  const { data: allPayments = [] } = useApiQuery<SessionPayment>('session-payments', 60 * 1000);
+  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendance-sessions', 60 * 1000);
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
 
-  const sessions = useLiveQuery(() => db.attendanceSessions.toArray(), []);
-  const students = useLiveQuery(() => db.students.toArray(), []);
-  const courses = useLiveQuery(() => db.courses.toArray(), []);
+  const { remove: removePayment, update: updatePayment } = useApiMutation<SessionPayment>('session-payments');
+  const { create: createLedgerEntry } = useApiMutation<LedgerEntry>('ledger-entries');
+
+  const payments = allPayments.filter(p => {
+    if (p.deleted_at) return false;
+    if (activeTab !== 'all' && p.type !== activeTab) return false;
+    return true;
+  });
+
+  const sessions = allSessions.filter(s => !s.deleted_at);
+  const students = allStudents.filter(s => !s.deleted_at);
+  const courses = allCourses.filter(c => !c.deleted_at);
 
   const studentMap = new Map(students?.map(s => [s.id, s.name]));
   const courseMap = new Map(courses?.map(c => [c.id, c.name]));
@@ -34,14 +38,9 @@ export function SessionPayments() {
 
   // Financial calculations
   const totalEarned = payments?.reduce((acc, p) => {
-    // Earned Revenue: sum of amount where the linked session is completed.
-    // If it's a package (no sessionId), we can count it as earned or prorate it, 
-    // but based on instructions we check if linked session is completed.
-    // For packages without a sessionId, we'll count the amount paid as earned or just the amount.
-    // Let's count packages as earned if they are paid, and fees as earned if session is completed.
     let isEarned = false;
     if (p.type === 'package') {
-       isEarned = true; // Package revenue is recognized upon purchase in this simple model
+       isEarned = true; 
     } else if (p.sessionId) {
        const session = sessionMap.get(p.sessionId);
        if (session?.status === 'completed') {
@@ -73,11 +72,7 @@ export function SessionPayments() {
     });
 
     if (isConfirmed) {
-      await db.sessionPayments.update(id, {
-        deleted_at: Date.now(),
-        updated_at: Date.now(),
-        sync_status: 'pending'
-      });
+      removePayment.mutate(id);
       toast.success('تم حذف الدفعة بنجاح');
     }
   };
@@ -86,26 +81,25 @@ export function SessionPayments() {
     const remaining = payment.amount - payment.paidAmount;
     if (remaining <= 0) return;
 
-    await db.sessionPayments.update(payment.id, {
-      paidAmount: payment.amount,
-      status: 'paid',
-      updated_at: Date.now()
+    updatePayment.mutate({
+      id: payment.id,
+      data: {
+        paidAmount: payment.amount,
+        status: 'paid'
+      }
     });
 
-    // Record ledger revenue
-    await db.ledgerEntries.add({
-      id: uuidv4(),
+    createLedgerEntry.mutate({
       type: 'revenue',
       category: 'تسديد متأخرات حصص',
       amount: remaining,
       date: new Date().toISOString().split('T')[0],
       description: `تسديد باقي رسوم الحصة للطالب ${studentMap.get(payment.studentId)}`,
       relatedType: 'session',
-      relatedId: payment.id,
-      created_at: Date.now(),
-      updated_at: Date.now(),
-      sync_status: 'pending'
-    });
+      relatedId: payment.id
+    } as LedgerEntry);
+
+    toast.success('تم التسديد بنجاح');
   };
 
   return (
@@ -281,6 +275,8 @@ function CreateSessionPaymentModal({
   courses: any[];
   initialData?: SessionPayment | null;
 }) {
+  const { create: createPayment, update: updatePayment } = useApiMutation<SessionPayment>('session-payments');
+  const { create: createLedgerEntry } = useApiMutation<LedgerEntry>('ledger-entries');
   const [formData, setFormData] = useState({
     studentId: initialData?.studentId || students[0]?.id || '',
     courseId: initialData?.courseId || courses[0]?.id || '',
@@ -302,21 +298,20 @@ function CreateSessionPaymentModal({
     const now = Date.now();
     
     if (initialData) {
-      await db.sessionPayments.update(initialData.id, {
-        studentId: formData.studentId,
-        courseId: formData.courseId,
-        type: formData.type,
-        amount: toMinorUnits(amountNum),
-        paidAmount: toMinorUnits(paidNum),
-        date: formData.date,
-        status,
-        updated_at: now,
-        sync_status: 'pending'
+      updatePayment.mutate({
+        id: initialData.id,
+        data: {
+          studentId: formData.studentId,
+          courseId: formData.courseId,
+          type: formData.type,
+          amount: toMinorUnits(amountNum),
+          paidAmount: toMinorUnits(paidNum),
+          date: formData.date,
+          status
+        }
       });
     } else {
-      const newPaymentId = uuidv4();
-      const newPayment: SessionPayment = {
-        id: newPaymentId,
+      const newPayment: Partial<SessionPayment> = {
         studentId: formData.studentId,
         courseId: formData.courseId,
         sessionId: null,
@@ -324,30 +319,26 @@ function CreateSessionPaymentModal({
         amount: toMinorUnits(amountNum),
         paidAmount: toMinorUnits(paidNum),
         date: formData.date,
-        status,
-        created_at: now,
-        updated_at: now,
-        sync_status: 'pending'
+        status
       };
 
-      await db.sessionPayments.add(newPayment);
-
-      // If paid > 0, record in ledgerEntries as revenue
-      if (paidNum > 0) {
-        await db.ledgerEntries.add({
-          id: uuidv4(),
-          type: 'revenue',
-          category: formData.type === 'fee' ? 'رسوم حصص' : 'اشتراكات باقات',
-          amount: toMinorUnits(paidNum),
-          date: formData.date,
-          description: `تحصيل رسوم للطالب`,
-          relatedType: 'session',
-          relatedId: newPaymentId,
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
-        });
-      }
+      createPayment.mutate(newPayment as SessionPayment, {
+        onSuccess: (createdPayment) => {
+          // If paid > 0, record in ledgerEntries as revenue using centralized helper
+          if (paidNum > 0) {
+            const studentName = students.find(s => s.id === formData.studentId)?.name || 'طالب';
+            createLedgerEntry.mutate({
+              type: 'revenue',
+              category: formData.type === 'fee' ? 'رسوم حصص' : 'اشتراكات باقات',
+              amount: toMinorUnits(paidNum),
+              date: formData.date,
+              description: `تحصيل رسوم (${formData.type === 'fee' ? 'حصة' : 'باقة'}) للطالب ${studentName}`,
+              relatedType: 'session',
+              relatedId: createdPayment.id
+            } as LedgerEntry);
+          }
+        }
+      });
     }
 
     onClose();

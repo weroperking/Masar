@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { Calendar as CalendarIcon, Users, Clock, Play, CheckCircle, Filter } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
+import { Group, Course, Enrollment, AttendanceSession } from '../../types';
 
 export function Schedule() {
   const navigate = useNavigate();
@@ -16,11 +15,15 @@ export function Schedule() {
   const [courseFilter, setCourseFilter] = useState<string>('all');
   const [roomFilter, setRoomFilter] = useState<string>('all');
   
-  const groups = useLiveQuery(() => db.groups.toArray(), []);
-  const courses = useLiveQuery(() => db.courses.toArray(), []);
-  const enrollments = useLiveQuery(() => db.enrollments.filter(e => e.status === 'active').toArray(), []);
-  const activeSessions = useLiveQuery(() => db.attendanceSessions.where('status').equals('live').toArray(), []);
+  const { data: groups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+  const { data: courses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const { data: allEnrollments = [] } = useApiQuery<Enrollment>('enrollments', 60 * 1000);
+  const enrollments = allEnrollments.filter(e => e.status === 'active');
+  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendance-sessions', 60 * 1000);
+  const activeSessions = allSessions.filter(s => s.status === 'live');
   
+  const { create: createSession } = useApiMutation<AttendanceSession>('attendance-sessions');
+
   const courseMap = new Map(courses?.map(c => [c.id, c.name]));
   const arabicDays = ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
   const uniqueRooms = Array.from(new Set(groups?.map(g => g.room).filter(Boolean))) as string[];
@@ -53,19 +56,18 @@ export function Schedule() {
 
   const handleStartSession = async (groupId: string, courseId: string, isTrial: boolean = false) => {
     const now = Date.now();
-    await db.attendanceSessions.add({
-      id: uuidv4(),
+    createSession.mutate({
       groupId,
       courseId,
       isTrial,
       startedAt: now,
       endedAt: null,
-      status: 'live',
-      created_at: now,
-      updated_at: now,
-      sync_status: 'pending'
+      status: 'live'
+    }, {
+      onSuccess: () => {
+        toast.success(isTrial ? 'تم بدء الحصة التجريبية. انتقل لصفحة الحضور لإدارتها.' : 'تم بدء الحصة. انتقل لصفحة الحضور لإدارتها.');
+      }
     });
-    toast.success(isTrial ? 'تم بدء الحصة التجريبية. انتقل لصفحة الحضور لإدارتها.' : 'تم بدء الحصة. انتقل لصفحة الحضور لإدارتها.');
   };
 
   return (

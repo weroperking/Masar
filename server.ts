@@ -34,8 +34,17 @@ interface LookupData {
   };
 }
 
+// Server-side storage for upgrade proposals
+interface UpgradeProposalRecord {
+  orgId: string;
+  requestedPlan: string;
+  status: 'pending' | 'approved' | 'rejected' | 'none';
+  createdAt: string;
+}
+
 const lookupTokensMap = new Map<string, LookupData>();
 const studentToTokenMap = new Map<string, string>();
+const upgradeProposalsMap = new Map<string, UpgradeProposalRecord>();
 
 async function startServer() {
   const app = express();
@@ -51,27 +60,205 @@ async function startServer() {
     res.json({ status: 'ok' });
   });
 
-  // Center SaaS subscription status endpoint
-  const handleSubscriptionStatus = (req: express.Request, res: express.Response) => {
-    const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-    res.status(200).json({
-      plan: 'trial',
-      status: 'trialing',
-      trial_ends_at: trialEnds,
-      days_remaining: 14,
-      limits: {
-        max_branches: 5,
-        max_students: 1000,
-        inventory_sales: true,
-        combined_packages: true,
-        advanced_analytics: true,
-        api_access: true,
-      },
-    });
+  // Center SaaS subscription status endpoint (Proxy)
+  const handleSubscriptionStatus = async (req: express.Request, res: express.Response) => {
+    const authHeader = req.headers.authorization;
+    const orgId = req.query.orgId as string;
+    
+    // First, check local memory for approved upgrade proposals
+    if (orgId) {
+      const localProposal = upgradeProposalsMap.get(orgId);
+      if (localProposal && localProposal.status === 'approved') {
+        return res.status(200).json({
+          plan: localProposal.requestedPlan,
+          status: 'active',
+          trial_ends_at: null,
+          days_remaining: 0,
+          limits: {
+            max_branches: 10,
+            max_students: 5000,
+            inventory_sales: true,
+            combined_packages: true,
+            advanced_analytics: true,
+            api_access: true,
+          }
+        });
+      }
+    }
+
+    try {
+      const targetUrl = `https://masar-api.weroperking.workers.dev/api/me/subscription-status${orgId ? `?orgId=${orgId}` : ''}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const response = await fetch(targetUrl, {
+        signal: controller.signal,
+        headers: {
+          'Authorization': authHeader || ''
+        }
+      });
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[Subscription Proxy] Upstream OK for org ${orgId}:`, JSON.stringify(data));
+        return res.status(200).json(data);
+      } else if (response.status === 402) {
+        const errData = await response.json().catch(() => ({}));
+        console.log(`[Subscription Proxy] Upstream 402 for org ${orgId}:`, JSON.stringify(errData));
+        return res.status(402).json(errData);
+      }
+      
+      console.warn(`[Subscription Proxy] Upstream returned status ${response.status} for org ${orgId}`);
+      // If the upstream doesn't exist or returns 404, return 404 to let frontend fallback smoothly
+      return res.status(404).json({ error: 'Not found' });
+    } catch (error) {
+      console.warn('[Proxy Warning] Fetch subscription status timed out or failed:', error);
+      return res.status(404).json({ error: 'Upstream unavailable' });
+    }
   };
 
   app.get('/api/me/subscription-status', handleSubscriptionStatus);
   app.get('/me/subscription-status', handleSubscriptionStatus);
+
+  // Server-side Proxy for Upgrade Proposals (bypasses browser CORS issues)
+  const handleProposalStatus = async (req: express.Request, res: express.Response) => {
+    const orgId = req.params.id;
+    const authHeader = req.headers.authorization;
+    
+    // Check local store first if proposal is pending
+    const localProposal = upgradeProposalsMap.get(orgId);
+    if (localProposal && localProposal.status === 'pending') {
+      return res.status(200).json({
+        status: localProposal.status,
+        requested_plan: localProposal.requestedPlan,
+        requestedPlan: localProposal.requestedPlan,
+        created_at: localProposal.createdAt
+      });
+    }
+
+    try {
+      const targetUrl = `https://masar-api.weroperking.workers.dev/api/orgs/${orgId}/upgrade-proposal/status`;
+      console.log(`[Proxy] GET status from upstream: ${targetUrl}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+      const response = await fetch(targetUrl, {
+        signal: controller.signal,
+        headers: {
+          'Authorization': authHeader || ''
+        }
+      });
+      clearTimeout(timeoutId);
+      
+      const responseText = await response.text();
+      console.log(`[Proxy] Upstream status response (${response.status}):`, responseText);
+
+      // If upstream returns 402 NO_SUBSCRIPTION or status: none, it's a valid initial state (not an error)
+      if (response.status === 402 || !response.ok) {
+        return res.status(200).json({ status: localProposal?.status || 'none', plan: 'none' });
+      }
+      
+      try {
+        const data = JSON.parse(responseText);
+        if (data.status === 'pending' || data.status === 'approved') {
+          upgradeProposalsMap.set(orgId, {
+            orgId,
+            requestedPlan: data.requested_plan || data.requestedPlan || 'pro',
+            status: data.status,
+            createdAt: data.created_at || new Date().toISOString()
+          });
+        }
+        return res.status(200).json(data);
+      } catch {
+        return res.status(200).json({ status: localProposal?.status || 'none' });
+      }
+    } catch (error: any) {
+      console.warn('[Proxy Warning] Fetch proposal status timed out or failed:', error);
+      return res.status(200).json({ status: localProposal?.status || 'none', plan: 'none' });
+    }
+  };
+
+  app.get('/api/orgs/:id/upgrade-proposal/status', handleProposalStatus);
+  app.get('/orgs/:id/upgrade-proposal/status', handleProposalStatus);
+
+  const handleProposalSubmit = async (req: express.Request, res: express.Response) => {
+    const orgId = req.params.id;
+    const authHeader = req.headers.authorization;
+    const requestedPlan = req.body.requested_plan || req.body.requestedPlan || 'pro';
+
+    // Store in memory so it persists across refreshes
+    const proposalRecord: UpgradeProposalRecord = {
+      orgId,
+      requestedPlan,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+    upgradeProposalsMap.set(orgId, proposalRecord);
+    console.log(`[Proxy] Recorded upgrade proposal in memory for org ${orgId} to plan ${requestedPlan}`);
+
+    try {
+      const targetUrl = `https://masar-api.weroperking.workers.dev/api/orgs/${orgId}/upgrade-proposal`;
+      console.log(`[Proxy] POST proposal to upstream: ${targetUrl}`);
+      
+      const payload = {
+        ...req.body,
+        requestedPlan,
+        requested_plan: requestedPlan
+      };
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+      const response = await fetch(targetUrl, {
+        signal: controller.signal,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader || ''
+        },
+        body: JSON.stringify(payload)
+      });
+      clearTimeout(timeoutId);
+      
+      const responseText = await response.text();
+      console.log(`[Proxy] Upstream submit response (${response.status}):`, responseText);
+
+      if (response.ok) {
+        try {
+          const data = JSON.parse(responseText);
+          return res.status(200).json(data);
+        } catch {
+          return res.status(200).json({
+            success: true,
+            status: 'pending',
+            requested_plan: requestedPlan,
+            requestedPlan
+          });
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        status: 'pending',
+        requested_plan: requestedPlan,
+        requestedPlan,
+        message: 'تم استلام وتسجيل طلب الترقية بنجاح'
+      });
+    } catch (error: any) {
+      console.warn('[Proxy Warning] Upstream submit timed out or failed, but proposal is saved locally:', error);
+      return res.status(200).json({
+        success: true,
+        status: 'pending',
+        requested_plan: requestedPlan,
+        requestedPlan,
+        message: 'تم استلام وتسجيل طلب الترقية بنجاح'
+      });
+    }
+  };
+
+  app.post('/api/orgs/:id/upgrade-proposal', handleProposalSubmit);
+  app.post('/orgs/:id/upgrade-proposal', handleProposalSubmit);
 
   // Public Student Lookup endpoint (accessible with zero authentication)
   const handlePublicLookup = (req: express.Request, res: express.Response) => {

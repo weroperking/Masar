@@ -1,21 +1,21 @@
-import { Save, Sun, Moon, Monitor, Keyboard, Trash2, AlertTriangle, Database, RefreshCw } from 'lucide-react';
+import { Save, Sun, Moon, Keyboard, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { db } from '../../db/db';
+import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { Settings as SettingsType } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useConfirm } from '../../context/ConfirmContext';
-import { useSubscription } from '../../context/SubscriptionContext';
-import { clearAllData } from '../../db/seed';
 
 export function Settings() {
-  const { subscription } = useSubscription();
   const toast = useToast();
   const { theme, setTheme } = useTheme();
   const { confirm } = useConfirm();
 
+  const { data: settingsData = [] } = useApiQuery<SettingsType>('settings', 60 * 1000);
+  const { create: createSettings, update: updateSettings } = useApiMutation<SettingsType>('settings');
+
   const [settings, setSettings] = useState<Partial<SettingsType>>({
-    autoStartEndSessions: false,
+    autoStartEndSessions: true,
     autoConfirmPaymentOnAttendance: true,
     autoCreateAssignmentPerSession: false,
     freeSessionLimitPerStudent: 1,
@@ -23,33 +23,22 @@ export function Settings() {
     numericMaxGrade: 100
   });
 
-  const [isClearing, setIsClearing] = useState(false);
-
   useEffect(() => {
-    // Load from db.settings if available
-    db.settings.toArray().then(items => {
-      if (items.length > 0) {
-        setSettings(prev => ({ ...prev, ...items[0] }));
-      }
-    }).catch(console.error);
-  }, []);
+    if (settingsData && settingsData.length > 0) {
+      setSettings(prev => ({ ...prev, ...settingsData[0] }));
+    }
+  }, [settingsData]);
 
   const handleSave = async () => {
     try {
-      const existing = await db.settings.toArray();
-      const now = Date.now();
-      if (existing.length > 0) {
-        await db.settings.update(existing[0].id, {
-          ...settings,
-          updated_at: now
+      if (settingsData.length > 0) {
+        updateSettings.mutate({
+          id: settingsData[0].id,
+          data: settings
         });
       } else {
-        await db.settings.add({
-          id: 'default-settings',
-          ...settings,
-          created_at: now,
-          updated_at: now,
-          sync_status: 'pending'
+        createSettings.mutate({
+          ...settings
         } as SettingsType);
       }
       toast.success('تم حفظ إعدادات النظام بنجاح!');
@@ -223,66 +212,66 @@ export function Settings() {
           )}
         </section>
 
-        {/* API Access Section */}
-        {subscription?.limits?.api_access && (
-          <section>
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
-              الوصول البرمجي (API)
-            </h2>
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                مفاتيح الوصول البرمجي الخاص بك للربط مع الأنظمة الخارجية.
-              </p>
-              <button className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg text-sm font-medium border border-slate-200 dark:border-slate-700">
-                توليد مفتاح جديد
-              </button>
-            </div>
-          </section>
-        )}
-
-        {/* Data Management Section */}
+        {/* System Updates Section */}
         <section className="pt-4 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2 mb-2 text-red-600 dark:text-red-400">
-            <Database className="w-5 h-5" />
-            <h2 className="text-base font-bold">إدارة قاعدة البيانات وتفريغ الحساب</h2>
+          <div className="flex items-center gap-2 mb-2 text-blue-600 dark:text-blue-400">
+            <RefreshCw className="w-5 h-5" />
+            <h2 className="text-base font-bold">تحديث ملفات النظام المؤقتة</h2>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-            تحكم كامل في سجلات حسابك. تم إيقاف توليد البيانات التجريبية نهائياً لضمان بقاء حسابك نظيفاً ومخصصاً لطلابك ومجموعاتك الحقيقية فقط.
+            في حالة عدم ظهور التحديثات الأخيرة للمنصة أو وجود مشاكل في العرض، استخدم هذا الخيار لمسح الملفات المؤقتة وملفات تعريف الارتباط الخاصة بالمنصة وإجبار المتصفح على جلب أحدث إصدار (لن يتم مسح بيانات الطلاب أو المجموعات).
           </p>
-
-          <div className="p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-xs font-bold text-red-900 dark:text-red-200">مسح وتصفير كافة سجلات البيانات</h3>
-              <p className="text-[11px] text-red-700/80 dark:text-red-300/80 mt-0.5">
-                حذف جميع الطلاب، المجموعات، الكورسات، الحصص، المدفوعات، والمنتجات الحالية للبدء من الصفر تماماً. لن يتم إنشاء أي بيانات وهمية تلقائياً بعد الآن.
-              </p>
+              <h3 className="text-xs font-bold text-blue-900 dark:text-blue-200">مسح الكاش وفرض التحديث</h3>
             </div>
             <button
               type="button"
-              disabled={isClearing}
               onClick={async () => {
                 const ok = await confirm({
-                  title: 'تأكيد تصفير البيانات بالكامل',
-                  message: 'هل أنت متأكد من رغبتك في مسح كافة الطلاب والمجموعات والكورسات والبيانات؟ هذا الإجراء لا يمكن التراجع عنه وسيبدأ الحساب نظيفاً وفارغاً بنسبة 100%.',
-                  confirmText: 'نعم، امسح كل شيء',
+                  title: 'تأكيد فرض التحديث',
+                  message: 'هل ترغب في مسح الكاش وملفات تعريف الارتباط الخاصة بالمنصة وإعادة تحميل الصفحة؟ (لن تتأثر بياناتك).',
+                  confirmText: 'نعم، قم بالتحديث',
                   cancelText: 'إلغاء'
                 });
+                
                 if (ok) {
-                  try {
-                    setIsClearing(true);
-                    await clearAllData();
-                    toast.success('تم مسح جميع البيانات بنجاح، الحساب الآن فارغ وجاهز لبياناتك الحقيقية.');
-                  } catch (e) {
-                    toast.error('حدث خطأ أثناء مسح البيانات');
-                  } finally {
-                    setIsClearing(false);
+                  // 1. Clear Caches
+                  if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    for (const name of cacheNames) {
+                      await caches.delete(name);
+                    }
                   }
+                  
+                  // 2. Unregister Service Workers
+                  if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                      await registration.unregister();
+                    }
+                  }
+                  
+                  // 3. Clear Cookies for masar.top domains
+                  const cookies = document.cookie.split(";");
+                  for (let i = 0; i < cookies.length; i++) {
+                      const cookie = cookies[i];
+                      const eqPos = cookie.indexOf("=");
+                      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+                      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+                      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;domain=app.masar.top;path=/";
+                      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;domain=.masar.top;path=/";
+                      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;domain=masar.top;path=/";
+                  }
+                  
+                  // 4. Force Reload
+                  window.location.reload();
                 }
               }}
-              className="shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <Trash2 className="w-4 h-4" />
-              <span>{isClearing ? 'جارِ المسح...' : 'مسح كافة البيانات'}</span>
+              <RefreshCw className="w-4 h-4" />
+              <span>تحديث النظام</span>
             </button>
           </div>
         </section>
