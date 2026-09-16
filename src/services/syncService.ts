@@ -328,16 +328,16 @@ async function applyDeltas(data: any): Promise<number> {
       );
 
       const targetTable = (db as any)[table];
-      await db.transaction('rw', targetTable, () => {
-        for (const item of prepared) {
-          if (item.deletedAt || item.deleted_at) {
-            targetTable.delete(item.id);
-          } else {
-            targetTable.put(item);
-          }
-          count++;
-        }
-      });
+      await db.transaction('rw', targetTable, () =>
+        Promise.all(
+          prepared.map((item: any) =>
+            item.deletedAt || item.deleted_at
+              ? targetTable.delete(item.id)
+              : targetTable.put(item)
+          )
+        )
+      );
+      count += prepared.length;
     }
   }
   return count;

@@ -68,9 +68,6 @@ export async function ensureDeviceKeypair(): Promise<CryptoKeyPair> {
   try {
     localStorage.removeItem('masar_device_pub_jwk');
     localStorage.removeItem('masar_device_priv_jwk');
-    if (typeof indexedDB !== 'undefined') {
-      indexedDB.deleteDatabase('MasarKeyDB');
-    }
   } catch {
     // Ignore legacy cleanup errors
   }

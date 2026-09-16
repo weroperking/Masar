@@ -16,6 +16,27 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Dev-only: unregister any stale service worker that is serving the built
+      // bundle instead of live Vite modules. Plain <script> on purpose — no import.meta,
+      // no module context. Hostname-gated so production is unaffected.
+      if (
+        location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1' ||
+        location.hostname.includes('run.app')
+      ) {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (rs) {
+            rs.forEach(function (r) { r.unregister(); });
+          });
+        }
+        if (window.caches) {
+          caches.keys().then(function (ks) {
+            ks.forEach(function (k) { caches.delete(k); });
+          });
+        }
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
