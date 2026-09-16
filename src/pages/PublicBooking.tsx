@@ -13,7 +13,7 @@ export function PublicBooking() {
 
   const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
   const courses = allCourses.filter(c => !c.deleted_at && c.isActive);
-  const { create: createBooking } = useApiMutation<BookingRequest>('booking-requests');
+  const { create: createBooking } = useApiMutation<BookingRequest>('bookingRequests');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -35,28 +35,59 @@ export function Attendance() {
   const handleManualAutoCheck = async () => {
     setIsAutoChecking(true);
     try {
-      const res = await autoScheduleService.checkAndRunSchedules();
-      if (res.started > 0) {
-        toast.success(`تم بدء ${res.started} حصة تلقائياً وفقاً للجدول الزمني!`);
+      const now = new Date();
+      const arabicDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+      const todayName = arabicDays[now.getDay()];
+      
+      const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+      
+      const todaySessions = allSessions.filter(s => s.startedAt >= startOfDay && s.startedAt < endOfDay);
+      const sessionsByGroup = new Set(todaySessions.map(s => s.groupId));
+      
+      let started = 0;
+      
+      for (const group of groups || []) {
+        if (group.status !== 'in_progress') continue;
+        
+        if (group.daysOfWeek && group.daysOfWeek.includes(todayName)) {
+          if (group.startTime && group.startTime <= currentTimeStr && !sessionsByGroup.has(group.id)) {
+            await createSession.mutateAsync({
+              groupId: group.id,
+              courseId: group.courseId,
+              startedAt: Date.now(),
+              endedAt: null,
+              status: 'live'
+            });
+            started++;
+          }
+        }
+      }
+
+      if (started > 0) {
+        toast.success(`تم بدء ${started} حصة تلقائياً وفقاً للجدول الزمني!`);
       } else {
         toast.info('تم فحص الجدول: لا توجد حصص جديدة حان موعد بدئها الآن.');
       }
-    } catch (e) {
-      toast.error('حدث خطأ أثناء فحص الحصص المجدولة');
+    } catch (e: any) {
+      console.error(e);
+      toast.error('حدث خطأ أثناء فحص الحصص المجدولة: ' + (e.message || 'Error'));
     } finally {
       setIsAutoChecking(false);
     }
   };
   
-  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendance-sessions', 30 * 1000);
+  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendanceSessions', 30 * 1000);
   const activeSessions = allSessions.filter(s => s.status === 'live');
   const completedSessions = allSessions.filter(s => s.status === 'completed');
   
-  const { data: allRecords = [] } = useApiQuery<AttendanceRecord>('attendance-records', 30 * 1000);
+  const { data: allRecords = [] } = useApiQuery<AttendanceRecord>('attendanceRecords', 30 * 1000);
   const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
   const students = allStudents.filter(s => !s.deleted_at);
   
-  const { create: createSession, update: updateSession } = useApiMutation<AttendanceSession>('attendance-sessions');
+  const { create: createSession, update: updateSession } = useApiMutation<AttendanceSession>('attendanceSessions');
 
   const courseMap = new Map(courses?.map(c => [c.id, c.name]));
   const groupMap = new Map(groups?.map(g => [g.id, g]));
@@ -70,7 +101,8 @@ export function Attendance() {
       endedAt: null,
       status: 'live'
     }, {
-      onSuccess: () => toast.success(isTrial ? 'تم بدء حصة تجريبية بنجاح!' : 'تم بدء الحصة بنجاح!')
+      onSuccess: () => toast.success(isTrial ? 'تم بدء حصة تجريبية بنجاح!' : 'تم بدء الحصة بنجاح!'),
+      onError: (err: any) => toast.error('حدث خطأ: ' + (err.message || 'فشل في بدء الحصة'))
     });
   };
 
@@ -175,17 +207,27 @@ export function Attendance() {
                     <div className="flex gap-2">
                       <button 
                         onClick={() => handleStartSession(group.id, group.courseId, false)}
-                        className="flex-1 flex items-center justify-center py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-md transition-colors text-xs font-semibold shadow-xs"
+                        disabled={createSession.isPending}
+                        className="flex-1 flex items-center justify-center py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-md transition-colors text-xs font-semibold shadow-xs disabled:opacity-50"
                       >
-                        <Play className="w-3 h-3 ml-1" />
+                        {createSession.isPending ? (
+                          <div className="w-3 h-3 ml-1 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Play className="w-3 h-3 ml-1" />
+                        )}
                         بدء حصة
                       </button>
                       <button 
                         onClick={() => handleStartSession(group.id, group.courseId, true)}
-                        className="flex-1 flex items-center justify-center py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition-colors text-xs font-semibold border border-slate-200 dark:border-slate-700"
+                        disabled={createSession.isPending}
+                        className="flex-1 flex items-center justify-center py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition-colors text-xs font-semibold border border-slate-200 dark:border-slate-700 disabled:opacity-50"
                         title="بدء حصة تجريبية (تطبق حدود حصص التجربة)"
                       >
-                        <Play className="w-3 h-3 ml-1" />
+                        {createSession.isPending ? (
+                          <div className="w-3 h-3 ml-1 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Play className="w-3 h-3 ml-1" />
+                        )}
                         تجربة
                       </button>
                     </div>
@@ -435,17 +477,17 @@ function AttendanceModal({
 
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
-  const { data: allSubscriptions = [] } = useApiQuery<any>('monthly-subscriptions', 60 * 1000);
+  const { data: allSubscriptions = [] } = useApiQuery<any>('monthlySubscriptions', 60 * 1000);
   const currentSubscriptions = allSubscriptions.filter((sub: any) => sub.courseId === session.courseId && sub.month === currentMonth && sub.year === currentYear && !sub.deleted_at);
 
-  const { data: allRecords = [] } = useApiQuery<AttendanceRecord>('attendance-records', 30 * 1000);
+  const { data: allRecords = [] } = useApiQuery<AttendanceRecord>('attendanceRecords', 30 * 1000);
   const existingRecords = allRecords.filter(r => r.sessionId === session.id);
 
   const { data: settingsArray = [] } = useApiQuery<any>('settings', 60 * 1000);
   const settings = settingsArray[0];
   const freeSessionLimit = settings?.freeSessionLimitPerStudent || 1;
 
-  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendance-sessions', 30 * 1000);
+  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendanceSessions', 30 * 1000);
   const allTrialSessions = allSessions.filter(s => s.isTrial);
   const trialSessionIds = allTrialSessions.map(s => s.id);
   const allTrialRecords = allRecords; // Since allRecords already fetched
@@ -455,8 +497,8 @@ function AttendanceModal({
                                             .sort((a,b) => (b.endedAt || 0) - (a.endedAt || 0))[0];
   const prevSessionRecords = prevSession ? allRecords.filter(r => r.sessionId === prevSession.id) : [];
   
-  const { create: createRecord, update: updateRecord } = useApiMutation<AttendanceRecord>('attendance-records');
-  const { data: qrCards = [] } = useApiQuery<any>('qr-cards', 60 * 1000);
+  const { create: createRecord, update: updateRecord } = useApiMutation<AttendanceRecord>('attendanceRecords');
+  const { data: qrCards = [] } = useApiQuery<any>('qrCards', 60 * 1000);
   
   const [recordMap, setRecordMap] = useState<Record<string, 'present' | 'absent'>>({});
   const [isSaved, setIsSaved] = useState(false);

@@ -256,8 +256,11 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
             <button 
               type="submit" 
               disabled={isPending}
-              className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs disabled:opacity-50"
+              className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs disabled:opacity-50 flex items-center justify-center gap-2"
             >
+              {isPending && (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
               {isPending ? 'جاري الحفظ...' : initialData ? 'حفظ التعديلات' : 'حفظ الكورس'}
             </button>
           </div>

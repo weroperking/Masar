@@ -3,7 +3,7 @@ import {
   Student, Course, Group, MonthlySubscription, AttendanceSession, AttendanceRecord, 
   Assessment, AssessmentGrade, Product, CourseProduct, SessionPayment, 
   LedgerEntry, BookingRequest, ProductSale, Event, User, MessageTemplate, 
-  Settings, QrCard, SyncMeta, Enrollment, SubscriptionCache
+  Settings, QrCard, SyncMeta, Enrollment, SubscriptionCache, SyncQueueItem
 } from '../types';
 
 export class AppDatabase extends Dexie {
@@ -29,6 +29,8 @@ export class AppDatabase extends Dexie {
   qrCards!: Table<QrCard>;
   syncMeta!: Table<SyncMeta>;
   subscriptionCache!: Table<SubscriptionCache>;
+  syncQueue!: Table<SyncQueueItem>;
+  keystore!: Table<{ id: string; key?: CryptoKey; keypair?: CryptoKeyPair; value?: any; at?: number; issuedAt?: number }>;
 
   constructor() {
     super('MasarDB');
@@ -67,18 +69,28 @@ export class AppDatabase extends Dexie {
     });
 
     // Version 4 - Rename payments to monthlySubscriptions, add enrollments
-    this.version(5).stores({
-      attendanceRecords: 'id, sessionId, studentId, groupId, status, sync_status'
-    });
-
     this.version(4).stores({
       payments: null, // Drop old table
       monthlySubscriptions: 'id, studentId, courseId, [month+year], status, sync_status',
       enrollments: 'id, studentId, groupId, courseId, status, sync_status'
     });
 
+    this.version(5).stores({
+      attendanceRecords: 'id, sessionId, studentId, groupId, status, sync_status'
+    });
+
     this.version(6).stores({
       subscriptionCache: 'id'
+    });
+
+    // Version 7 - Local-first Sync Queue
+    this.version(7).stores({
+      syncQueue: 'id, entityType, entityId, createdAt'
+    });
+
+    // Version 8 - Dedicated Keystore for non-extractable keys & hydration tracking
+    this.version(8).stores({
+      keystore: 'id'
     });
   }
 }

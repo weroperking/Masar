@@ -1,0 +1,24 @@
+{
+  "name": "مسار — حصصك من غير دوشة",
+  "short_name": "مسار",
+  "description": "منصة مسار لإدارة السناتر والأكاديميات التعليمية",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#2563eb",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

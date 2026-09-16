@@ -48,10 +48,10 @@ export function Dashboard() {
   const activeStudentsCount = allStudents.filter(s => s.isActive && !s.deleted_at).length;
 
   // Queries for Financials
-  const { data: allLedger = [] } = useApiQuery<LedgerEntry>('ledger-entries', 60 * 1000);
+  const { data: allLedger = [] } = useApiQuery<LedgerEntry>('ledgerEntries', 60 * 1000);
   const ledgerEntries = allLedger.filter(e => !e.deleted_at);
-  const { data: payments = [] } = useApiQuery<MonthlySubscription>('monthly-subscriptions', 60 * 1000);
-  const { data: sessionPayments = [] } = useApiQuery<SessionPayment>('session-payments', 60 * 1000);
+  const { data: payments = [] } = useApiQuery<MonthlySubscription>('monthlySubscriptions', 60 * 1000);
+  const { data: sessionPayments = [] } = useApiQuery<SessionPayment>('sessionPayments', 60 * 1000);
 
   // Compute stats based on Date Range
   const stats = useMemo(() => {

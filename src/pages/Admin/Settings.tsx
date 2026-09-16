@@ -1,5 +1,6 @@
-import { Save, Sun, Moon, Keyboard, RefreshCw } from 'lucide-react';
+import { Save, Sun, Moon, Keyboard, RefreshCw, User as UserIcon, Building2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useUser, useOrganization } from '@clerk/clerk-react';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { Settings as SettingsType } from '../../types';
 import { useToast } from '../../context/ToastContext';
@@ -10,6 +11,8 @@ export function Settings() {
   const toast = useToast();
   const { theme, setTheme } = useTheme();
   const { confirm } = useConfirm();
+  const { user } = useUser();
+  const { organization } = useOrganization();
 
   const { data: settingsData = [] } = useApiQuery<SettingsType>('settings', 60 * 1000);
   const { create: createSettings, update: updateSettings } = useApiMutation<SettingsType>('settings');
@@ -20,14 +23,27 @@ export function Settings() {
     autoCreateAssignmentPerSession: false,
     freeSessionLimitPerStudent: 1,
     assignmentGradingMethod: 'numeric',
-    numericMaxGrade: 100
+    numericMaxGrade: 100,
+    teacherName: '',
+    academyName: ''
   });
 
   useEffect(() => {
     if (settingsData && settingsData.length > 0) {
-      setSettings(prev => ({ ...prev, ...settingsData[0] }));
+      setSettings(prev => ({
+        ...prev,
+        ...settingsData[0],
+        teacherName: settingsData[0].teacherName || prev.teacherName || localStorage.getItem('masar_teacher_name') || '',
+        academyName: settingsData[0].academyName || prev.academyName || organization?.name || localStorage.getItem('masar_academy_name') || ''
+      }));
+    } else {
+      setSettings(prev => ({
+        ...prev,
+        teacherName: prev.teacherName || localStorage.getItem('masar_teacher_name') || '',
+        academyName: prev.academyName || organization?.name || localStorage.getItem('masar_academy_name') || ''
+      }));
     }
-  }, [settingsData]);
+  }, [settingsData, organization?.name]);
 
   const handleSave = async () => {
     try {
@@ -41,6 +57,33 @@ export function Settings() {
           ...settings
         } as SettingsType);
       }
+
+      // Sync teacher & academy names to local storage & Clerk metadata
+      if (settings.teacherName) {
+        localStorage.setItem('masar_teacher_name', settings.teacherName);
+        if (organization?.id) {
+          localStorage.setItem(`masar_teacher_name_${organization.id}`, settings.teacherName);
+        }
+        if (user) {
+          try {
+            await user.update({
+              unsafeMetadata: {
+                ...(user.unsafeMetadata || {}),
+                teacherName: settings.teacherName
+              }
+            });
+          } catch (e) {
+            console.warn('Could not update clerk metadata:', e);
+          }
+        }
+      }
+      if (settings.academyName) {
+        localStorage.setItem('masar_academy_name', settings.academyName);
+        if (organization?.id) {
+          localStorage.setItem(`masar_academy_name_${organization.id}`, settings.academyName);
+        }
+      }
+
       toast.success('تم حفظ إعدادات النظام بنجاح!');
     } catch (err) {
       toast.error('حدث خطأ أثناء حفظ الإعدادات');
@@ -56,6 +99,44 @@ export function Settings() {
 
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 space-y-8">
         
+        {/* Academy & Teacher Profile Section */}
+        <section>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
+            <UserIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <span>بيانات المعلم والسنتر التعليمي</span>
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+            الاسم الظاهر في أعلى المنصة وعلى كروت الطلاب وتقارير الحضور والغياب.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                اسم المعلم / المحاضر الرئيسي
+              </label>
+              <input
+                type="text"
+                value={settings.teacherName || ''}
+                onChange={e => setSettings({ ...settings, teacherName: e.target.value })}
+                placeholder="أ/ محمد خالد"
+                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                اسم الأكاديمية أو السنتر
+              </label>
+              <input
+                type="text"
+                value={settings.academyName || ''}
+                onChange={e => setSettings({ ...settings, academyName: e.target.value })}
+                placeholder="سنتر الأوائل التعليمي"
+                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+              />
+            </div>
+          </div>
+        </section>
+
         {/* Theme Settings Section */}
         <section>
           <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center justify-between">

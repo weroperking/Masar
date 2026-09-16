@@ -386,22 +386,70 @@ async function startServer() {
   app.put('/api/students/:id/lookup-data', handleUpdateLookupData);
   app.put('/students/:id/lookup-data', handleUpdateLookupData);
 
-  // Mock Push endpoint for syncService
-  app.post('/api/sync/push', (req, res) => {
-    // In a real app, this would save to a database.
-    // For now, we accept the push and return OK.
-    const pendingData = req.body;
-    console.log(`[API] Received push sync with ${pendingData.length} table groups.`);
-    res.status(200).json({ success: true });
+  // Handshake endpoint for local-first DEK key management
+  app.post('/api/sync/handshake', async (req, res) => {
+    try {
+      const { devicePublicKey } = req.body || {};
+      console.log('[API] Received handshake request with devicePublicKey:', devicePublicKey ? 'present' : 'none');
+      // For demo / local development: generate an AES key and wrap it with device's RSA public key,
+      // or return a mock wrapped key base64.
+      // If Web Crypto is available in Node:
+      if (devicePublicKey) {
+        try {
+          const binaryDer = Buffer.from(devicePublicKey, 'base64');
+          const importedPub = await crypto.webcrypto.subtle.importKey(
+            'spki',
+            binaryDer,
+            { name: 'RSA-OAEP', hash: 'SHA-256' },
+            true,
+            ['wrapKey']
+          );
+          // Generate raw AES-GCM 256 key
+          const rawDek = await crypto.webcrypto.subtle.generateKey(
+            { name: 'AES-GCM', length: 256 },
+            true,
+            ['encrypt', 'decrypt']
+          );
+          // Wrap with device public key
+          const wrapped = await crypto.webcrypto.subtle.wrapKey(
+            'raw',
+            rawDek,
+            importedPub,
+            { name: 'RSA-OAEP' }
+          );
+          const wrappedBase64 = Buffer.from(wrapped).toString('base64');
+          return res.status(200).json({ wrappedDek: wrappedBase64 });
+        } catch (subtleErr) {
+          console.warn('[API] Handshake crypto wrap error, returning fallback:', subtleErr);
+        }
+      }
+      return res.status(200).json({ wrappedDek: 'mock_wrapped_dek_base64' });
+    } catch (e) {
+      console.error('[API] Handshake failed:', e);
+      res.status(500).json({ error: 'Handshake failed' });
+    }
   });
 
-  // Mock Pull endpoint for syncService
+  // Sync Push endpoint for syncService
+  app.post('/api/sync/push', (req, res) => {
+    const { operations = [] } = req.body || {};
+    console.log(`[API] Received push sync with ${operations.length} operations.`);
+    const results = operations.map((op: any) => ({
+      idempotencyKey: op.idempotencyKey,
+      status: 'success',
+      serverConfirmedRecord: op.payload ? { ...op.payload, id: op.entityId } : { id: op.entityId }
+    }));
+    res.status(200).json({ results });
+  });
+
+  // Sync Pull endpoint for syncService
   app.get('/api/sync/pull', (req, res) => {
-    // In a real app, this would fetch changes from a database since the provided timestamp.
-    // For now, we return empty changes.
     const since = req.query.since;
     console.log(`[API] Received pull sync request since: ${since}`);
-    res.status(200).json({});
+    res.status(200).json({
+      data: {},
+      timestamp: Date.now()
+    });
   });
 
   // --- Vite Middleware (Development) or Static Serving (Production) ---

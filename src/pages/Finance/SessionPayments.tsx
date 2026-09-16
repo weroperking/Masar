@@ -14,13 +14,13 @@ export function SessionPayments() {
   const [editingPayment, setEditingPayment] = useState<SessionPayment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const { data: allPayments = [] } = useApiQuery<SessionPayment>('session-payments', 60 * 1000);
-  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendance-sessions', 60 * 1000);
+  const { data: allPayments = [] } = useApiQuery<SessionPayment>('sessionPayments', 60 * 1000);
+  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendanceSessions', 60 * 1000);
   const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
   const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
 
-  const { remove: removePayment, update: updatePayment } = useApiMutation<SessionPayment>('session-payments');
-  const { create: createLedgerEntry } = useApiMutation<LedgerEntry>('ledger-entries');
+  const { remove: removePayment, update: updatePayment } = useApiMutation<SessionPayment>('sessionPayments');
+  const { create: createLedgerEntry } = useApiMutation<LedgerEntry>('ledgerEntries');
 
   const payments = allPayments.filter(p => {
     if (p.deleted_at) return false;
@@ -275,8 +275,8 @@ function CreateSessionPaymentModal({
   courses: any[];
   initialData?: SessionPayment | null;
 }) {
-  const { create: createPayment, update: updatePayment } = useApiMutation<SessionPayment>('session-payments');
-  const { create: createLedgerEntry } = useApiMutation<LedgerEntry>('ledger-entries');
+  const { create: createPayment, update: updatePayment } = useApiMutation<SessionPayment>('sessionPayments');
+  const { create: createLedgerEntry } = useApiMutation<LedgerEntry>('ledgerEntries');
   const [formData, setFormData] = useState({
     studentId: initialData?.studentId || students[0]?.id || '',
     courseId: initialData?.courseId || courses[0]?.id || '',

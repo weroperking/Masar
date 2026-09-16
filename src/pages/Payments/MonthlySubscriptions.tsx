@@ -36,10 +36,10 @@ export function MonthlySubscriptions() {
   const { data: allEnrollments = [] } = useApiQuery<Enrollment>('enrollments', 60 * 1000);
   const enrollments = allEnrollments.filter(e => e.status === 'active');
   
-  const { data: allSubscriptions = [] } = useApiQuery<MonthlySubscription>('monthly-subscriptions', 60 * 1000);
+  const { data: allSubscriptions = [] } = useApiQuery<MonthlySubscription>('monthlySubscriptions', 60 * 1000);
   const subscriptions = allSubscriptions.filter(s => s.month === selectedMonth && s.year === selectedYear);
 
-  const { create: createSubscription, update: updateSubscription } = useApiMutation<MonthlySubscription>('monthly-subscriptions');
+  const { create: createSubscription, update: updateSubscription } = useApiMutation<MonthlySubscription>('monthlySubscriptions');
 
   const courseMap = useMemo(() => new Map(courses?.map(c => [c.id, c])), [courses]);
   const studentMap = useMemo(() => new Map(students?.map(s => [s.id, s])), [students]);
@@ -432,7 +432,7 @@ export function MonthlySubscriptions() {
 function PaymentModal({ sub, month, year, onClose }: { sub: any, month: number, year: number, onClose: () => void }) {
   const toast = useToast();
   const { getToken } = useAuth();
-  const { create: createSubscription, update: updateSubscription } = useApiMutation<MonthlySubscription>('monthly-subscriptions');
+  const { create: createSubscription, update: updateSubscription } = useApiMutation<MonthlySubscription>('monthlySubscriptions');
   const [paidAmount, setPaidAmount] = useState<string>(toMajorUnits(sub.amountPaid).toString());
   const [amountTotal, setAmountTotal] = useState<string>(toMajorUnits(sub.amountTotal).toString());
   const [dueDate, setDueDate] = useState<string>(sub.dueDate);

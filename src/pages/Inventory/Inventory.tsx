@@ -18,7 +18,7 @@ export function Inventory() {
   const { confirm } = useConfirm();
 
   const { data: products = [], isLoading: isLoadingProducts } = useApiQuery<Product>('products', 2 * 60 * 1000);
-  const { data: sales = [], isLoading: isLoadingSales } = useApiQuery<ProductSale>('product-sales', 15 * 1000);
+  const { data: sales = [], isLoading: isLoadingSales } = useApiQuery<ProductSale>('productSales', 15 * 1000);
   const { data: students = [] } = useApiQuery<Student>('students', 60 * 1000);
 
   const { remove: removeProduct } = useApiMutation<Product>('products');
@@ -501,9 +501,9 @@ function SellProductModal({
   const [customerName, setCustomerName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('نقدي');
 
-  const { create: createSale } = useApiMutation<ProductSale>('product-sales');
+  const { create: createSale } = useApiMutation<ProductSale>('productSales');
   const { update: updateProduct } = useApiMutation<Product>('products');
-  const { create: createRevenue } = useApiMutation<any>('revenue-entries');
+  const { create: createRevenue } = useApiMutation<any>('ledgerEntries');
 
   const selectedProduct = products.find(p => p.id === selectedProductId);
   const totalAmount = (selectedProduct?.salePrice || 0) * (Number(quantity) || 1);

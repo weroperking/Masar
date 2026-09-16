@@ -20,7 +20,7 @@ export function CourseProducts() {
   const { confirm } = useConfirm();
 
   // Reactive queries with soft-delete exclusion
-  const { data: allCourseProducts = [] } = useApiQuery<CourseProduct>('course-products', 60 * 1000);
+  const { data: allCourseProducts = [] } = useApiQuery<CourseProduct>('courseProducts', 60 * 1000);
   const courseProducts = allCourseProducts.filter(cp => !cp.deleted_at);
   const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
   const courses = allCourses.filter(c => !c.deleted_at);
@@ -30,12 +30,12 @@ export function CourseProducts() {
   const groups = allGroups.filter(g => !g.deleted_at);
   const { data: allEnrollments = [] } = useApiQuery<Enrollment>('enrollments', 60 * 1000);
   const enrollments = allEnrollments.filter(e => !e.deleted_at && e.status === 'active');
-  const { data: allSales = [] } = useApiQuery<ProductSale>('product-sales', 60 * 1000);
+  const { data: allSales = [] } = useApiQuery<ProductSale>('productSales', 60 * 1000);
   const sales = allSales.filter(s => !s.deleted_at);
   const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
   const students = allStudents.filter(s => !s.deleted_at);
 
-  const { remove: removeCourseProduct } = useApiMutation<CourseProduct>('course-products');
+  const { remove: removeCourseProduct } = useApiMutation<CourseProduct>('courseProducts');
 
   const courseMap = new Map(courses?.map(c => [c.id, c]));
   const productMap = new Map(products?.map(p => [p.id, p]));
@@ -340,7 +340,7 @@ function BindBookModal({
   allCourseProducts?: CourseProduct[];
 }) {
   const toast = useToast();
-  const { create: createCourseProduct, update: updateCourseProduct } = useApiMutation<CourseProduct>('course-products');
+  const { create: createCourseProduct, update: updateCourseProduct } = useApiMutation<CourseProduct>('courseProducts');
   const isEdit = !!link;
 
   const [formData, setFormData] = useState({

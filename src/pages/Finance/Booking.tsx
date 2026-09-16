@@ -13,11 +13,11 @@ export function Booking() {
   const [activeTab, setActiveTab] = useState<'pending' | 'accepted' | 'rejected' | 'all'>('pending');
   const [acceptingBooking, setAcceptingBooking] = useState<BookingRequest | null>(null);
 
-  const { data: allBookingsData = [] } = useApiQuery<BookingRequest>('booking-requests', 60 * 1000);
+  const { data: allBookingsData = [] } = useApiQuery<BookingRequest>('bookingRequests', 60 * 1000);
   const allBookings = [...allBookingsData].sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime());
   
   const { data: courses = [] } = useApiQuery<Course>('courses', 60 * 1000);
-  const { update: updateBooking, remove: removeBooking } = useApiMutation<BookingRequest>('booking-requests');
+  const { update: updateBooking, remove: removeBooking } = useApiMutation<BookingRequest>('bookingRequests');
 
   const courseMap = new Map(courses.map(c => [c.id, c.name]));
   
@@ -251,7 +251,7 @@ export function Booking() {
 }
 
 function CreateBookingModal({ onClose, courses }: { onClose: () => void; courses: any[] }) {
-  const { create: createBooking } = useApiMutation<BookingRequest>('booking-requests');
+  const { create: createBooking } = useApiMutation<BookingRequest>('bookingRequests');
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -357,7 +357,7 @@ function AcceptBookingModal({ booking, onClose }: { booking: BookingRequest; onC
   
   const { create: createStudent } = useApiMutation<Student>('students');
   const { create: createEnrollment } = useApiMutation<any>('enrollments');
-  const { update: updateBooking } = useApiMutation<BookingRequest>('booking-requests');
+  const { update: updateBooking } = useApiMutation<BookingRequest>('bookingRequests');
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();

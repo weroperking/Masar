@@ -21,13 +21,13 @@ export function QrCards() {
   const toast = useToast();
   const { confirm } = useConfirm();
 
-  const { data: allCards = [] } = useApiQuery<QrCard>('qr-cards', 60 * 1000);
+  const { data: allCards = [] } = useApiQuery<QrCard>('qrCards', 60 * 1000);
   const cards = [...allCards].filter(c => !c.deleted_at).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
   const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
   const students = allStudents.filter(s => !s.deleted_at);
   const { data: settings = [] } = useApiQuery<Settings>('settings', 60 * 1000);
 
-  const { create: createCard, update: updateCard, remove: removeCard } = useApiMutation<QrCard>('qr-cards');
+  const { create: createCard, update: updateCard, remove: removeCard } = useApiMutation<QrCard>('qrCards');
   const { update: updateStudent } = useApiMutation<Student>('students');
 
   // Modals state
@@ -65,7 +65,13 @@ export function QrCards() {
   // Handle Save from Generator Modal
   const handleSaveCards = async (newCards: Partial<QrCard>[], shouldPrintImmediately: boolean = false) => {
     try {
-      await Promise.all(newCards.map(c => createCard.mutateAsync(c as QrCard)));
+      // Process in chunks of 5 to avoid overwhelming the server
+      const chunkSize = 5;
+      for (let i = 0; i < newCards.length; i += chunkSize) {
+        const chunk = newCards.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(c => createCard.mutateAsync(c as QrCard)));
+      }
+      
       toast.success(`تم إنشاء وتخصيص ${newCards.length} بطاقة QR بنجاح`);
 
       if (shouldPrintImmediately && newCards.length > 0) {
@@ -75,9 +81,12 @@ export function QrCards() {
           setIsPrintSheetOpen(true);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save cards', err);
-      toast.error('حدث خطأ أثناء حفظ البطاقات');
+      // Try to extract a meaningful error message if available
+      const errorMessage = err?.message || err?.toString() || 'Internal Server Error';
+      const statusCode = err?.response?.status || err?.status || '500';
+      toast.error(`حدث خطأ أثناء حفظ البطاقات: ${statusCode} - ${errorMessage}`);
     }
   };
 

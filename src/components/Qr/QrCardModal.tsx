@@ -636,7 +636,27 @@ export function QrCardModal({
                   if (file) {
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                      setBackgroundImage(reader.result as string);
+                      const img = document.createElement('img');
+                      img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        const maxWidth = 600;
+                        if (width > maxWidth) {
+                          height = Math.round((height * maxWidth) / width);
+                          width = maxWidth;
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                          ctx.drawImage(img, 0, 0, width, height);
+                          setBackgroundImage(canvas.toDataURL('image/jpeg', 0.5));
+                        } else {
+                          setBackgroundImage(reader.result as string);
+                        }
+                      };
+                      img.src = reader.result as string;
                     };
                     reader.readAsDataURL(file);
                   } else {
@@ -774,7 +794,11 @@ export function QrCardModal({
               onClick={() => handleSubmit(false)}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 shadow-2xs"
             >
-              <Save className="w-3.5 h-3.5" />
+              {isSubmitting ? (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
               <span>{isSubmitting ? 'جاري الحفظ...' : 'توليد وحفظ البطاقات'}</span>
             </button>
 
@@ -784,8 +808,12 @@ export function QrCardModal({
               onClick={() => handleSubmit(true)}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 shadow-2xs"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>توليد وطباعة فورية</span>
+              {isSubmitting ? (
+                <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Printer className="w-3.5 h-3.5" />
+              )}
+              <span>{isSubmitting ? 'جاري الطباعة...' : 'توليد وطباعة فورية'}</span>
             </button>
           </div>
         </div>

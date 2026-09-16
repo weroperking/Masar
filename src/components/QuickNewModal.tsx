@@ -53,7 +53,7 @@ export function QuickNewModal({
       icon: Wallet,
       color: 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400',
       action: () => {
-        navigate('/session-payments');
+        navigate('/sessionPayments');
         onClose();
       }
     },

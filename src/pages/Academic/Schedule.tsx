@@ -19,10 +19,10 @@ export function Schedule() {
   const { data: courses = [] } = useApiQuery<Course>('courses', 60 * 1000);
   const { data: allEnrollments = [] } = useApiQuery<Enrollment>('enrollments', 60 * 1000);
   const enrollments = allEnrollments.filter(e => e.status === 'active');
-  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendance-sessions', 60 * 1000);
+  const { data: allSessions = [] } = useApiQuery<AttendanceSession>('attendanceSessions', 60 * 1000);
   const activeSessions = allSessions.filter(s => s.status === 'live');
   
-  const { create: createSession } = useApiMutation<AttendanceSession>('attendance-sessions');
+  const { create: createSession } = useApiMutation<AttendanceSession>('attendanceSessions');
 
   const courseMap = new Map(courses?.map(c => [c.id, c.name]));
   const arabicDays = ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];

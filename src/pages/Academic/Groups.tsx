@@ -213,6 +213,8 @@ function GroupFormModal({ onClose, courses, initialData }: { onClose: () => void
     }));
   };
 
+  const isPending = createGroup.isPending || updateGroup.isPending;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -418,14 +420,19 @@ function GroupFormModal({ onClose, courses, initialData }: { onClose: () => void
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+              disabled={isPending}
+              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors disabled:opacity-50"
             >
               إلغاء
             </button>
             <button 
               type="submit" 
-              className="px-4 py-1.5 text-white bg-blue-600 hover:bg-blue-700 rounded-md text-xs font-bold transition-colors shadow-xs"
+              disabled={isPending}
+              className="px-4 py-1.5 text-white bg-blue-600 hover:bg-blue-700 rounded-md text-xs font-bold transition-colors shadow-xs disabled:opacity-50 flex items-center justify-center gap-2"
             >
+              {isPending && (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
               {initialData ? 'حفظ التعديلات' : 'حفظ المجموعة'}
             </button>
           </div>

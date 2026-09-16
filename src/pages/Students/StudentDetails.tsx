@@ -38,21 +38,21 @@ export function StudentDetails() {
   const { data: courses = [] } = useApiQuery<any>('courses', 2 * 60 * 1000);
 
   // Payments & Bills
-  const { data: allSubscriptions = [] } = useApiQuery<MonthlySubscription>('monthly-subscriptions', 60 * 1000);
+  const { data: allSubscriptions = [] } = useApiQuery<MonthlySubscription>('monthlySubscriptions', 60 * 1000);
   const monthlySubscriptions = allSubscriptions.filter(s => s.studentId === id);
   
-  const { data: allLedgers = [] } = useApiQuery<any>('revenue-entries', 60 * 1000);
+  const { data: allLedgers = [] } = useApiQuery<any>('ledgerEntries', 60 * 1000);
   const ledgerEntries = allLedgers.filter(l => l.relatedType === 'subscription' && monthlySubscriptions.map(b => b.id).includes(l.relatedId || ''));
 
   // Attendance
-  const { data: allAttendanceRecords = [] } = useApiQuery<any>('attendance-records', 60 * 1000);
+  const { data: allAttendanceRecords = [] } = useApiQuery<any>('attendanceRecords', 60 * 1000);
   const attendanceRecords = allAttendanceRecords.filter(r => r.studentId === id);
   
-  const { data: attendanceSessions = [] } = useApiQuery<any>('attendance-sessions', 60 * 1000);
+  const { data: attendanceSessions = [] } = useApiQuery<any>('attendanceSessions', 60 * 1000);
 
   // Exams
   const { data: allAssessments = [] } = useApiQuery<any>('assessments', 2 * 60 * 1000);
-  const { data: allGrades = [] } = useApiQuery<any>('assessment-grades', 60 * 1000);
+  const { data: allGrades = [] } = useApiQuery<any>('assessmentGrades', 60 * 1000);
   const studentGrades = allGrades.filter(g => g.studentId === id);
 
   const [isEditStudentModalOpen, setIsEditStudentModalOpen] = useState(false);
@@ -1000,7 +1000,7 @@ export function EditPricingModal({
 function PaymentModal({ bill, course, onClose }: { bill: MonthlySubscription, course: any, onClose: () => void }) {
   const toast = useToast();
   const { getToken } = useAuth();
-  const { create: createSubscription, update: updateSubscription } = useApiMutation<MonthlySubscription>('monthly-subscriptions');
+  const { create: createSubscription, update: updateSubscription } = useApiMutation<MonthlySubscription>('monthlySubscriptions');
   const [amountTotal, setAmountTotal] = useState(toMajorUnits(bill.amountTotal).toString());
   const [paidAmount, setPaidAmount] = useState(toMajorUnits(bill.amountPaid).toString());
   const [paymentMethod, setPaymentMethod] = useState('نقدي');

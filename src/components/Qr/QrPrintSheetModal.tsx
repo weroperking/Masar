@@ -42,7 +42,7 @@ export function QrPrintSheetModal({
         format: 'a4' // or 'id-1' for single cards
       });
 
-      const cardsContainer = document.getElementById('qr-cards-print-container');
+      const cardsContainer = document.getElementById('qrCards-print-container');
       if (!cardsContainer) return;
 
       const cardElements = cardsContainer.querySelectorAll('.qr-print-card');

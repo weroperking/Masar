@@ -203,6 +203,7 @@ export interface Settings extends BaseRecord {
   autoCreateAssignmentPerSession?: boolean;
   autoStartEndSessions?: boolean;
   academyName?: string;
+  teacherName?: string;
   whatsappNumber?: string;
   currency?: string;
   autoConfirmPaymentOnAttendance: boolean;
@@ -277,4 +278,13 @@ export interface SubscriptionStatus {
 export interface SubscriptionCache extends SubscriptionStatus {
   id: string; // usually 'singleton'
   checked_at: number;
+}
+
+export interface SyncQueueItem {
+  id: string; // idempotency key / UUID
+  entityType: string;
+  entityId: string;
+  operation: 'create' | 'update' | 'delete';
+  payload?: any;
+  createdAt: number;
 }

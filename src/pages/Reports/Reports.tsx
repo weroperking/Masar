@@ -14,7 +14,7 @@ export function Reports() {
   const students = allStudents.filter(s => !s.deleted_at);
   const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
   const courses = allCourses.filter(c => !c.deleted_at);
-  const { data: allLedger = [] } = useApiQuery<LedgerEntry>('ledger-entries', 60 * 1000);
+  const { data: allLedger = [] } = useApiQuery<LedgerEntry>('ledgerEntries', 60 * 1000);
   const ledgerEntries = allLedger.filter(e => !e.deleted_at);
   const { data: allProducts = [] } = useApiQuery<Product>('products', 60 * 1000);
   const products = allProducts.filter(p => !p.deleted_at);

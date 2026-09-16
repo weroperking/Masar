@@ -20,6 +20,7 @@ import { useToast } from '../context/ToastContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { MasarLogo } from './MasarLogo';
+import { getSyncState, triggerManualSync } from '../services/syncService';
 
 // Base navigation groups (we will filter them inside the component)
 const getNavigationGroups = (limits: any) => {
@@ -40,14 +41,14 @@ const getNavigationGroups = (limits: any) => {
         { name: 'الحضور والغياب', href: '/attendance', icon: UserCheck },
         { name: 'الجدول الزمني', href: '/schedule', icon: Calendar },
         { name: 'الاختبارات والواجبات', href: '/assessments', icon: FileText },
-        { name: 'الكتب التعليمية', href: '/course-products', icon: Library },
+        { name: 'الكتب التعليمية', href: '/courseProducts', icon: Library },
       ]
     },
     {
       title: 'المالية',
       items: [
         { name: 'الاشتراكات الشهرية', href: '/payments', icon: CreditCard },
-        { name: 'مدفوعات الحصص', href: '/session-payments', icon: Wallet },
+        { name: 'مدفوعات الحصص', href: '/sessionPayments', icon: Wallet },
         { name: 'السجلات المالية', href: '/ledgers', icon: FileSpreadsheet },
         { name: 'المستحقات', href: '/dues', icon: FileSpreadsheet },
         { name: 'الحجز الأونلاين', href: '/booking', icon: Globe },
@@ -181,6 +182,36 @@ export function Layout() {
       window.removeEventListener('offline', handleOffline);
     };
   }, [toast]);
+
+  // Sync state & outbox listener
+  const pendingQueueCount = useLiveQuery(async () => {
+    try {
+      return await db.syncQueue.count();
+    } catch {
+      return 0;
+    }
+  }, []);
+
+  const [syncState, setSyncState] = useState(getSyncState());
+  useEffect(() => {
+    const handleSyncChange = () => setSyncState(getSyncState());
+    window.addEventListener('masar_sync_status_change', handleSyncChange);
+    return () => window.removeEventListener('masar_sync_status_change', handleSyncChange);
+  }, []);
+
+  const handleManualSyncClick = async () => {
+    if (!navigator.onLine) {
+      toast.warning('الجهاز غير متصل بالإنترنت حالياً.');
+      return;
+    }
+    toast.info('جاري مزامنة البيانات مع الخادم...');
+    try {
+      await triggerManualSync(getToken);
+      toast.success('تمت المزامنة بنجاح!');
+    } catch (e: any) {
+      toast.error('فشلت المزامنة: ' + (e.message || 'خطأ غير معروف'));
+    }
+  };
 
   // Periodic automatic attendance session starter
   useEffect(() => {
@@ -378,6 +409,60 @@ export function Layout() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Sync Status Pill */}
+            <button
+              onClick={handleManualSyncClick}
+              disabled={syncState.isSyncing}
+              className={cn(
+                "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                syncState.breakerOpen || syncState.syncPillStatus === 'paused'
+                  ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800 hover:bg-rose-100 cursor-pointer"
+                  : !isOnline
+                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
+                  : syncState.isSyncing || (pendingQueueCount || 0) > 0 || syncState.syncPillStatus === 'pending'
+                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800"
+              )}
+              title={
+                syncState.breakerOpen || syncState.syncPillStatus === 'paused'
+                  ? 'المزامنة متوقفة مؤقتاً بعد عدة محاولات — انقر للمحاولة الآن'
+                  : !isOnline
+                  ? 'أنت تعمل محلياً دون اتصال'
+                  : syncState.isSyncing
+                  ? 'جاري مزامنة البيانات...'
+                  : (pendingQueueCount || 0) > 0
+                  ? `يوجد ${pendingQueueCount} تعديل محلي بانتظار المزامنة`
+                  : 'جميع البيانات متزامنة ومحفوظة محلياً'
+              }
+            >
+              {syncState.breakerOpen || syncState.syncPillStatus === 'paused' ? (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                  <span>المزامنة متوقفة (انقر للإعادة)</span>
+                </>
+              ) : !isOnline ? (
+                <>
+                  <WifiOff className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>غير متصل (محلي)</span>
+                </>
+              ) : syncState.isSyncing ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600 dark:text-amber-400" />
+                  <span>جاري المزامنة...</span>
+                </>
+              ) : (pendingQueueCount || 0) > 0 ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>بانتظار المزامنة ({pendingQueueCount})</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>متزامن</span>
+                </>
+              )}
+            </button>
+
             {/* Mobile search button */}
             {showNav && (
               <button

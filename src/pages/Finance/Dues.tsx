@@ -12,9 +12,9 @@ export function Dues() {
   const students = allStudents.filter(s => !s.deleted_at);
   const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
   const courses = allCourses.filter(c => !c.deleted_at);
-  const { data: allMonthlySubscriptions = [] } = useApiQuery<MonthlySubscription>('monthly-subscriptions', 60 * 1000);
+  const { data: allMonthlySubscriptions = [] } = useApiQuery<MonthlySubscription>('monthlySubscriptions', 60 * 1000);
   const monthlySubscriptions = allMonthlySubscriptions.filter(s => !s.deleted_at);
-  const { data: allSessionPayments = [] } = useApiQuery<SessionPayment>('session-payments', 60 * 1000);
+  const { data: allSessionPayments = [] } = useApiQuery<SessionPayment>('sessionPayments', 60 * 1000);
   const sessionPayments = allSessionPayments.filter(s => !s.deleted_at);
 
   const studentMap = new Map(students?.map(s => [s.id, s]));
@@ -187,9 +187,9 @@ export function Dues() {
 }
 
 function SettleDueModal({ due, onClose }: { due: any; onClose: () => void }) {
-  const { update: updateSubscription } = useApiMutation<MonthlySubscription>('monthly-subscriptions');
-  const { update: updateSessionPayment } = useApiMutation<SessionPayment>('session-payments');
-  const { create: createLedgerEntry } = useApiMutation<LedgerEntry>('ledger-entries');
+  const { update: updateSubscription } = useApiMutation<MonthlySubscription>('monthlySubscriptions');
+  const { update: updateSessionPayment } = useApiMutation<SessionPayment>('sessionPayments');
+  const { create: createLedgerEntry } = useApiMutation<LedgerEntry>('ledgerEntries');
   const [payAmount, setPayAmount] = useState(toMajorUnits(due.remaining).toString());
 
   const handleSettle = async (e: React.FormEvent) => {

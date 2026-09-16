@@ -19,6 +19,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { MasarLogo } from '../../components/MasarLogo';
+import { db } from '../../db/db';
 
 export function CustomOrganizationList() {
   const { userMemberships, isLoaded, setActive, createOrganization } = useOrganizationList({
@@ -83,8 +84,96 @@ export function CustomOrganizationList() {
     try {
       setLoading(true);
       setError('');
+
+      const teacherFullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+
+      // 1. Update Clerk user profile with the entered teacher name
+      if (user && (firstName.trim() || lastName.trim())) {
+        try {
+          await user.update({
+            firstName: firstName.trim() || undefined,
+            lastName: lastName.trim() || undefined,
+            unsafeMetadata: {
+              ...(user.unsafeMetadata || {}),
+              teacherName: teacherFullName,
+              firstName: firstName.trim(),
+              lastName: lastName.trim()
+            }
+          });
+        } catch (uErr) {
+          console.warn('Could not update user directly in Clerk:', uErr);
+        }
+      }
+
+      // 2. Create organization
       const newOrg = await createOrganization({ name: orgName.trim() });
       await setActive({ organization: newOrg.id });
+
+      // 3. Persist to localStorage
+      if (teacherFullName) {
+        localStorage.setItem('masar_teacher_name', teacherFullName);
+        if (firstName.trim()) localStorage.setItem('masar_teacher_first_name', firstName.trim());
+        if (lastName.trim()) localStorage.setItem('masar_teacher_last_name', lastName.trim());
+        if (newOrg?.id) {
+          localStorage.setItem(`masar_teacher_name_${newOrg.id}`, teacherFullName);
+        }
+      }
+      localStorage.setItem('masar_academy_name', orgName.trim());
+      if (newOrg?.id) {
+        localStorage.setItem(`masar_academy_name_${newOrg.id}`, orgName.trim());
+      }
+
+      // 4. Save to IndexedDB (Settings & Users)
+      try {
+        const existingSettings = await db.settings.toArray();
+        if (existingSettings.length > 0) {
+          await db.settings.update(existingSettings[0].id, {
+            teacherName: teacherFullName || existingSettings[0].teacherName,
+            academyName: orgName.trim(),
+            updated_at: Date.now()
+          });
+        } else {
+          await db.settings.add({
+            id: 'default-settings',
+            teacherName: teacherFullName,
+            academyName: orgName.trim(),
+            autoConfirmPaymentOnAttendance: true,
+            autoStartEndSessions: false,
+            autoCreateAssignmentPerSession: false,
+            freeSessionLimitPerStudent: 1,
+            assignmentGradingMethod: 'numeric',
+            numericMaxGrade: 100,
+            created_at: Date.now(),
+            updated_at: Date.now(),
+            sync_status: 'synced'
+          });
+        }
+
+        const userEmail = user?.primaryEmailAddress?.emailAddress || '';
+        const existingUser = userEmail ? await db.users.where('email').equals(userEmail).first() : null;
+        if (existingUser) {
+          await db.users.update(existingUser.id, {
+            name: teacherFullName || existingUser.name,
+            clerkUserId: user?.id,
+            role: 'admin',
+            updated_at: Date.now()
+          });
+        } else if (teacherFullName) {
+          await db.users.add({
+            id: 'user-' + Date.now(),
+            name: teacherFullName,
+            email: userEmail,
+            clerkUserId: user?.id,
+            role: 'admin',
+            status: 'active',
+            created_at: Date.now(),
+            updated_at: Date.now(),
+            sync_status: 'synced'
+          });
+        }
+      } catch (dbErr) {
+        console.warn('Failed to seed settings/users in IndexedDB:', dbErr);
+      }
     } catch (err: any) {
       console.error(err);
       setError(err.errors?.[0]?.longMessage || 'حدث خطأ أثناء إنشاء الأكاديمية');

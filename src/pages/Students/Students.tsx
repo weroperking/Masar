@@ -515,9 +515,9 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
 
         const existingEnrolls = enrollments.filter(e => e.studentId === existingStudent.id);
         
-        for (const gId of selectedGroupIds) {
+        await Promise.all(selectedGroupIds.map(async (gId) => {
           const grp = groups?.find(g => g.id === gId);
-          if (!grp) continue;
+          if (!grp) return;
           const crs = courses?.find(c => c.id === grp.courseId);
           const basePrice = crs?.price || 0;
           const pricing = groupPricings[gId] || { pricingMode: 'default' };
@@ -565,24 +565,24 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
           if (existingStudent.id && grp.courseId) {
             await syncStudentMonthlySubscriptions(existingStudent.id, grp.courseId, effectiveFee, token);
           }
-        }
+        }));
 
-        for (const oldEnr of existingEnrolls) {
+        await Promise.all(existingEnrolls.map(async (oldEnr) => {
           if (!selectedGroupIds.includes(oldEnr.groupId) && oldEnr.status === 'active') {
             await updateEnrollment.mutateAsync({
               id: oldEnr.id,
               data: { status: 'withdrawn' }
             });
           }
-        }
+        }));
 
         toast.success(`تم تحديث بيانات الطالب (${formData.name}) والرسوم بنجاح!`);
       } else {
         const newStudent = await createStudent.mutateAsync(normalizedFormData);
 
-        for (const gId of selectedGroupIds) {
+        await Promise.all(selectedGroupIds.map(async (gId) => {
           const grp = groups?.find(g => g.id === gId);
-          if (!grp) continue;
+          if (!grp) return;
           const crs = courses?.find(c => c.id === grp.courseId);
           const basePrice = crs?.price || 0;
           const pricing = groupPricings[gId] || { pricingMode: 'default' };
@@ -607,7 +607,17 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
             customPrice: finalCustomPrice,
             discountPercentage: pricing.discountPercentage
           });
-        }
+
+          const effectiveFee = pricing.pricingMode === 'free'
+            ? 0
+            : finalCustomPrice !== undefined
+              ? finalCustomPrice
+              : basePrice;
+
+          if (newStudent.id && grp.courseId) {
+            await syncStudentMonthlySubscriptions(newStudent.id, grp.courseId, effectiveFee, token);
+          }
+        }));
 
         toast.success(`تم تسجيل الطالب (${formData.name}) في المجموعات وتحديد رسومه بنجاح!`);
       }
@@ -1001,8 +1011,12 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
             </button>
             <button 
               type="submit" 
-              className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs"
+              disabled={createStudent.isPending || updateStudent.isPending || createEnrollment.isPending || updateEnrollment.isPending}
+              className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
             >
+              {(createStudent.isPending || updateStudent.isPending || createEnrollment.isPending || updateEnrollment.isPending) && (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
               {existingStudent ? 'حفظ التعديلات' : 'حفظ الطالب والتسكين'}
             </button>
           </div>

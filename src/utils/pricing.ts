@@ -1,5 +1,5 @@
-import { Enrollment, Course, MonthlySubscription } from '../types';
-import { fetchWithAuth } from '../config/api';
+import { Enrollment, Course, MonthlySubscription, LedgerEntry } from '../types';
+import { db } from '../db/db';
 
 /**
  * Calculates the exact expected fee (in minor units / piastres) for a student enrolled in a course,
@@ -47,15 +47,15 @@ export async function syncStudentMonthlySubscriptions(
   studentId: string,
   courseId: string,
   newFeeMinor: number,
-  token: string
+  _token?: string
 ): Promise<void> {
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
-  // Fetch subscriptions for this student
-  const data = await fetchWithAuth(`/api/monthly-subscriptions?studentId=${studentId}`, token);
-  const key = Object.keys(data)[0];
-  const subscriptions: MonthlySubscription[] = data[key] || [];
+  // Fetch subscriptions for this student directly from local db
+  const subscriptions = await db.monthlySubscriptions
+    .filter(s => s.studentId === studentId && !s.deleted_at)
+    .toArray();
 
   const courseSubs = subscriptions.filter(s => s.courseId === courseId);
 
@@ -79,12 +79,21 @@ export async function syncStudentMonthlySubscriptions(
         derivedStatus = isOverdue ? 'overdue' : 'pending';
       }
 
-      await fetchWithAuth(`/api/monthly-subscriptions/${sub.id}`, token, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          amountTotal: newFeeMinor,
-          status: derivedStatus as any
-        })
+      const updatedFields = {
+        amountTotal: newFeeMinor,
+        status: derivedStatus as any,
+        updated_at: Date.now(),
+        sync_status: 'pending' as const
+      };
+
+      await db.monthlySubscriptions.update(sub.id, updatedFields);
+      await db.syncQueue.add({
+        id: crypto.randomUUID(),
+        entityType: 'monthlySubscriptions',
+        entityId: sub.id,
+        operation: 'update',
+        payload: updatedFields,
+        createdAt: Date.now()
       });
     }
   }
@@ -101,7 +110,7 @@ export async function recordLedgerRevenue({
   category = 'اشتراكات شهرية',
   date,
   paymentMethod,
-  token
+  _token
 }: {
   relatedType: 'subscription' | 'session' | 'book' | 'other' | 'manual';
   relatedId: string;
@@ -110,21 +119,35 @@ export async function recordLedgerRevenue({
   category?: string;
   date?: string;
   paymentMethod?: any;
-  token: string;
+  _token?: string;
+  token?: string;
 }): Promise<void> {
   if (amountMinor <= 0) return;
 
-  await fetchWithAuth(`/api/revenue-entries`, token, {
-    method: 'POST',
-    body: JSON.stringify({
-      type: 'revenue',
-      category,
-      amount: amountMinor,
-      date: date || new Date().toISOString().split('T')[0],
-      description,
-      relatedType,
-      relatedId,
-      paymentMethod: paymentMethod || 'نقدي'
-    })
+  const now = Date.now();
+  const newEntry: LedgerEntry = {
+    id: crypto.randomUUID(),
+    type: 'revenue',
+    category,
+    amount: amountMinor,
+    date: date || new Date().toISOString().split('T')[0],
+    description,
+    relatedType,
+    relatedId,
+    paymentMethod: paymentMethod || 'نقدي',
+    created_at: now,
+    updated_at: now,
+    sync_status: 'pending'
+  };
+
+  await db.ledgerEntries.add(newEntry);
+  await db.syncQueue.add({
+    id: crypto.randomUUID(),
+    entityType: 'ledgerEntries',
+    entityId: newEntry.id,
+    operation: 'create',
+    payload: newEntry,
+    createdAt: now
   });
 }
+

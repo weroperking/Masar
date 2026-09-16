@@ -28,11 +28,11 @@ export function Assessments() {
   const enrollments = allEnrollments.filter(e => e.status === 'active' && !e.deleted_at);
   const { data: allStudentsRaw = [] } = useApiQuery<Student>('students', 60 * 1000);
   const allStudents = allStudentsRaw.filter(s => !s.deleted_at);
-  const { data: allGradesUnfiltered = [] } = useApiQuery<AssessmentGrade>('assessment-grades', 60 * 1000);
+  const { data: allGradesUnfiltered = [] } = useApiQuery<AssessmentGrade>('assessmentGrades', 60 * 1000);
   const allGrades = allGradesUnfiltered.filter(g => !g.deleted_at);
 
   const { remove: removeAssessment } = useApiMutation<Assessment>('assessments');
-  const { remove: removeGrade } = useApiMutation<AssessmentGrade>('assessment-grades');
+  const { remove: removeGrade } = useApiMutation<AssessmentGrade>('assessmentGrades');
 
   const courseMap = new Map(courses?.map(c => [c.id, c.name]));
 
@@ -388,7 +388,7 @@ function GradingModal({
   existingGrades: AssessmentGrade[];
 }) {
   const toast = useToast();
-  const { create: createGrade, update: updateGrade } = useApiMutation<AssessmentGrade>('assessment-grades');
+  const { create: createGrade, update: updateGrade } = useApiMutation<AssessmentGrade>('assessmentGrades');
   
   const [scope, setScope] = useState<'course' | 'all'>('course');
   const [searchQuery, setSearchQuery] = useState('');
@@ -438,6 +438,7 @@ function GradingModal({
   
   const [gradesMap, setGradesMap] = useState<Record<string, string>>({});
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   React.useEffect(() => {
     if (existingGrades) {
@@ -482,45 +483,52 @@ function GradingModal({
   const handleSave = async () => {
     const now = Date.now();
     let savedCount = 0;
+    setIsSaving(true);
+    try {
+      // Save grades for all students in the active roster
+      for (const student of activeStudentList) {
+        const gradeVal = gradesMap[student.id];
+        if (gradeVal === '' || gradeVal === undefined) continue;
+        
+        const parsedGrade = assessment.gradingMethod === 'numeric' 
+          ? Number(gradeVal) 
+          : gradeVal;
 
-    // Save grades for all students in the active roster
-    for (const student of activeStudentList) {
-      const gradeVal = gradesMap[student.id];
-      if (gradeVal === '' || gradeVal === undefined) continue;
-      
-      const parsedGrade = assessment.gradingMethod === 'numeric' 
-        ? Number(gradeVal) 
-        : gradeVal;
-
-      const existing = existingGrades?.find(g => g.studentId === student.id);
-      
-      if (existing) {
-        if (existing.grade.toString() !== gradeVal) {
-          updateGrade.mutate({
-            id: existing.id,
-            data: {
-              grade: parsedGrade,
-              gradedAt: now
-            }
-          });
+        const existing = existingGrades?.find(g => g.studentId === student.id);
+        
+        if (existing) {
+          if (existing.grade.toString() !== gradeVal) {
+            await updateGrade.mutateAsync({
+              id: existing.id,
+              data: {
+                grade: parsedGrade,
+                gradedAt: now
+              }
+            });
+            savedCount++;
+          }
+        } else {
+          await createGrade.mutateAsync({
+            assessmentId: assessment.id,
+            studentId: student.id,
+            grade: parsedGrade,
+            gradedAt: now
+          } as AssessmentGrade);
           savedCount++;
         }
-      } else {
-        createGrade.mutate({
-          assessmentId: assessment.id,
-          studentId: student.id,
-          grade: parsedGrade,
-          gradedAt: now
-        } as AssessmentGrade);
-        savedCount++;
       }
+      
+      setIsSaved(true);
+      toast.success('تم حفظ وتحديث درجات الطلاب بنجاح');
+      setTimeout(() => {
+        onClose();
+      }, 700);
+    } catch (err: any) {
+      console.error(err);
+      toast.error('حدث خطأ أثناء حفظ الدرجات: ' + (err?.message || ''));
+    } finally {
+      setIsSaving(false);
     }
-    
-    setIsSaved(true);
-    toast.success('تم حفظ وتحديث درجات الطلاب بنجاح');
-    setTimeout(() => {
-      onClose();
-    }, 700);
   };
 
   const ratingsList = ['ممتاز', 'جيد جدا', 'جيد', 'مقبول', 'ضعيف'];
@@ -829,10 +837,15 @@ function GradingModal({
             <button 
               type="button" 
               onClick={handleSave} 
-              className="px-6 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-2xs hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+              disabled={isSaving}
+              className="px-6 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-2xs hover:bg-blue-700 transition-colors flex items-center gap-1.5 disabled:opacity-50"
             >
-              <Check className="w-4 h-4" />
-              <span>حفظ ورصد الدرجات</span>
+              {isSaving ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Check className="w-4 h-4" />
+              )}
+              <span>{isSaving ? 'جاري الحفظ...' : 'حفظ ورصد الدرجات'}</span>
             </button>
           </div>
         </div>

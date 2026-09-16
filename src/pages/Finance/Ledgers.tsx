@@ -14,9 +14,9 @@ export function Ledgers() {
   const [editingEntry, setEditingEntry] = useState<LedgerEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: allEntriesRaw = [] } = useApiQuery<LedgerEntry>('ledger-entries', 60 * 1000);
+  const { data: allEntriesRaw = [] } = useApiQuery<LedgerEntry>('ledgerEntries', 60 * 1000);
   const allEntries = allEntriesRaw.filter(e => !e.deleted_at);
-  const { remove: removeEntry } = useApiMutation<LedgerEntry>('ledger-entries');
+  const { remove: removeEntry } = useApiMutation<LedgerEntry>('ledgerEntries');
 
   const entries = allEntries.filter(e => {
     if (filterType !== 'all' && e.type !== filterType) return false;
@@ -263,7 +263,7 @@ function LedgerModal({
   initialData?: LedgerEntry | null;
   onClose: () => void; 
 }) {
-  const { create: createEntry, update: updateEntry } = useApiMutation<LedgerEntry>('ledger-entries');
+  const { create: createEntry, update: updateEntry } = useApiMutation<LedgerEntry>('ledgerEntries');
   const revenueCategories = ['اشتراكات شهرية', 'رسوم حصص', 'مبيعات كتب وملازم', 'حجوزات', 'إيرادات أخرى'];
   const expenseCategories = ['إيجار السنتر', 'رواتب معلمين', 'رواتب موظفين', 'أدوات ومطبوعات', 'فواتير كهرباء ومياه', 'صيانة', 'ضيافة', 'مصروفات أخرى'];
   const categories = type === 'revenue' ? revenueCategories : expenseCategories;
