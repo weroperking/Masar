@@ -195,35 +195,6 @@ export async function decryptRecord<T>(env: Envelope): Promise<T> {
   return JSON.parse(decoded);
 }
 
-export class SyncError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SyncError';
-  }
-}
-
-export async function decryptSyncResponse<T>(body: { encrypted: string } | T): Promise<T> {
-  if (!body || typeof body !== 'object' || !('encrypted' in body)) {
-    return body as T;
-  }
-
-  try {
-    const dek = sessionDek ?? (await db.keystore.get('dek'))?.key;
-    if (!dek) throw new Error('No DEK available for sync response decryption');
-
-    const raw = Uint8Array.from(atob((body as { encrypted: string }).encrypted), (ch) => ch.charCodeAt(0));
-    const iv = raw.slice(0, 12);
-    const ciphertext = raw.slice(12);
-
-    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, dek, ciphertext);
-    return JSON.parse(new TextDecoder().decode(decrypted)) as T;
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message || err.name : String(err);
-    console.error('[decryptSyncResponse] Decryption failed:', message, err);
-    throw new SyncError(`Sync response decryption failed: ${message}`);
-  }
-}
-
 export async function encryptPayload(payload: any): Promise<{ _cipher: string; _iv: string }> {
   const env = await encryptRecord(payload);
   return { _cipher: env.ct, _iv: env.iv };

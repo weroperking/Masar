@@ -5,7 +5,6 @@ import {
   unwrapDek, 
   encryptRecord, 
   decryptRecord, 
-  decryptSyncResponse,
   Envelope, 
   getOrCreateLocalDek,
   getPublicKeyHash
@@ -174,12 +173,11 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
         );
 
         const publicKeyHash = await getPublicKeyHash();
-        const raw = await fetchWithAuth('/api/sync/push', token, {
+        const res = await fetchWithAuth('/api/sync/push', token, {
           method: 'POST',
           headers: syncHeaders(token, publicKeyHash),
           body: JSON.stringify({ operations: wireOps })
         });
-        const res = await decryptSyncResponse(raw);
 
         if (res && Array.isArray(res.results)) {
           for (const result of res.results) {
@@ -201,10 +199,9 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
     const lastPull = lastPullStr ? parseInt(lastPullStr, 10) : 0;
     try {
       const publicKeyHash = await getPublicKeyHash();
-      const rawPull = await fetchWithAuth(`/api/sync/pull?since=${lastPull}`, token, {
+      const pullRes = await fetchWithAuth(`/api/sync/pull?since=${lastPull}`, token, {
         headers: syncHeaders(token, publicKeyHash)
       });
-      const pullRes = await decryptSyncResponse(rawPull);
 
       if (pullRes && pullRes.data) {
         await applyDeltas(pullRes.data);
@@ -269,10 +266,9 @@ export async function hydrateIfNeeded(getToken: () => Promise<string | null>): P
 
     console.log('[syncService] Hydrating account data (since=0)...');
     const publicKeyHash = await getPublicKeyHash();
-    const rawRes = await fetchWithAuth('/api/sync/pull?since=0', token, {
+    const res = await fetchWithAuth('/api/sync/pull?since=0', token, {
       headers: syncHeaders(token, publicKeyHash)
     });
-    const res = await decryptSyncResponse(rawRes);
 
     let count = 0;
     if (res && res.data) {
