@@ -29,7 +29,8 @@ let syncPillStatus: SyncPillStatus = 'synced';
 export async function performHandshake(getToken: () => Promise<string | null>): Promise<void> {
   try {
     const cachedDek = await db.keystore.get('dek');
-    if (cachedDek?.key) {
+    const cachedHash = await db.keystore.get('publicKeyHash');
+    if (cachedDek?.key && cachedHash?.value) {
       return;
     }
 
