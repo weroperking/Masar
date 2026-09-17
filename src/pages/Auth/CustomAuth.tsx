@@ -399,348 +399,361 @@ export function CustomAuth() {
   const isVerifyView = view === 'verify_signup' || view === 'verify_signin' || view === 'verify_signin_otp';
 
   return (
-    <div className="min-h-screen w-full flex flex-col justify-center items-center bg-white dark:bg-slate-950 px-4 py-12 sm:px-6 lg:px-8" dir="rtl">
-      <div className="w-full max-w-md mx-auto">
-        {/* Brand Logo with generous negative space */}
-        <div className="flex justify-center mb-8">
-          <MasarLogo size="lg" />
-        </div>
-
-        {/* Main Card Container */}
-        <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-8 sm:p-10 shadow-sm">
-          
-          {/* Header Section */}
-          <div className="text-center mb-8">
-            {isVerifyView && (
-              <div className="w-12 h-12 rounded-2xl bg-blue-500/5 border border-blue-600/10 text-blue-600 flex items-center justify-center mx-auto mb-4">
-                <Mail className="w-6 h-6" />
-              </div>
-            )}
-            
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-              {view === 'signin' && 'تسجيل الدخول'}
-              {view === 'signup' && 'إنشاء حساب جديد'}
-              {view === 'verify_signup' && 'تأكيد البريد الإلكتروني'}
-              {(view === 'verify_signin' || view === 'verify_signin_otp') && 'التحقق برمز الدخول'}
-            </h1>
-
-            <p className="text-slate-500 dark:text-slate-400 text-sm mt-2 leading-relaxed max-w-sm mx-auto">
-              {view === 'signin' && 'أهلاً بك مجدداً في مسار. أدخل بياناتك للوصول إلى لوحة التحكم.'}
-              {view === 'signup' && 'ابدأ الآن في إدارة حصصك، طلابك، ومصروفاتك في مكان واحد.'}
-              {view === 'verify_signup' && 'أدخل رمز التحقق (OTP) المكوّن من 6 أرقام لتأكيد حسابك.'}
-              {(view === 'verify_signin' || view === 'verify_signin_otp') && 'أدخل رمز التحقق (OTP) المرسل إلى بريدك لتسجيل الدخول مباشرة.'}
-            </p>
-
-            {isVerifyView && email && (
-              <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/5 border border-blue-600/10 rounded-lg text-blue-600 font-mono text-xs sm:text-sm dir-ltr">
-                <Mail className="w-3.5 h-3.5" />
-                <span>{email}</span>
-              </div>
-            )}
+    <div className="min-h-screen w-full flex bg-white dark:bg-slate-950" dir="rtl">
+      
+      {/* 1. Form Section (Right Side in RTL) */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center px-4 py-12 sm:px-6 lg:px-12 xl:px-24">
+        <div className="w-full max-w-sm mx-auto">
+          {/* Brand Logo for mobile only */}
+          <div className="flex lg:hidden justify-center mb-10">
+            <MasarLogo size="lg" />
           </div>
 
-          {/* Feedback & Error Alerts */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-400 text-sm rounded-xl space-y-2">
-              <p className="leading-relaxed">{error}</p>
+          <div className="w-full">
+            {/* Header Section */}
+            <div className="mb-8">
+              {isVerifyView && (
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/5 border border-blue-600/10 text-blue-600 flex items-center justify-center mb-5">
+                  <Mail className="w-6 h-6" />
+                </div>
+              )}
+              
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                {view === 'signin' && 'تسجيل الدخول إلى حسابك.'}
+                {view === 'signup' && 'إنشاء حساب جديد.'}
+                {view === 'verify_signup' && 'تأكيد البريد الإلكتروني.'}
+                {(view === 'verify_signin' || view === 'verify_signin_otp') && 'التحقق برمز الدخول.'}
+              </h1>
+
+              <p className="text-slate-500 dark:text-slate-400 text-sm mt-3 leading-relaxed">
+                {view === 'signin' && 'أهلاً بك مجدداً! قم بتسجيل الدخول للبدء.'}
+                {view === 'signup' && 'ابدأ الآن في إدارة حصصك، طلابك، ومصروفاتك في مكان واحد.'}
+                {view === 'verify_signup' && 'أدخل رمز التحقق (OTP) المكوّن من 6 أرقام لتأكيد حسابك.'}
+                {(view === 'verify_signin' || view === 'verify_signin_otp') && 'أدخل رمز التحقق (OTP) المرسل إلى بريدك لتسجيل الدخول.'}
+              </p>
+
+              {isVerifyView && email && (
+                <div className="mt-4 inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 font-mono text-sm dir-ltr">
+                  <Mail className="w-4 h-4 text-slate-400" />
+                  <span>{email}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Feedback & Error Alerts */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-400 text-sm rounded-xl space-y-2">
+                <p className="leading-relaxed">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => clerk.signOut()}
+                  className="text-xs text-red-600 dark:text-red-300 font-medium hover:underline block text-right"
+                >
+                  هل واجهت تعارض في الجلسة؟ اضغط هنا لتفريغ الجلسات
+                </button>
+              </div>
+            )}
+
+            {resendSuccess && (
+              <div className="mb-6 p-3.5 bg-blue-500/5 border border-blue-600/20 text-blue-600 text-sm rounded-xl flex items-center gap-2">
+                <Check className="w-4 h-4 shrink-0" />
+                <span>{resendSuccess}</span>
+              </div>
+            )}
+
+            {/* 1. SIGN IN FORM */}
+            {view === 'signin' && (
+              <form onSubmit={handleSignIn} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    البريد الإلكتروني
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="h-5 w-5" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="block w-full pr-11 pl-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all sm:text-sm"
+                      placeholder="name@example.com"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    كلمة المرور
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="block w-full pr-11 pl-11 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all sm:text-sm"
+                      placeholder="••••••••"
+                      dir="ltr"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                      tabIndex={-1}
+                      aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 space-y-4">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-all duration-150 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                      <>
+                        <span>تسجيل الدخول</span>
+                        <ArrowRight className="w-4 h-4 rotate-180" />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="text-center">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      ليس لديك حساب؟{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setView('signup');
+                          setError('');
+                          setResendSuccess('');
+                        }}
+                        className="font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                      >
+                        إنشاء حساب جديد
+                      </button>
+                    </p>
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={handleRequestOTP}
+                        className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      >
+                        نسيت كلمة المرور؟ الدخول بالرمز
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {/* 2. SIGN UP FORM */}
+            {view === 'signup' && (
+              <form onSubmit={handleSignUp} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    البريد الإلكتروني
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="h-5 w-5" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="block w-full pr-11 pl-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all sm:text-sm"
+                      placeholder="name@example.com"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    كلمة المرور
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="block w-full pr-11 pl-11 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all sm:text-sm"
+                      placeholder="••••••••"
+                      dir="ltr"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                      tabIndex={-1}
+                      aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 space-y-4">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-all duration-150 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                      <>
+                        <span>إنشاء حساب</span>
+                        <ArrowRight className="w-4 h-4 rotate-180" />
+                      </>
+                    )}
+                  </button>
+                  
+                  <div className="text-center">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      لديك حساب بالفعل؟{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setView('signin');
+                          setError('');
+                          setResendSuccess('');
+                        }}
+                        className="font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                      >
+                        تسجيل الدخول
+                      </button>
+                    </p>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {/* 3. EMAIL CONFIRMATION / VERIFICATION FORM */}
+            {isVerifyView && (
+              <form
+                onSubmit={
+                  view === 'verify_signup'
+                    ? handleVerifySignUp
+                    : view === 'verify_signin_otp'
+                    ? handleVerifyOTP
+                    : handleVerifySignIn
+                }
+                className="space-y-6"
+              >
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 text-center">
+                    رمز التحقق (6 أرقام)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                    className="block w-full max-w-xs mx-auto px-4 py-3.5 text-center font-mono text-2xl font-bold tracking-[0.4em] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-300 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all sm:text-lg"
+                    placeholder="123456"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="pt-2 space-y-4">
+                  <button
+                    type="submit"
+                    disabled={loading || code.trim().length < 4}
+                    className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-all duration-150 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تأكيد المتابعة'}
+                  </button>
+
+                  <div className="text-center space-y-3">
+                    <button
+                      type="button"
+                      onClick={handleResendCode}
+                      disabled={resendLoading}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors disabled:opacity-50 block mx-auto"
+                    >
+                      {resendLoading ? 'جاري إرسال رمز جديد...' : 'لم يصلك الرمز؟ إعادة الإرسال'}
+                    </button>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setView('signin');
+                          setError('');
+                          setResendSuccess('');
+                          setCode('');
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                      >
+                        <ArrowRight className="w-3.5 h-3.5" />
+                        <span>العودة للوراء</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {/* Stale session cleaner helper */}
+            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
               <button
                 type="button"
                 onClick={() => clerk.signOut()}
-                className="text-xs text-red-600 dark:text-red-300 font-medium hover:underline block text-right"
+                className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
               >
-                هل واجهت تعارض في الجلسة؟ اضغط هنا لتفريغ الجلسات المعلقة
+                <LogOut className="w-3.5 h-3.5" />
+                <span>تفريغ الجلسات السابقة وتحديث الصفحة</span>
               </button>
             </div>
-          )}
 
-          {resendSuccess && (
-            <div className="mb-6 p-3.5 bg-blue-500/5 border border-blue-600/20 text-blue-600 text-sm rounded-xl flex items-center gap-2">
-              <Check className="w-4 h-4 shrink-0" />
-              <span>{resendSuccess}</span>
-            </div>
-          )}
-
-          {/* 1. SIGN IN FORM */}
-          {view === 'signin' && (
-            <form onSubmit={handleSignIn} className="space-y-5">
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400">
-                  البريد الإلكتروني
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="h-5 w-5" />
-                  </div>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full pr-11 pl-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all sm:text-sm"
-                    placeholder="name@example.com"
-                    dir="ltr"
-                  />
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  البريد الإلكتروني المسجل به في منصة مسار
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-slate-500 dark:text-slate-400">
-                    كلمة المرور
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleRequestOTP}
-                    className="text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                  >
-                    نسيت كلمة المرور؟
-                  </button>
-                </div>
-                <div className="relative">
-                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="h-5 w-5" />
-                  </div>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pr-11 pl-11 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all sm:text-sm"
-                    placeholder="••••••••"
-                    dir="ltr"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                    tabIndex={-1}
-                    aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  أدخل كلمة المرور الخاصة بحسابك
-                </p>
-              </div>
-
-              <div className="pt-2 space-y-3">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-black text-white font-medium text-sm transition-all duration-150 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تسجيل الدخول'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSendOTP}
-                  disabled={loading}
-                  className="w-full py-2.5 px-4 rounded-xl bg-blue-500/5 hover:bg-blue-500/10 text-blue-600 border border-blue-600/20 text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                >
-                  <KeyRound className="w-4 h-4" />
-                  <span>الدخول السريع برمز التحقق (OTP)</span>
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* 2. SIGN UP FORM */}
-          {view === 'signup' && (
-            <form onSubmit={handleSignUp} className="space-y-5">
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400">
-                  البريد الإلكتروني
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Mail className="h-5 w-5" />
-                  </div>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full pr-11 pl-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all sm:text-sm"
-                    placeholder="name@example.com"
-                    dir="ltr"
-                  />
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  سنرسل رمز تأكيد لتفعيل حسابك على هذا البريد
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400">
-                  كلمة المرور
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="h-5 w-5" />
-                  </div>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pr-11 pl-11 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all sm:text-sm"
-                    placeholder="••••••••"
-                    dir="ltr"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                    tabIndex={-1}
-                    aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  يجب أن تحتوي على 8 خانات على الأقل لضمان أمان حسابك
-                </p>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-black text-white font-medium text-sm transition-all duration-150 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'إنشاء حساب جديد'}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* 3. EMAIL CONFIRMATION / VERIFICATION FORM */}
-          {isVerifyView && (
-            <form
-              onSubmit={
-                view === 'verify_signup'
-                  ? handleVerifySignUp
-                  : view === 'verify_signin_otp'
-                  ? handleVerifyOTP
-                  : handleVerifySignIn
-              }
-              className="space-y-6"
-            >
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 text-center">
-                  رمز التحقق (6 أرقام)
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  maxLength={6}
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                  className="block w-full max-w-xs mx-auto px-4 py-3.5 text-center font-mono text-2xl font-bold tracking-[0.4em] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-300 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all sm:text-lg"
-                  placeholder="123456"
-                  dir="ltr"
-                />
-                <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
-                  تأكد من فحص صندوق الرسائل غير المرغوب فيها (Spam) إذا لم تجد الرمز
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  type="submit"
-                  disabled={loading || code.trim().length < 4}
-                  className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-black text-white font-medium text-sm transition-all duration-150 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تأكيد الرمز والمتابعة'}
-                </button>
-
-                <div className="text-center pt-2">
-                  <button
-                    type="button"
-                    onClick={handleResendCode}
-                    disabled={resendLoading}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors disabled:opacity-50"
-                  >
-                    {resendLoading ? 'جاري إرسال رمز جديد...' : 'لم يصلك الرمز؟ إعادة الإرسال'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          )}
-
-          {/* Footer Navigation & View Switcher */}
-          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
-            {view === 'signin' && (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                ليس لديك حساب؟{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setView('signup');
-                    setError('');
-                    setResendSuccess('');
-                  }}
-                  className="font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                >
-                  إنشاء حساب جديد
-                </button>
-              </p>
-            )}
-
-            {view === 'signup' && (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                لديك حساب بالفعل؟{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setView('signin');
-                    setError('');
-                    setResendSuccess('');
-                  }}
-                  className="font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                >
-                  تسجيل الدخول
-                </button>
-              </p>
-            )}
-
-            {isVerifyView && (
-              <button
-                type="button"
-                onClick={() => {
-                  setView('signin');
-                  setError('');
-                  setResendSuccess('');
-                  setCode('');
-                }}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-              >
-                <ArrowRight className="w-4 h-4" />
-                <span>العودة لتسجيل الدخول</span>
-              </button>
-            )}
           </div>
-
-          {/* Stale session cleaner helper */}
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => clerk.signOut()}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-            >
-              <LogOut className="w-3 h-3" />
-              <span>تفريغ الجلسات السابقة وتحديث الصفحة</span>
-            </button>
-          </div>
-
         </div>
       </div>
+
+      {/* 2. Visual Section (Left Side in RTL) */}
+      <div className="hidden lg:flex lg:w-1/2 relative bg-slate-900 overflow-hidden">
+        {/* The Animated Gradient Iframe */}
+        <iframe 
+          src="https://backgrounds.supply/gradient-lab/embed#s=eyJtIjoicGxhc21hIiwiYyI6WyIjMGQyNDQ3IiwiIzFkNGY3YSIsIiM1YmFjZmYiLCIjMTk3YWY2IiwiI2M2ZjRjZiIsIiMwMDAwMDAiLCIjMDAwMDAwIiwiIzAwMDAwMCJdLCJvIjpbWzAuMzIsMF0sWzAuMDk4ODg1NDM4MTk5OTgzMTksMC4zMDQzMzgwODUyMTQ0NDkxNl0sWy0wLjI1ODg4NTQzODE5OTk4MzE2LDAuMTg4MDkxMjgwNzMzNTkxNDRdLFstMC4yNTg4ODU0MzgxOTk5ODMyLC0wLjE4ODA5MTI4MDczMzU5MTM4XSxbMC4wOTg4ODU0MzgxOTk5ODMxMiwtMC4zMDQzMzgwODUyMTQ0NDkxNl0sWzAsMF0sWzAsMF0sWzAsMF1dLCJuIjo1LCJiIjoxLCJrIjoxLjA1LCJzIjoxLjEsImciOjAuMDIsInAiOnsidV96b29tIjoxLjQsInVfY29tcGxleGl0eSI6MywidV9zbW9vdGgiOjAuNiwidV9zcGVlZCI6MC40fX0" 
+          style={{ width: '100%', height: '100%', minHeight: '280px', border: '0', borderRadius: '0', display: 'block', position: 'absolute', inset: 0 }} 
+          loading="lazy" 
+          allow="fullscreen" 
+          title="Gradient by Backgrounds Supply"
+        />
+        
+        {/* Overlay to ensure text readability */}
+        <div className="absolute inset-0 bg-slate-900/10 dark:bg-slate-900/30 mix-blend-multiply pointer-events-none"></div>
+        
+        {/* Content Wrapper */}
+        <div className="absolute inset-0 flex flex-col justify-between p-12 lg:p-16 z-10 pointer-events-none">
+          {/* Logo overlay on visual side - forcing white color */}
+          <div className="text-white drop-shadow-md brightness-0 invert pointer-events-auto w-max">
+            <MasarLogo size="lg" />
+          </div>
+
+          <div className="max-w-xl">
+            <h2 className="text-4xl lg:text-5xl font-bold tracking-tight mb-4 text-white drop-shadow-sm leading-tight">
+              إدارة متكاملة<br />لمركزك التعليمي.
+            </h2>
+          </div>
+        </div>
+      </div>
+      
     </div>
   );
 }
