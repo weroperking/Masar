@@ -47,7 +47,8 @@ export function useApiQuery<T extends { id?: string; deleted_at?: number | null;
                 decryptedList.push({ ...plain, id: item.id });
               }
             } catch (err) {
-              console.warn(`[useApiQuery] Decryption error for ${resource} item:`, err);
+              const message = err instanceof Error ? err.message || err.name : String(err);
+              console.warn(`[useApiQuery] Decryption error for ${resource} item:`, message, err);
             }
           } else {
             // Unencrypted legacy record
