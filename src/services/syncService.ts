@@ -6,7 +6,8 @@ import {
   encryptRecord, 
   decryptRecord, 
   Envelope, 
-  getOrCreateLocalDek 
+  getOrCreateLocalDek,
+  getPublicKeyHash
 } from './cryptoService';
 import { fetchWithAuth, syncHeaders } from '../config/api';
 
@@ -55,6 +56,13 @@ export async function performHandshake(getToken: () => Promise<string | null>): 
 
       if (res?.wrappedDek) {
         await unwrapDek(res.wrappedDek, keypair.privateKey);
+        if (res.publicKeyHash) {
+          await db.keystore.put({
+            id: 'publicKeyHash',
+            value: res.publicKeyHash,
+            at: Date.now(),
+          });
+        }
         return;
       }
     } catch (netErr) {
@@ -180,9 +188,10 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
           })
         );
 
+        const publicKeyHash = await getPublicKeyHash();
         const res = await fetchWithAuth('/api/sync/push', token, {
           method: 'POST',
-          headers: syncHeaders(token),
+          headers: syncHeaders(token, publicKeyHash),
           body: JSON.stringify({ operations: wireOps })
         });
 
@@ -207,8 +216,9 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
     const lastPullStr = localStorage.getItem('masar_last_pull_timestamp');
     const lastPull = lastPullStr ? parseInt(lastPullStr, 10) : 0;
     try {
+      const publicKeyHash = await getPublicKeyHash();
       const pullRes = await fetchWithAuth(`/api/sync/pull?since=${lastPull}`, token, {
-        headers: syncHeaders(token)
+        headers: syncHeaders(token, publicKeyHash)
       });
 
       if (pullRes && pullRes.data) {
@@ -281,7 +291,7 @@ export async function hydrateIfNeeded(getToken: () => Promise<string | null>): P
 
     console.log('[syncService] Hydrating account data (since=0)...');
     const res = await fetchWithAuth('/api/sync/pull?since=0', token, {
-      headers: syncHeaders(token)
+      headers: syncHeaders(token, await getPublicKeyHash())
     });
 
     let count = 0;
