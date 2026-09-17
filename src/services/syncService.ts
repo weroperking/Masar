@@ -13,7 +13,6 @@ import { fetchWithAuth, syncHeaders } from '../config/api';
 
 export type SyncPillStatus = 'synced' | 'pending' | 'paused' | 'syncing';
 
-// Phase 3 — Backoff & Circuit Breaker Constants
 const MAX_ATTEMPTS = 6;
 const BASE_MS = 500;
 const CAP_MS = 30_000;
@@ -27,12 +26,8 @@ let breakerOpen = false;
 let retryTimeout: any = null;
 let syncPillStatus: SyncPillStatus = 'synced';
 
-/**
- * Handshake with server to retrieve/unwrap encrypted DEK
- */
 export async function performHandshake(getToken: () => Promise<string | null>): Promise<void> {
   try {
-    // Check if valid DEK already in keystore
     const cachedDek = await db.keystore.get('dek');
     if (cachedDek?.key) {
       return;
@@ -76,9 +71,6 @@ export async function performHandshake(getToken: () => Promise<string | null>): 
   }
 }
 
-/**
- * Reset circuit breaker and attempt immediate sync (e.g. on manual user tap or online event)
- */
 export function resetCircuitBreaker() {
   consecutiveFailures = 0;
   breakerOpen = false;
@@ -98,9 +90,6 @@ export function getSyncPillStatus(): SyncPillStatus {
   return syncPillStatus;
 }
 
-/**
- * Phase 3 & Phase 5: Process sync queue with lock and exponential backoff
- */
 export async function processSyncQueue(getToken: () => Promise<string | null>) {
   if (breakerOpen) {
     updateSyncStatus('paused');
@@ -111,7 +100,6 @@ export async function processSyncQueue(getToken: () => Promise<string | null>) {
     return;
   }
 
-  // Phase 5 — Multi-tab leader election via Web Locks API
   if (typeof navigator !== 'undefined' && navigator.locks) {
     await navigator.locks.request('masar_sync_leader', { ifAvailable: true }, async (lock) => {
       if (lock) {
@@ -135,13 +123,10 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
       return;
     }
 
-    // Ensure DEK is ready
     await performHandshake(getToken);
 
-    // 1. Push Outbox
     const queue = await db.syncQueue.orderBy('createdAt').toArray();
     if (queue.length > 0) {
-      // Deduplicate operations by entityId
       const grouped = new Map();
       for (const op of queue) {
         const key = `${op.entityType}:${op.entityId}`;
@@ -168,11 +153,9 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
       const operationsToPush = Array.from(grouped.values());
 
       if (operationsToPush.length > 0) {
-        // Phase 1e — operations already hold encrypted envelope in payload
         const wireOps = await Promise.all(
           operationsToPush.map(async (o) => {
             let payload = o.payload;
-            // If legacy unencrypted payload, wrap in envelope
             if (payload && !payload.envelope && !payload.ct) {
               const env = await encryptRecord(payload);
               payload = { id: o.entityId, envelope: env, updatedAt: o.createdAt };
@@ -195,7 +178,6 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
           body: JSON.stringify({ operations: wireOps })
         });
 
-        // Delete processed operations from sync queue
         if (res && Array.isArray(res.results)) {
           for (const result of res.results) {
             if (result.status === 'success' || result.status === 'applied') {
@@ -212,7 +194,6 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
       }
     }
 
-    // 2. Pull Deltas
     const lastPullStr = localStorage.getItem('masar_last_pull_timestamp');
     const lastPull = lastPullStr ? parseInt(lastPullStr, 10) : 0;
     try {
@@ -231,7 +212,6 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
       console.warn('[syncService] Delta pull deferred:', pullErr?.message || pullErr);
     }
 
-    // Sync Succeeded
     lastSyncTime = Date.now();
     consecutiveFailures = 0;
     breakerOpen = false;
@@ -244,13 +224,11 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
     console.warn(`[syncService] Sync failure (${consecutiveFailures}/${BREAKER_THRESHOLD}):`, err?.message || err);
     syncError = err?.message || 'Sync error';
 
-    // Phase 3 — Circuit Breaker threshold
     if (consecutiveFailures >= BREAKER_THRESHOLD) {
       breakerOpen = true;
       updateSyncStatus('paused');
       console.warn('[syncService] Circuit breaker tripped. Sync paused.');
 
-      // Auto-reset when network reconnects
       if (typeof window !== 'undefined') {
         window.addEventListener('online', () => {
           resetCircuitBreaker();
@@ -260,7 +238,6 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
       return;
     }
 
-    // Phase 3 — Exponential Backoff with jitter
     const delay = Math.min(CAP_MS, BASE_MS * (2 ** consecutiveFailures)) * (1 + Math.random() * 0.3);
     console.log(`[syncService] Scheduling retry in ${Math.round(delay)}ms...`);
     updateSyncStatus('pending');
@@ -274,9 +251,6 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
   }
 }
 
-/**
- * Phase 4 — Hydrate on first load if not yet hydrated
- */
 export async function hydrateIfNeeded(getToken: () => Promise<string | null>): Promise<{ hydrated: boolean; recordCount: number }> {
   try {
     const flag = await db.keystore.get('hydrated');
@@ -290,8 +264,9 @@ export async function hydrateIfNeeded(getToken: () => Promise<string | null>): P
     }
 
     console.log('[syncService] Hydrating account data (since=0)...');
+    const publicKeyHash = await getPublicKeyHash();
     const res = await fetchWithAuth('/api/sync/pull?since=0', token, {
-      headers: syncHeaders(token, await getPublicKeyHash())
+      headers: syncHeaders(token, publicKeyHash)
     });
 
     let count = 0;
@@ -318,7 +293,6 @@ async function applyDeltas(data: any): Promise<number> {
       const records = data[table];
       if (!Array.isArray(records)) continue;
 
-      // Encrypt outside of IDB transaction if needed
       const prepared = await Promise.all(
         records.map(async (record: any) => {
           let envelope = record.envelope;

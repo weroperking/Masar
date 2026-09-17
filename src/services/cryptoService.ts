@@ -10,7 +10,6 @@ export type Envelope = {
   ct: string; // base64 ct + GCM-tag
 };
 
-// Helper to convert ArrayBuffer to Base64
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -20,7 +19,6 @@ export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-// Helper to convert Base64 to ArrayBuffer
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
@@ -30,10 +28,6 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-/**
- * 1a. Ensure device RSA-OAEP keypair with extractable: false.
- * Persisted in db.keystore as CryptoKeyPair.
- */
 export async function ensureDeviceKeypair(): Promise<CryptoKeyPair> {
   if (inMemoryKeyPair) return inMemoryKeyPair;
 
@@ -47,7 +41,6 @@ export async function ensureDeviceKeypair(): Promise<CryptoKeyPair> {
     console.warn('[cryptoService] Error loading deviceKeypair from db.keystore:', err);
   }
 
-  // Generate non-extractable RSA-OAEP 2048 keypair
   const keypair = await window.crypto.subtle.generateKey(
     {
       name: 'RSA-OAEP',
@@ -55,7 +48,7 @@ export async function ensureDeviceKeypair(): Promise<CryptoKeyPair> {
       publicExponent: new Uint8Array([1, 0, 1]),
       hash: 'SHA-256',
     },
-    false, // Non-extractable private key
+    false,
     ['encrypt', 'decrypt']
   );
 
@@ -65,7 +58,6 @@ export async function ensureDeviceKeypair(): Promise<CryptoKeyPair> {
     console.warn('[cryptoService] Failed to persist deviceKeypair in db.keystore:', putErr);
   }
 
-  // Clean up legacy localStorage keys
   try {
     localStorage.removeItem('masar_device_pub_jwk');
     localStorage.removeItem('masar_device_priv_jwk');
@@ -81,17 +73,11 @@ export async function getDeviceKeyPair(): Promise<CryptoKeyPair> {
   return ensureDeviceKeypair();
 }
 
-/**
- * Export public key to base64 SPKI
- */
 export async function exportPublicKey(keyPair: CryptoKeyPair): Promise<string> {
   const exported = await window.crypto.subtle.exportKey('spki', keyPair.publicKey);
   return arrayBufferToBase64(exported);
 }
 
-/**
- * 1b. Unwrap DEK with private key and store in db.keystore as non-extractable CryptoKey.
- */
 export async function unwrapDek(wrappedDekBase64: string, privateKey: CryptoKey): Promise<CryptoKey> {
   try {
     if (!wrappedDekBase64 || wrappedDekBase64 === 'mock_wrapped_dek_base64') {
@@ -108,7 +94,7 @@ export async function unwrapDek(wrappedDekBase64: string, privateKey: CryptoKey)
       'raw',
       dekBytes,
       { name: 'AES-GCM', length: 256 },
-      false, // Non-extractable DEK
+      false,
       ['encrypt', 'decrypt']
     );
 
@@ -121,9 +107,6 @@ export async function unwrapDek(wrappedDekBase64: string, privateKey: CryptoKey)
   }
 }
 
-/**
- * Get or create fallback local non-extractable DEK if server handshake is unreachable offline
- */
 export async function getOrCreateLocalDek(): Promise<CryptoKey> {
   if (sessionDek) return sessionDek;
 
@@ -137,10 +120,9 @@ export async function getOrCreateLocalDek(): Promise<CryptoKey> {
     console.warn('[cryptoService] Error loading cached DEK from db.keystore:', err);
   }
 
-  // Generate non-extractable AES-GCM 256
   const newDek = await window.crypto.subtle.generateKey(
     { name: 'AES-GCM', length: 256 },
-    false, // Non-extractable
+    false,
     ['encrypt', 'decrypt']
   );
 
@@ -181,10 +163,6 @@ export async function getPublicKeyHash(): Promise<string | null> {
   }
 }
 
-/**
- * 1c. Encrypt record at rest returning standard Envelope
- * { v: 1, iv: base64(12), ct: base64(ciphertext + tag) }
- */
 export async function encryptRecord<T>(plain: T): Promise<Envelope> {
   const dek = await getDek();
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
@@ -202,9 +180,6 @@ export async function encryptRecord<T>(plain: T): Promise<Envelope> {
   };
 }
 
-/**
- * 1c. Decrypt record from Envelope
- */
 export async function decryptRecord<T>(env: Envelope): Promise<T> {
   const dek = await getDek();
   const iv = new Uint8Array(base64ToArrayBuffer(env.iv));
@@ -220,25 +195,21 @@ export async function decryptRecord<T>(env: Envelope): Promise<T> {
   return JSON.parse(decoded);
 }
 
-// Backward compatibility helpers
 export async function encryptPayload(payload: any): Promise<{ _cipher: string; _iv: string }> {
   const env = await encryptRecord(payload);
   return { _cipher: env.ct, _iv: env.iv };
 }
 
 export async function decryptPayload(cipherData: { _cipher: string | ArrayBuffer; _iv: string | Uint8Array | ArrayBuffer }): Promise<any> {
-  const ivStr = typeof cipherData._iv === 'string' 
-    ? cipherData._iv 
+  const ivStr = typeof cipherData._iv === 'string'
+    ? cipherData._iv
     : arrayBufferToBase64((cipherData._iv instanceof Uint8Array ? cipherData._iv : new Uint8Array(cipherData._iv as ArrayBuffer)).buffer as ArrayBuffer);
-  const ctStr = typeof cipherData._cipher === 'string' 
-    ? cipherData._cipher 
+  const ctStr = typeof cipherData._cipher === 'string'
+    ? cipherData._cipher
     : arrayBufferToBase64(cipherData._cipher as ArrayBuffer);
   return decryptRecord({ v: 1, iv: ivStr, ct: ctStr });
 }
 
-/**
- * 1d. Migrate existing plaintext records to encrypted envelopes
- */
 export function migratePlaintextRecords(): Promise<void> {
   if (plaintextMigrationInFlight) return plaintextMigrationInFlight;
   plaintextMigrationInFlight = (async () => {
@@ -273,7 +244,7 @@ export function migratePlaintextRecords(): Promise<void> {
       console.log('[cryptoService] Plaintext migration completed successfully.');
     } catch (err) {
       console.warn('[cryptoService] Migration of plaintext records error:', err);
-      plaintextMigrationInFlight = null; // allow retry only on failure
+      plaintextMigrationInFlight = null;
     }
   })();
   return plaintextMigrationInFlight;

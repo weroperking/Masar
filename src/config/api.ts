@@ -24,7 +24,6 @@ export async function fetchWithAuth(url: string, token: string | null, options: 
     headers.set('Content-Type', 'application/json');
   }
 
-  // Ensure X-Sync-Encrypted is consistently present on sync endpoints
   if (url.startsWith('/api/sync') && !headers.has('X-Sync-Encrypted')) {
     headers.set('X-Sync-Encrypted', 'true');
   }
