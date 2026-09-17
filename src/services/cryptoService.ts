@@ -2,6 +2,7 @@ import { db } from '../db/db';
 
 let sessionDek: CryptoKey | null = null;
 let inMemoryKeyPair: CryptoKeyPair | null = null;
+let plaintextMigrationInFlight: Promise<void> | null = null;
 
 export type Envelope = {
   v: 1;
@@ -167,6 +168,15 @@ export async function getDek(): Promise<CryptoKey> {
   return await getOrCreateLocalDek();
 }
 
+export async function getPublicKeyHash(): Promise<string | null> {
+  try {
+    const row = await db.keystore.get('publicKeyHash');
+    return row?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function setSessionDek(key: CryptoKey) {
   sessionDek = key;
 }
@@ -229,39 +239,46 @@ export async function decryptPayload(cipherData: { _cipher: string | ArrayBuffer
 /**
  * 1d. Migrate existing plaintext records to encrypted envelopes
  */
-export async function migratePlaintextRecords(): Promise<void> {
-  try {
-    const flag = await db.keystore.get('plaintextMigrated');
-    if (flag) return;
+export function migratePlaintextRecords(): Promise<void> {
+  if (plaintextMigrationInFlight) return plaintextMigrationInFlight;
+  plaintextMigrationInFlight = (async () => {
+    try {
+      const flag = await db.keystore.get('plaintextMigrated');
+      if (flag) return;
 
-    const tables = [
-      db.students, db.courses, db.groups, db.enrollments,
-      db.attendanceSessions, db.attendanceRecords, db.assessments, db.assessmentGrades,
-      db.products, db.courseProducts, db.sessionPayments, db.ledgerEntries,
-      db.bookingRequests, db.productSales, db.events, db.users,
-      db.messageTemplates, db.settings, db.qrCards
-    ];
+      const tables = [
+        db.students, db.courses, db.groups, db.enrollments,
+        db.attendanceSessions, db.attendanceRecords, db.assessments, db.assessmentGrades,
+        db.products, db.courseProducts, db.sessionPayments, db.ledgerEntries,
+        db.bookingRequests, db.productSales, db.events, db.users,
+        db.messageTemplates, db.settings, db.qrCards
+      ];
 
-    for (const table of tables) {
-      const rows = await table.toArray();
-      const unencrypted = rows.filter((r: any) => !r.envelope);
-      if (unencrypted.length === 0) continue;
+      for (const table of tables) {
+        const rows = await table.toArray();
+        const unencrypted = rows.filter((r: any) => !r.envelope);
+        if (unencrypted.length === 0) continue;
 
-      // Encrypt outside of IDB transaction
-      const prepared = await Promise.all(
-        unencrypted.map(async (r: any) => ({
-          ...r,
-          envelope: await encryptRecord(r),
-        }))
-      );
+        // Encrypt outside of IDB transaction
+        const prepared = await Promise.all(
+          unencrypted.map(async (r: any) => ({
+            ...r,
+            envelope: await encryptRecord(r),
+          }))
+        );
 
-      // Fast synchronous IDB commit
-      await db.transaction('rw', table, () => Promise.all(prepared.map((p: any) => table.put(p))));
+        // Fast synchronous IDB commit
+        await db.transaction('rw', table, () => Promise.all(prepared.map((p: any) => table.put(p))));
+      }
+
+      await db.keystore.put({ id: 'plaintextMigrated', at: Date.now() });
+      console.log('[cryptoService] Plaintext migration completed successfully.');
+    } catch (err) {
+      console.warn('[cryptoService] Migration of plaintext records error:', err);
+    } finally {
+      const flag = await db.keystore.get('plaintextMigrated').catch(() => null);
+      if (!flag) plaintextMigrationInFlight = null;
     }
-
-    await db.keystore.put({ id: 'plaintextMigrated', at: Date.now() });
-    console.log('[cryptoService] Plaintext migration completed successfully.');
-  } catch (err) {
-    console.warn('[cryptoService] Migration of plaintext records error:', err);
-  }
+  })();
+  return plaintextMigrationInFlight;
 }
