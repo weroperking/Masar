@@ -4,6 +4,7 @@ import { Calendar as CalendarIcon, Users, Clock, Play, CheckCircle, Filter } fro
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import { Group, Course, Enrollment, AttendanceSession } from '../../types';
+import { formatTime12, formatTimeRange12 } from '../../utils/time';
 
 export function Schedule() {
   const navigate = useNavigate();
@@ -223,8 +224,8 @@ export function Schedule() {
                                 )}
                               </div>
                               <p className="text-blue-600 mt-0.5 truncate">{courseMap.get(group.courseId)}</p>
-                              <p className="text-slate-500 mt-1 font-mono" dir="ltr">
-                                {group.startTime} - {group.endTime}
+                              <p className="text-slate-500 mt-1 font-mono" dir="rtl">
+                                {formatTimeRange12(group.startTime, group.endTime)}
                               </p>
                               {group.room && <p className="text-slate-500 text-[10px] mt-1 bg-slate-100 dark:bg-slate-800 inline-block px-1.5 py-0.5 rounded">قاعة: {group.room}</p>}
                             </div>
@@ -302,8 +303,8 @@ export function Schedule() {
                   return (
                     <div key={group.id} className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <div className="flex items-start gap-4">
-                        <div className="text-blue-600 dark:text-blue-400 font-mono font-bold text-base mt-0.5" dir="ltr">
-                          {group.startTime}
+                        <div className="text-blue-600 dark:text-blue-400 font-mono font-bold text-base mt-0.5" dir="rtl">
+                          {formatTime12(group.startTime)}
                         </div>
                         <div>
                           <h4 
@@ -314,7 +315,7 @@ export function Schedule() {
                           </h4>
                           <p className="text-sm text-blue-600 font-medium">{courseMap.get(group.courseId)}</p>
                           <p className="text-xs text-slate-500 mt-1">
-                            ينتهي في {group.endTime} • السعة: {group.maxStudents || 'مفتوح'} طالب {group.room && `• قاعة: ${group.room}`}
+                            ينتهي في {formatTime12(group.endTime)} • السعة: {group.maxStudents || 'مفتوح'} طالب {group.room && `• قاعة: ${group.room}`}
                           </p>
                         </div>
                       </div>

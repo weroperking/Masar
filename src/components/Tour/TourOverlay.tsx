@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTour } from '../../context/TourContext';
 import { 
-  ChevronLeft, ChevronRight, X, Sparkles, HelpCircle, 
+  ChevronLeft, ChevronRight, X, HelpCircle, 
   Lightbulb, CheckCircle2, ArrowRight
 } from 'lucide-react';
 import { cn } from '../../lib/utils';

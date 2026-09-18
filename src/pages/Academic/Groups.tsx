@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, X, Calendar, Clock, Users, Trash2, Edit2 } from 'lucide-react';
 import { Group } from '../../types';
+import { formatTimeRange12, formatTime12 } from '../../utils/time';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
@@ -128,9 +129,9 @@ export function Groups() {
                           <Calendar className="w-3.5 h-3.5 ml-1.5 text-slate-400 shrink-0" />
                           <span>{group.daysOfWeek.join('، ')}</span>
                         </div>
-                        <div className="flex items-center font-mono">
+                        <div className="flex items-center font-mono" dir="rtl">
                           <Clock className="w-3.5 h-3.5 ml-1.5 text-slate-400 shrink-0" />
-                          <span>{group.startTime} - {group.endTime}</span>
+                          <span>{formatTimeRange12(group.startTime, group.endTime)}</span>
                         </div>
                         {group.room && (
                           <div className="flex items-center">
@@ -365,7 +366,14 @@ function GroupFormModal({ onClose, courses, initialData }: { onClose: () => void
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">وقت البدء *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">وقت البدء *</label>
+                {formData.startTime && (
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">
+                    {formatTime12(formData.startTime)}
+                  </span>
+                )}
+              </div>
               <input 
                 required 
                 type="time" 
@@ -375,7 +383,14 @@ function GroupFormModal({ onClose, courses, initialData }: { onClose: () => void
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">وقت الانتهاء *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">وقت الانتهاء *</label>
+                {formData.endTime && (
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">
+                    {formatTime12(formData.endTime)}
+                  </span>
+                )}
+              </div>
               <input 
                 required 
                 type="time" 

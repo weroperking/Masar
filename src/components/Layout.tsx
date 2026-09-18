@@ -21,6 +21,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { MasarLogo } from './MasarLogo';
 import { getSyncState, triggerManualSync } from '../services/syncService';
+import { formatTime12 } from '../utils/time';
 
 // Base navigation groups (we will filter them inside the component)
 const getNavigationGroups = (limits: any) => {
@@ -222,7 +223,7 @@ export function Layout() {
     const handleAutoStart = (e: any) => {
       const detail = e.detail || {};
       toast.success(
-        `بدأت الحصة تلقائياً: ${detail.groupName || ''} (${detail.courseName || ''}) لحلول موعد البدء (${detail.startTime || ''})`
+        `بدأت الحصة تلقائياً: ${detail.groupName || ''} (${detail.courseName || ''}) لحلول موعد البدء (${formatTime12(detail.startTime) || ''})`
       );
     };
 
@@ -529,7 +530,7 @@ export function Layout() {
         
         {/* Page Content */}
         <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-150">
-          <div className="mx-auto w-full h-full min-h-full pb-12">
+          <div className="w-full h-full min-h-full pb-12">
             <Outlet />
           </div>
         </div>

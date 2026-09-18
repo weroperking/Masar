@@ -8,7 +8,7 @@ import {
   Search, Users, BookOpen, CreditCard, LayoutDashboard, Settings, 
   UserCheck, Calendar, FileText, Library, Wallet, 
   FileSpreadsheet, Globe, Package, BarChart3, UserCog, 
-  MessageSquare, QrCode, Moon, Sun, Plus, ArrowRight, CornerDownLeft, Sparkles
+  MessageSquare, QrCode, Moon, Sun, Plus, ArrowRight, CornerDownLeft, Zap
 } from 'lucide-react';
 
 interface PaletteItem {
@@ -296,7 +296,7 @@ export function CommandPalette({
             </span>
           </div>
           <div className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
+            <Zap className="w-3.5 h-3.5" />
             منظومة مسار السريعة
           </div>
         </div>

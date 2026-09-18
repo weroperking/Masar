@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useApiQuery } from '../config/queryHooks';
-import { Users, Wallet, CreditCard, TrendingUp, Sparkles, ArrowUpRight, AlertCircle, BarChart3, Filter } from 'lucide-react';
+import { Users, Wallet, CreditCard, TrendingUp, ArrowUpRight, AlertCircle, BarChart3, Filter } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toMajorUnits } from '../utils/currency';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';

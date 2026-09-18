@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { 
   ArrowRight, User, BookOpen, Clock, Calendar, Wallet, 
-  QrCode, RefreshCw, Sparkles, CheckCircle2, 
+  QrCode, RefreshCw, CheckCircle2, 
   GraduationCap, Edit2, Check, X, MessageCircle, Globe, Copy, ExternalLink,
   AlertTriangle, DollarSign, List, FileText, ArrowLeftRight, Activity, Users
 } from 'lucide-react';

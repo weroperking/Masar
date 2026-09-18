@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   CheckCircle2, AlertCircle, Clock, GraduationCap, 
-  Wallet, Sparkles, BookOpen, AlertTriangle, ShieldCheck
+  Wallet, BookOpen, AlertTriangle, ShieldCheck
 } from 'lucide-react';
 import { PublicLookupData } from '../types';
 

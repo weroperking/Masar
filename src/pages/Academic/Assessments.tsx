@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { 
   FileText, Plus, Search, Edit2, Trash2, X, Users, CheckCircle, 
-  GraduationCap, Check, Sparkles, UserPlus, SlidersHorizontal, Calculator 
+  GraduationCap, Check, UserPlus, SlidersHorizontal, Calculator 
 } from 'lucide-react';
 import { Assessment, Student, Course, Group, Enrollment, AssessmentGrade } from '../../types';
 import { format } from 'date-fns';

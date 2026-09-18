@@ -2,6 +2,7 @@ import React from 'react';
 import { BottomSheet } from './BottomSheet';
 import { Group } from '../../types';
 import { Calendar, Clock, MapPin, Check } from 'lucide-react';
+import { formatTimeRange12 } from '../../utils/time';
 
 interface GroupBottomSheetProps {
   isOpen: boolean;
@@ -115,9 +116,9 @@ export function GroupBottomSheet({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      {group.startTime || '00:00'} - {group.endTime || '00:00'}
+                    <span className="flex items-center gap-1 font-mono" dir="rtl">
+                      <Clock className="w-3.5 h-3.5 ml-0.5" />
+                      {formatTimeRange12(group.startTime, group.endTime)}
                     </span>
                     <span>•</span>
                     <span>{formatDays(group.daysOfWeek)}</span>

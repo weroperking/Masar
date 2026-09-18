@@ -1,4 +1,4 @@
-import { Save, Sun, Moon, Keyboard, RefreshCw, User as UserIcon, Building2, Sparkles, HelpCircle } from 'lucide-react';
+import { Save, Sun, Moon, Keyboard, RefreshCw, User as UserIcon, Building2, HelpCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useUser, useOrganization } from '@clerk/clerk-react';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
@@ -93,10 +93,10 @@ export function Settings() {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 w-full">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">إعدادات النظام</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">تخصيص المظهر، أتمتة الجلسات، وقواعد التقييم</p>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">إعدادات النظام</h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">تخصيص المظهر، أتمتة الجلسات، وقواعد التقييم</p>
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 space-y-8">
@@ -298,7 +298,7 @@ export function Settings() {
         {/* Interactive Onboarding Tour Section */}
         <section className="pt-4 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2 mb-2 text-blue-600 dark:text-blue-400">
-            <Sparkles className="w-5 h-5" />
+            <HelpCircle className="w-5 h-5" />
             <h2 className="text-base font-bold">الجولة التعريفية التفاعلية للمنصة</h2>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
@@ -317,7 +317,7 @@ export function Settings() {
               onClick={() => startTour(0)}
               className="shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <Sparkles className="w-4 h-4" />
+              <HelpCircle className="w-4 h-4" />
               <span>إعادة الجولة التعريفية</span>
             </button>
           </div>

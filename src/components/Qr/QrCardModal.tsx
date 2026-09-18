@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   X, User, Layers, Users, RefreshCw, Check, 
-  Printer, Save, Search, CheckCircle2, AlertCircle, Palette, QrCode, Sparkles, SlidersHorizontal,
+  Printer, Save, Search, CheckCircle2, AlertCircle, Palette, QrCode, CreditCard, SlidersHorizontal,
   Image
 } from 'lucide-react';
 import { Student, QrCard } from '../../types';
@@ -313,7 +313,7 @@ export function QrCardModal({
                       : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
-                  <Sparkles className="w-4 h-4 mb-1" />
+                  <CreditCard className="w-4 h-4 mb-1" />
                   <span className="text-xs">كارت عام فوري</span>
                   <span className="text-[10px] text-slate-400 mt-0.5">بطاقة واحدة للتوزيع</span>
                 </button>

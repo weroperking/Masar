@@ -3,10 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
 import { 
   Play, CheckCircle, Clock, X, Users, MessageCircle, StopCircle, Calendar, 
-  AlertTriangle, QrCode, Check, Search, Sparkles, UserCheck, UserX, Trash2, ArrowRight, RefreshCw, Zap
+  AlertTriangle, QrCode, Check, Search, UserCheck, UserX, Trash2, ArrowRight, RefreshCw, Zap
 } from 'lucide-react';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { AttendanceSession, Student, Group, Course, AttendanceRecord } from '../../types';
+import { formatTime12, formatTimeRange12, formatTimestamp12 } from '../../utils/time';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { format } from 'date-fns';
@@ -189,7 +190,7 @@ export function Attendance() {
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mb-2">{courseMap.get(group.courseId)}</p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">{group.startTime} - {group.endTime}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 font-mono" dir="rtl">{formatTimeRange12(group.startTime, group.endTime)}</p>
                 </div>
                 <div>
                   {isLive ? (
@@ -280,7 +281,7 @@ export function Attendance() {
                       </div>
                       
                       <div className="text-xs text-slate-500 mb-4 flex gap-4 font-mono">
-                        <span className="flex items-center"><Clock className="w-3.5 h-3.5 ml-1 text-slate-400" /> بدأ: {format(new Date(session.startedAt), 'hh:mm a')}</span>
+                        <span className="flex items-center"><Clock className="w-3.5 h-3.5 ml-1 text-slate-400" /> بدأ: {formatTimestamp12(session.startedAt)}</span>
                       </div>
 
                       <div className="flex gap-2">
@@ -317,9 +318,9 @@ export function Attendance() {
                     <div key={group.id} className="border border-slate-200 dark:border-slate-800 rounded-lg p-5">
                       <h3 className="font-bold text-slate-900 dark:text-slate-100">{group.name}</h3>
                       <p className="text-sm text-slate-500 mb-3">{courseMap.get(group.courseId)}</p>
-                      <div className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
+                      <div className="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 font-mono" dir="rtl">
                         <Clock className="w-4 h-4 ml-1.5 text-blue-500" />
-                        {group.startTime} - {group.endTime}
+                        {formatTimeRange12(group.startTime, group.endTime)}
                       </div>
                     </div>
                   ))}
@@ -359,8 +360,8 @@ export function Attendance() {
                             )}
                           </td>
                           <td className="px-4 py-2.5 text-slate-500 font-mono">{format(new Date(session.startedAt), 'dd MMM yyyy', { locale: ar })}</td>
-                          <td className="px-4 py-2.5 text-slate-500 font-mono" dir="ltr">{format(new Date(session.startedAt), 'hh:mm a')}</td>
-                          <td className="px-4 py-2.5 text-slate-500 font-mono" dir="ltr">{session.endedAt ? format(new Date(session.endedAt), 'hh:mm a') : '-'}</td>
+                          <td className="px-4 py-2.5 text-slate-500 font-mono" dir="rtl">{formatTimestamp12(session.startedAt)}</td>
+                          <td className="px-4 py-2.5 text-slate-500 font-mono" dir="rtl">{session.endedAt ? formatTimestamp12(session.endedAt) : '-'}</td>
                         </tr>
                       ))}
                     </tbody>

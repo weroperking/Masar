@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { Group, Course, Enrollment, Student } from '../../types';
+import { formatTimeRange12 } from '../../utils/time';
 
 export function GroupDetails() {
   const { id } = useParams<{ id: string }>();
@@ -197,9 +198,9 @@ export function GroupDetails() {
             </div>
             <div>
               <span className="block text-[11px] text-slate-500 mb-0.5">التوقيت</span>
-              <div className="flex items-center gap-1.5 font-mono text-slate-900 dark:text-slate-100" dir="ltr">
+              <div className="flex items-center gap-1.5 font-mono text-slate-900 dark:text-slate-100" dir="rtl">
                 <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                {group.startTime} - {group.endTime}
+                {formatTimeRange12(group.startTime, group.endTime)}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
