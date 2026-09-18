@@ -1,125 +1,449 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApiQuery, useApiMutation } from '../config/queryHooks';
-import { CheckCircle2, GraduationCap } from 'lucide-react';
-import { BookingRequest, Course } from '../types';
+import { BookingRequest, Course, Group, Settings as SettingsType } from '../types';
+import { CourseBottomSheet } from '../components/Booking/CourseBottomSheet';
+import { GradeBottomSheet } from '../components/Booking/GradeBottomSheet';
+import { GroupBottomSheet } from '../components/Booking/GroupBottomSheet';
+import { StudentDetailsBottomSheet } from '../components/Booking/StudentDetailsBottomSheet';
+import { BookingSuccessBottomSheet } from '../components/Booking/BookingSuccessBottomSheet';
+import {
+  BookOpen,
+  GraduationCap,
+  Calendar,
+  Check,
+  ChevronDown,
+  User,
+  Edit3,
+  RotateCcw,
+} from 'lucide-react';
+
+const DEFAULT_COURSES: Course[] = [
+  {
+    id: 'default-course-math',
+    name: 'مراجعة الرياضيات العامة والتفاضل',
+    subject: 'الرياضيات',
+    price: 0,
+    paymentType: 'monthly',
+    isActive: true,
+    created_at: Date.now(),
+    updated_at: Date.now(),
+    sync_status: 'synced',
+  },
+  {
+    id: 'default-course-eng',
+    name: 'كورس اللغة الإنجليزية التأسيسي والشامل',
+    subject: 'اللغة الإنجليزية',
+    price: 0,
+    paymentType: 'monthly',
+    isActive: true,
+    created_at: Date.now(),
+    updated_at: Date.now(),
+    sync_status: 'synced',
+  },
+  {
+    id: 'default-course-phys',
+    name: 'كورس الفيزياء المتقدم',
+    subject: 'الفيزياء',
+    price: 0,
+    paymentType: 'monthly',
+    isActive: true,
+    created_at: Date.now(),
+    updated_at: Date.now(),
+    sync_status: 'synced',
+  },
+];
 
 export function PublicBooking() {
   const [submitted, setSubmitted] = useState(false);
+
+  // Form State (Student Name and Phone only)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    courseId: '',
   });
 
+  const [selectedGrade, setSelectedGrade] = useState<string>('الصف الثالث الثانوي');
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+
+  // Bottom Sheets state
+  const [isCourseSheetOpen, setIsCourseSheetOpen] = useState(false);
+  const [isGradeSheetOpen, setIsGradeSheetOpen] = useState(false);
+  const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
+  const [isStudentDetailsSheetOpen, setIsStudentDetailsSheetOpen] = useState(false);
+
+  // Queries
   const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
-  const courses = allCourses.filter(c => !c.deleted_at && c.isActive);
+  const { data: allGroups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+  const { data: allEnrollments = [] } = useApiQuery<any>('enrollments', 60 * 1000);
+  const { data: settingsList = [] } = useApiQuery<SettingsType>('settings', 60 * 1000);
   const { create: createBooking } = useApiMutation<BookingRequest>('bookingRequests');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.phone || !formData.courseId) return;
+  // Academy name from settings or saved storage
+  const academyName = useMemo(() => {
+    return (
+      settingsList[0]?.academyName ||
+      localStorage.getItem('masar_academy_name') ||
+      'أكاديمية مسار التعليمية'
+    );
+  }, [settingsList]);
 
-    const course = courses?.find(c => c.id === formData.courseId);
-    if (!course) return;
+  // Active courses
+  const courses = useMemo(() => {
+    const active = allCourses.filter((c) => !c.deleted_at && c.isActive);
+    return active.length > 0 ? active : DEFAULT_COURSES;
+  }, [allCourses]);
 
-    createBooking.mutate({
-      name: formData.name,
-      phone: formData.phone,
-      courseId: formData.courseId,
-      declaredAmount: course.price,
-      requestDate: new Date().toISOString().split('T')[0],
-      status: 'pending'
-    }, {
-      onSuccess: () => setSubmitted(true)
-    });
+  // Current selected course object
+  const selectedCourse = useMemo(() => {
+    if (selectedCourseId) {
+      const found = courses.find((c) => c.id === selectedCourseId);
+      if (found) return found;
+    }
+    return courses[0] || DEFAULT_COURSES[0];
+  }, [courses, selectedCourseId]);
+
+  // Enrollment counts for each group to determine available seats
+  const enrollmentCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const enr of allEnrollments) {
+      if (enr.groupId && enr.status !== 'dropped' && enr.status !== 'inactive') {
+        counts[enr.groupId] = (counts[enr.groupId] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [allEnrollments]);
+
+  // Course groups (with default schedule options if center has not defined groups yet)
+  const courseGroups = useMemo(() => {
+    const filtered = allGroups.filter((g) => !g.deleted_at && g.courseId === selectedCourse.id);
+    if (filtered.length > 0) return filtered;
+    return [
+      {
+        id: `default-grp-1-${selectedCourse.id}`,
+        courseId: selectedCourse.id,
+        name: 'مجموعة السبت والثلاثاء (4:00 عصراً)',
+        type: 'in_person' as const,
+        daysOfWeek: ['saturday', 'tuesday'],
+        startTime: '16:00',
+        endTime: '18:00',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: '',
+        maxStudents: 25,
+        status: 'scheduled' as const,
+        sync_status: 'synced' as const,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      },
+      {
+        id: `default-grp-2-${selectedCourse.id}`,
+        courseId: selectedCourse.id,
+        name: 'مجموعة الأحد والأربعاء (6:00 مساءً)',
+        type: 'in_person' as const,
+        daysOfWeek: ['sunday', 'wednesday'],
+        startTime: '18:00',
+        endTime: '20:00',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: '',
+        maxStudents: 20,
+        status: 'scheduled' as const,
+        sync_status: 'synced' as const,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      },
+      {
+        id: `default-grp-3-${selectedCourse.id}`,
+        courseId: selectedCourse.id,
+        name: 'مجموعة أونلاين مسائية (الجمعة 7:00 م)',
+        type: 'online' as const,
+        daysOfWeek: ['friday'],
+        startTime: '19:00',
+        endTime: '21:30',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: '',
+        maxStudents: 35,
+        status: 'scheduled' as const,
+        sync_status: 'synced' as const,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      },
+    ];
+  }, [allGroups, selectedCourse.id]);
+
+  // Selected Group Object
+  const selectedGroup = useMemo(() => {
+    if (!selectedGroupId) return null;
+    return courseGroups.find((g) => g.id === selectedGroupId) || null;
+  }, [courseGroups, selectedGroupId]);
+
+  const handleSubmitBooking = async () => {
+    // If student details are not filled, open the student details bottomsheet
+    if (!formData.name.trim() || !formData.phone.trim()) {
+      setIsStudentDetailsSheetOpen(true);
+      return;
+    }
+
+    createBooking.mutate(
+      {
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        courseId: selectedCourse.id,
+        groupId: selectedGroup?.id || undefined,
+        gradeLevel: selectedGrade,
+        declaredAmount: 0,
+        requestDate: new Date().toISOString().split('T')[0],
+        status: 'pending',
+      },
+      {
+        onSuccess: () => {
+          setSubmitted(true);
+        },
+      }
+    );
   };
 
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4" dir="rtl">
-        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center border border-slate-100">
-          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 className="w-10 h-10 text-emerald-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">تم تسجيل طلبك بنجاح!</h2>
-          <p className="text-slate-600 mb-8">
-            شكراً لك، تم استلام طلب الانضمام الخاص بك. سنتواصل معك قريباً لتأكيد الحجز.
-          </p>
-          <button 
-            onClick={() => {
-              setFormData({ name: '', phone: '', courseId: '' });
-              setSubmitted(false);
-            }}
-            className="px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors w-full"
-          >
-            تسجيل طالب آخر
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const handleReset = () => {
+    setFormData({ name: '', phone: '' });
+    setSelectedGroupId('');
+    setSubmitted(false);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4" dir="rtl">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 border border-slate-100">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mb-4">
-            <GraduationCap className="w-8 h-8 text-blue-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900">طلب انضمام للمركز</h2>
-          <p className="text-slate-500 text-sm mt-1">سجل بياناتك للالتحاق بالكورسات المتاحة</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">اسم الطالب ثلاثي *</label>
-            <input
-              required
-              type="text"
-              placeholder="الاسم الكامل"
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">رقم الهاتف (واتساب) *</label>
-            <input
-              required
-              type="tel"
-              dir="ltr"
-              placeholder="01..."
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-right font-mono"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">الكورس المطلوب *</label>
-            <select
-              required
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              value={formData.courseId}
-              onChange={(e) => setFormData({ ...formData, courseId: e.target.value })}
-            >
-              <option value="" disabled>-- اختر الكورس --</option>
-              {courses?.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            disabled={!formData.name || !formData.phone || !formData.courseId}
-            className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-          >
-            تأكيد إرسال الطلب
-          </button>
-        </form>
+    <div
+      className="relative min-h-screen w-full overflow-x-hidden flex flex-col justify-end md:justify-center p-0 md:p-6 lg:p-10 font-sans text-slate-900 dark:text-slate-100"
+      dir="rtl"
+    >
+      {/* BACKGROUND IFRAME (Placed behind all components) */}
+      <div className="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none select-none">
+        <iframe
+          src="https://backgrounds.supply/gradient-lab/embed#s=eyJtIjoibGF2YSIsImMiOlsiIzA2N2M4NyIsIiM2YzgxZTYiLCIjMGUwZjViIiwiIzI1NGZkNiIsIiMzNTBlYzMiLCIjMDAwMDAwIiwiIzAwMDAwMCIsIiMwMDAwMDAiXSwibyI6W1swLjMyLDBdLFswLjA5ODg4NTQzODE5OTk4MzE5LDAuMzA0MzM4MDg1MjE0NDQ5MTZdLFstMC4yNTg4ODU0MzgxOTk5ODMxNiwwLjE4ODA5MTI4MDczMzU5MTQ0XSxbLTAuMjU4ODg1NDM4MTk5OTgzMiwtMC4xODgwOTEyODA3MzM1OTEzOF0sWzAuMDk4ODg1NDM4MTk5OTgzMTIsLTAuMzA0MzM4MDg1MjE0NDQ5MTZdLFswLDBdLFswLDBdLFswLDBdXSwibiI6NSwiYiI6MSwiayI6MS4wNSwicyI6MS4xLCJnIjowLjAyLCJwIjp7InVfem9vbSI6MS42LCJ1X2dsb3ciOjEsInVfY3J1c3QiOjAuNSwidV9zcGVlZCI6MC4xOH19"
+          className="w-full h-full border-0 scale-105 opacity-90 dark:opacity-80"
+          loading="lazy"
+          allow="fullscreen"
+          title="Gradient by Backgrounds Supply"
+        />
+        {/* Soft slate overlay for contrast and legibility */}
+        <div className="absolute inset-0 bg-slate-950/25 backdrop-blur-[2px] pointer-events-none" />
       </div>
+
+      {/* PRE-OPENED BOTTOM SHEET COMPONENT (Full width on mobile, responsive card on tablets & widescreen) */}
+      <div className="relative z-10 w-full flex flex-col items-center justify-end md:justify-center pointer-events-auto">
+        {/* Container: Full width on mobile, fluid max-w on tablets and widescreens */}
+        <div className="w-full max-w-lg md:max-w-xl lg:max-w-2xl mx-auto flex flex-col shadow-2xl">
+          {/* Frosted Translucent Glass Top Header with Notch & Grab Handle */}
+          <div className="w-full flex flex-col items-center justify-center pt-3 pb-1.5 bg-gradient-to-b from-white/70 to-white/95 dark:from-slate-900/70 dark:to-slate-900/95 backdrop-blur-xl rounded-t-[32px] md:rounded-t-3xl border-t border-x border-white/60 dark:border-slate-800/80 transition-all">
+            {/* Grab handle pill */}
+            <div className="w-14 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full shadow-sm mb-1 cursor-pointer opacity-90 hover:opacity-100 transition-opacity" />
+          </div>
+
+          {/* Main Card Body */}
+          <div className="w-full bg-white dark:bg-slate-900 px-5 sm:px-8 pt-3 pb-6 sm:pb-8 shadow-2xl border-x md:border-b border-slate-100 dark:border-slate-800 md:rounded-b-3xl space-y-4 sm:space-y-5">
+            {/* Header: Academy Name (Verified badge deleted as requested) */}
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
+                  <span>{academyName}</span>
+                </h1>
+              </div>
+            </div>
+
+            {/* Specifications Grid: 3 columns (Course, Grade Level, Group) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+              {/* Item 1: Course */}
+              <button
+                type="button"
+                onClick={() => setIsCourseSheetOpen(true)}
+                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer"
+              >
+                <div className="flex items-center justify-end w-full">
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                </div>
+                <div className="w-full">
+                  <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium block">
+                    الكورس المطلوب
+                  </span>
+                  <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
+                    {selectedCourse.name}
+                  </p>
+                </div>
+              </button>
+
+              {/* Item 2: Grade Level */}
+              <button
+                type="button"
+                onClick={() => setIsGradeSheetOpen(true)}
+                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <GraduationCap className="w-4 h-4" />
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                </div>
+                <div className="w-full">
+                  <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium block">
+                    المرحلة الدراسية
+                  </span>
+                  <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
+                    {selectedGrade}
+                  </p>
+                </div>
+              </button>
+
+              {/* Item 3: Group & Schedule (Selection based on available seats) */}
+              <button
+                type="button"
+                onClick={() => setIsGroupSheetOpen(true)}
+                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                </div>
+                <div className="w-full">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium block">
+                      المجموعة والموعد
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
+                    {selectedGroup ? selectedGroup.name : 'تنسيق مع السنتر'}
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Student Information Row (Opens StudentDetailsBottomSheet) */}
+            <button
+              type="button"
+              onClick={() => setIsStudentDetailsSheetOpen(true)}
+              className="w-full p-3 sm:p-3.5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 hover:bg-blue-100/60 dark:hover:bg-blue-950/50 transition-all flex items-center justify-between text-right cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <User className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[11px] text-blue-700 dark:text-blue-300 font-medium">
+                    بيانات الطالب للتسجيل والتواصل
+                  </div>
+                  <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                    {formData.name ? `${formData.name} — ${formData.phone}` : 'اضغط لإدخال اسم الطالب ورقم الواتساب'}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-bold shrink-0 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-blue-200/80 dark:border-blue-900/60 shadow-xs">
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>{formData.name ? 'تعديل' : 'إدخال'}</span>
+              </div>
+            </button>
+
+            {/* Bottom Action Area: Status & Pill "Book Now" + Cancel/Reset Button */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              {/* Left Side: Real-time Seat Reservation Status */}
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-start">
+                  <span className="text-[11px] font-medium text-slate-400 dark:text-slate-400">حالة المقاعد</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                      متاح للتسجيل الفوري
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Side: Action Buttons with Cancel option */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {/* Reset / Cancel Button */}
+                {formData.name && (
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="py-3 px-4 rounded-full border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                    title="إلغاء وتفريغ البيانات"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>إلغاء</span>
+                  </button>
+                )}
+
+                {/* Primary "Book Now" Button in Masar Blue */}
+                <button
+                  type="button"
+                  onClick={handleSubmitBooking}
+                  className="flex-1 sm:flex-initial px-8 sm:px-10 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-sm sm:text-base transition-all shadow-lg shadow-blue-600/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Check className="w-4 h-4 stroke-[2.5]" />
+                  <span>احجز الآن</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* DETECTED BOTTOM SHEETS */}
+
+      {/* 1. Course Selection BottomSheet */}
+      <CourseBottomSheet
+        isOpen={isCourseSheetOpen}
+        onClose={() => setIsCourseSheetOpen(false)}
+        courses={courses}
+        selectedCourseId={selectedCourse.id}
+        onSelect={(course) => {
+          setSelectedCourseId(course.id);
+          setSelectedGroupId('');
+        }}
+      />
+
+      {/* 2. Grade Level Selection BottomSheet */}
+      <GradeBottomSheet
+        isOpen={isGradeSheetOpen}
+        onClose={() => setIsGradeSheetOpen(false)}
+        selectedGrade={selectedGrade}
+        onSelect={(grade) => setSelectedGrade(grade)}
+      />
+
+      {/* 3. Group Selection BottomSheet (Enforcing available seats) */}
+      <GroupBottomSheet
+        isOpen={isGroupSheetOpen}
+        onClose={() => setIsGroupSheetOpen(false)}
+        groups={courseGroups}
+        selectedGroupId={selectedGroupId}
+        onSelect={(group) => {
+          setSelectedGroupId(group ? group.id : '');
+        }}
+        enrollmentCounts={enrollmentCounts}
+      />
+
+      {/* 4. Student Personal Details BottomSheet */}
+      <StudentDetailsBottomSheet
+        isOpen={isStudentDetailsSheetOpen}
+        onClose={() => setIsStudentDetailsSheetOpen(false)}
+        name={formData.name}
+        phone={formData.phone}
+        onSave={(data) => {
+          setFormData({
+            name: data.name,
+            phone: data.phone,
+          });
+        }}
+      />
+
+      {/* 5. Booking Success BottomSheet */}
+      {submitted && (
+        <BookingSuccessBottomSheet
+          studentName={formData.name}
+          studentPhone={formData.phone}
+          courseName={selectedCourse.name}
+          groupName={selectedGroup ? selectedGroup.name : undefined}
+          gradeLevel={selectedGrade}
+          onReset={handleReset}
+          onClose={() => setSubmitted(false)}
+        />
+      )}
     </div>
   );
 }

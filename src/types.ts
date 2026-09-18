@@ -150,6 +150,8 @@ export interface BookingRequest extends BaseRecord {
   studentId?: string;
   courseId: string;
   groupId?: string;
+  gradeLevel?: string;
+  notes?: string;
   requestDate: string;
   status: 'pending' | 'approved' | 'rejected' | 'accepted';
 }

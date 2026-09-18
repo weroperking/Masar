@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { Globe, Copy, Check, Plus, X, UserCheck, UserX, Trash2, Filter } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Globe, Copy, Check, Plus, X, UserCheck, UserX, Trash2, Filter, Calendar, Hash, User } from 'lucide-react';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { BookingRequest, Student, Course, Group } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useAuth } from '@clerk/clerk-react';
+import { syncStudentMonthlySubscriptions } from '../../utils/pricing';
+import { getNextStudentCode, findStudentWithCode, normalizeStudentCode } from '../../utils/studentCode';
 
 export function Booking() {
   const toast = useToast();
@@ -17,9 +20,11 @@ export function Booking() {
   const allBookings = [...allBookingsData].sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime());
   
   const { data: courses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const { data: allGroups = [] } = useApiQuery<Group>('groups', 60 * 1000);
   const { update: updateBooking, remove: removeBooking } = useApiMutation<BookingRequest>('bookingRequests');
 
   const courseMap = new Map(courses.map(c => [c.id, c.name]));
+  const groupMap = new Map(allGroups.map(g => [g.id, g.name]));
   
   // Public booking route
   const bookingLink = `${window.location.origin}/book`;
@@ -171,6 +176,7 @@ export function Booking() {
                     <th className="px-4 py-2.5 font-semibold">اسم الطالب</th>
                     <th className="px-4 py-2.5 font-semibold">رقم الهاتف</th>
                     <th className="px-4 py-2.5 font-semibold">الكورس المطلوب</th>
+                    <th className="px-4 py-2.5 font-semibold">المجموعة المختارة</th>
                     <th className="px-4 py-2.5 font-semibold">تاريخ الطلب</th>
                     <th className="px-4 py-2.5 font-semibold">الحالة</th>
                     <th className="px-4 py-2.5 font-semibold">الإجراءات</th>
@@ -182,6 +188,16 @@ export function Booking() {
                       <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{b.name}</td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-mono text-[11px]" dir="ltr">{b.phone}</td>
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{courseMap.get(b.courseId) || 'عام'}</td>
+                      <td className="px-4 py-3">
+                        {b.groupId ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                            <Calendar className="w-3 h-3 text-blue-600 shrink-0" />
+                            {groupMap.get(b.groupId) || b.groupId}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">تنسيق مع السنتر</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-500 font-mono text-[11px]">{b.requestDate}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold ${
@@ -351,9 +367,40 @@ function CreateBookingModal({ onClose, courses }: { onClose: () => void; courses
 }
 
 function AcceptBookingModal({ booking, onClose }: { booking: BookingRequest; onClose: () => void }) {
+  const toast = useToast();
+  const { getToken } = useAuth();
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const { data: courses = [] } = useApiQuery<Course>('courses', 60 * 1000);
   const { data: allGroups = [] } = useApiQuery<Group>('groups', 60 * 1000);
+
   const groups = allGroups.filter(g => g.courseId === booking.courseId);
-  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const groupMap = new Map(allGroups.map(g => [g.id, g.name]));
+  const courseMap = new Map(courses.map(c => [c.id, c.name]));
+
+  // Calculate the next sequential student ID / code (0001, 0002, ...) in order after the last used ID
+  const nextSeqCode = useMemo(() => getNextStudentCode(allStudents), [allStudents]);
+
+  const [studentCode, setStudentCode] = useState('');
+
+  useEffect(() => {
+    if (!studentCode && nextSeqCode) {
+      setStudentCode(nextSeqCode);
+    }
+  }, [nextSeqCode]);
+
+  // Real-time duplicate student code detection
+  const duplicateStudent = useMemo(() => {
+    const code = studentCode.trim();
+    if (!code) return undefined;
+    return findStudentWithCode(code, allStudents);
+  }, [studentCode, allStudents]);
+
+  // Pre-select group requested by the student in online booking if available
+  const [selectedGroupId, setSelectedGroupId] = useState(
+    booking.groupId && groups.some(g => g.id === booking.groupId)
+      ? booking.groupId
+      : (groups[0]?.id || booking.groupId || '')
+  );
   
   const { create: createStudent } = useApiMutation<Student>('students');
   const { create: createEnrollment } = useApiMutation<any>('enrollments');
@@ -361,25 +408,51 @@ function AcceptBookingModal({ booking, onClose }: { booking: BookingRequest; onC
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const cleanPhone = (booking.phone || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim();
+    const rawCode = studentCode.trim() || nextSeqCode;
+    const finalStudentCode = normalizeStudentCode(rawCode) || nextSeqCode;
+
+    // Strict duplicate check
+    const conflict = findStudentWithCode(finalStudentCode, allStudents);
+    if (conflict) {
+      toast.error(`كود الطالب (${finalStudentCode}) مستخدم بالفعل للطالب: ${conflict.name}. غير مسموح بتكرار كود الطالب.`);
+      return;
+    }
     
     createStudent.mutate({
       name: booking.name,
-      phone: booking.phone,
+      phone: cleanPhone,
+      studentCode: finalStudentCode,
+      gradeLevel: booking.gradeLevel || '',
       parentName: 'ولي أمر ' + booking.name,
-      parentPhone: booking.phone,
+      parentPhone: cleanPhone,
       school: '',
       leadSource: 'حجز أونلاين (الموقع)',
       isActive: true
     }, {
-      onSuccess: (studentData: Student) => {
-        // Enroll the student
-        createEnrollment.mutate({
+      onSuccess: async (studentData: Student) => {
+        // Enroll the student in group
+        await createEnrollment.mutateAsync({
           studentId: studentData.id,
           courseId: booking.courseId,
           groupId: selectedGroupId,
           enrolledAt: new Date().toISOString(),
-          status: 'active'
+          status: 'active',
+          pricingMode: 'default'
         });
+
+        // Synchronize subscription fee for course
+        const crs = courses.find(c => c.id === booking.courseId);
+        const basePrice = crs?.price || 0;
+        try {
+          const token = await getToken();
+          if (token && studentData.id && booking.courseId) {
+            await syncStudentMonthlySubscriptions(studentData.id, booking.courseId, basePrice, token);
+          }
+        } catch (err) {
+          console.warn('Subscription sync error:', err);
+        }
         
         // Mark booking as accepted
         updateBooking.mutate({
@@ -390,7 +463,11 @@ function AcceptBookingModal({ booking, onClose }: { booking: BookingRequest; onC
           }
         });
         
+        toast.success(`تم قبول الطالب (${booking.name}) بنجاح بالكود #${finalStudentCode} وتسكينه في المجموعة!`);
         onClose();
+      },
+      onError: () => {
+        toast.error('حدث خطأ أثناء قبول وتسجيل الطالب');
       }
     });
   };
@@ -399,22 +476,111 @@ function AcceptBookingModal({ booking, onClose }: { booking: BookingRequest; onC
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col">
         <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">قبول الطالب وتسكينه في مجموعة</h2>
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">قبول الطالب وتسكينه في مجموعة</h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">سيتم إنشاء حساب طالب جديد برقم ID متسلسل رسمي</p>
+          </div>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
             <X className="w-4 h-4" />
           </button>
         </div>
         
-        <form onSubmit={handleConfirm} className="p-5 space-y-3.5">
+        <form onSubmit={handleConfirm} className="p-5 space-y-4">
+          {/* Student Info Card */}
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-blue-600" />
+                {booking.name}
+              </span>
+              <span className="text-[11px] font-mono font-medium text-slate-600 dark:text-slate-400" dir="ltr">
+                {booking.phone}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+              <span>الكورس: <strong className="text-slate-700 dark:text-slate-300">{courseMap.get(booking.courseId) || 'عام'}</strong></span>
+              {booking.gradeLevel && <span>الصف: <strong className="text-slate-700 dark:text-slate-300">{booking.gradeLevel}</strong></span>}
+            </div>
+          </div>
+
+          {/* Sequential Student ID Code */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اختر المجموعة *</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                <Hash className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                كود / رقم الطالب (ID) *
+              </label>
+              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60">
+                تسلسل تلقائي رسمي
+              </span>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                required
+                value={studentCode}
+                onChange={e => setStudentCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="مثال: 0001"
+                className={`w-full pl-8 pr-3 py-2 border rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 transition-colors ${
+                  duplicateStudent
+                    ? 'border-red-500 focus:ring-red-500 bg-red-50/30 dark:bg-red-950/30'
+                    : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-emerald-500'
+                }`}
+                dir="ltr"
+              />
+              <span className="absolute left-3 top-2 text-xs text-slate-400 pointer-events-none font-mono font-bold">
+                #
+              </span>
+            </div>
+            {duplicateStudent ? (
+              <div className="mt-1.5 p-2 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300 flex flex-col gap-1">
+                <div className="flex items-center gap-1 text-[11px] font-bold">
+                  <span>⚠️ هذا الكود مستخدم بالفعل للطالب:</span>
+                  <span className="underline">{duplicateStudent.name}</span>
+                </div>
+                <p className="text-[10px] text-red-600 dark:text-red-400">
+                  غير مسموح بتكرار كود الطالب لمنع تداخل كروت الباركود والتحضير.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setStudentCode(nextSeqCode)}
+                  className="self-start text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 hover:bg-emerald-200 dark:hover:bg-emerald-800/80 px-2 py-0.5 rounded transition-colors"
+                >
+                  استخدام الكود التالي المتاح (#{nextSeqCode})
+                </button>
+              </div>
+            ) : (
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                يطابق نظام ترقيم الطلاب المضافين يدوياً، ويستخدم في طباعة الكروت وكود الباركود والتحضير السريع.
+              </p>
+            )}
+          </div>
+
+          {/* Highlight student's selected group */}
+          {booking.groupId && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 rounded-xl flex items-center gap-2 text-xs text-blue-800 dark:text-blue-200">
+              <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+              <div>
+                <span className="font-bold">المجموعة المطلوبة من الطالب: </span>
+                <span className="font-semibold">{groupMap.get(booking.groupId) || booking.groupId}</span>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">تسكين في المجموعة *</label>
             <select
               required
-              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={selectedGroupId}
               onChange={e => setSelectedGroupId(e.target.value)}
             >
               <option value="" disabled>-- اختر المجموعة المناسبة --</option>
+              {booking.groupId && !groups.some(g => g.id === booking.groupId) && (
+                <option value={booking.groupId}>
+                  {groupMap.get(booking.groupId) || booking.groupId} (اختيار الطالب)
+                </option>
+              )}
               {groups?.map(g => (
                 <option key={g.id} value={g.id}>{g.name}</option>
               ))}
@@ -431,10 +597,11 @@ function AcceptBookingModal({ booking, onClose }: { booking: BookingRequest; onC
             </button>
             <button 
               type="submit" 
-              className="px-4 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-xs font-bold transition-colors shadow-xs disabled:opacity-50" 
-              disabled={!selectedGroupId}
+              className="px-4 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-xs font-bold transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5" 
+              disabled={!selectedGroupId || createStudent.isPending || Boolean(duplicateStudent)}
             >
-              تأكيد القبول والتسجيل
+              <Check className="w-3.5 h-3.5" />
+              {createStudent.isPending ? 'جاري الحفظ...' : 'تأكيد القبول والتسجيل'}
             </button>
           </div>
         </form>

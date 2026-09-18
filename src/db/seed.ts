@@ -101,15 +101,23 @@ export async function sanitizeNumericCodes() {
       }
     }
 
-    // 2. Sanitize student codes
+    // 2. Sanitize and deduplicate student codes to guarantee absolute uniqueness
+    const assignedCodes = new Set<string>();
     for (const student of students) {
-      let code = student.studentCode;
-      if (!code || !/^\d+$/.test(code)) {
-        const digits = code ? code.replace(/\D/g, '') : '';
-        if (digits.length > 0) {
-          code = digits.padStart(4, '0');
+      let code = student.studentCode ? student.studentCode.trim() : '';
+      const digits = code.replace(/\D/g, '');
+      const formatted = digits ? digits.padStart(4, '0') : '';
+      
+      const isDuplicate = formatted ? assignedCodes.has(formatted) : true;
+      
+      if (!code || !/^\d+$/.test(code) || isDuplicate) {
+        if (formatted && !assignedCodes.has(formatted)) {
+          code = formatted;
         } else {
           maxNum++;
+          while (assignedCodes.has(String(maxNum).padStart(4, '0'))) {
+            maxNum++;
+          }
           code = String(maxNum).padStart(4, '0');
         }
         await db.students.update(student.id, {
@@ -118,6 +126,7 @@ export async function sanitizeNumericCodes() {
           sync_status: 'pending'
         });
       }
+      assignedCodes.add(code);
     }
 
     // 3. Sanitize cards to match student codes or numeric sequences

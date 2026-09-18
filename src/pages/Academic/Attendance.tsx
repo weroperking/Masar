@@ -204,33 +204,18 @@ export function Attendance() {
                       إدارة الحضور
                     </button>
                   ) : (
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => handleStartSession(group.id, group.courseId, false)}
-                        disabled={createSession.isPending}
-                        className="flex-1 flex items-center justify-center py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-md transition-colors text-xs font-semibold shadow-xs disabled:opacity-50"
-                      >
-                        {createSession.isPending ? (
-                          <div className="w-3 h-3 ml-1 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Play className="w-3 h-3 ml-1" />
-                        )}
-                        بدء حصة
-                      </button>
-                      <button 
-                        onClick={() => handleStartSession(group.id, group.courseId, true)}
-                        disabled={createSession.isPending}
-                        className="flex-1 flex items-center justify-center py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition-colors text-xs font-semibold border border-slate-200 dark:border-slate-700 disabled:opacity-50"
-                        title="بدء حصة تجريبية (تطبق حدود حصص التجربة)"
-                      >
-                        {createSession.isPending ? (
-                          <div className="w-3 h-3 ml-1 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Play className="w-3 h-3 ml-1" />
-                        )}
-                        تجربة
-                      </button>
-                    </div>
+                    <button 
+                      onClick={() => handleStartSession(group.id, group.courseId, false)}
+                      disabled={createSession.isPending}
+                      className="w-full flex items-center justify-center py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-md transition-colors text-xs font-semibold shadow-xs disabled:opacity-50"
+                    >
+                      {createSession.isPending ? (
+                        <div className="w-3 h-3 ml-1 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Play className="w-3 h-3 ml-1" />
+                      )}
+                      بدء حصة
+                    </button>
                   )}
                 </div>
               </div>
@@ -502,13 +487,15 @@ function AttendanceModal({
   
   const [recordMap, setRecordMap] = useState<Record<string, 'present' | 'absent'>>({});
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [viewTab, setViewTab] = useState<'attended' | 'absent'>('attended');
   const [extraGuestStudents, setExtraGuestStudents] = useState<Student[]>([]);
   
   const [qrInput, setQrInput] = useState('');
   
   const qrInputRef = useRef<HTMLInputElement>(null);
-  const handleQrScanRef = useRef<any>(null);
+  const initializedSessionIdRef = useRef<string | null>(null);
+  const processStudentCodeRef = useRef<(code: string) => void>(() => {});
 
   // Combine roster students and any guest students attended in this session
   const combinedStudents = [
@@ -516,31 +503,106 @@ function AttendanceModal({
     ...extraGuestStudents.filter(g => !rosterStudents.some(r => r.id === g.id))
   ];
 
+  // Initialize recordMap once per session from existing database records
+  useEffect(() => {
+    if (session?.id && initializedSessionIdRef.current !== session.id) {
+      const sessionRecords = allRecords.filter(r => r.sessionId === session.id);
+      
+      setRecordMap(prev => {
+        const map: Record<string, 'present' | 'absent'> = { ...prev };
+        sessionRecords.forEach(r => {
+          if (r.studentId && !map[r.studentId]) {
+            map[r.studentId] = r.status;
+          }
+        });
+        return map;
+      });
+
+      const guestIds = sessionRecords.map(r => r.studentId).filter((id): id is string => !!id && !rosterStudents.some(s => s.id === id));
+      if (guestIds.length > 0 && allStudents.length > 0) {
+        const guests = allStudents.filter(s => guestIds.includes(s.id));
+        setExtraGuestStudents(prev => [
+          ...prev,
+          ...guests.filter(g => !prev.some(p => p.id === g.id))
+        ]);
+      }
+
+      if (allRecords.length > 0 || sessionRecords.length > 0) {
+        initializedSessionIdRef.current = session.id;
+      }
+    }
+  }, [session?.id, allRecords, rosterStudents, allStudents]);
+
   // Process code scanning or manual submit
   const processStudentCode = (rawCode: string) => {
     const code = rawCode.trim();
     setQrInput('');
     if (!code) return;
 
-    const cleanDigits = code.replace(/\D/g, '');
+    // Convert Arabic numerals to standard digits and strip leading '#' or symbols
+    const normalizedCode = code
+      .replace(/^[#№\s]+/, '')
+      .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString())
+      .trim();
+
+    const cleanDigits = normalizedCode.replace(/\D/g, '');
+    const numValue = cleanDigits ? parseInt(cleanDigits, 10) : null;
+
+    const matchesStudent = (s: Student) => {
+      if (!s) return false;
+      // 1. Database ID match
+      if (s.id === code || s.id === normalizedCode || s.id?.toLowerCase() === code.toLowerCase() || s.id?.toLowerCase() === normalizedCode.toLowerCase()) {
+        return true;
+      }
+
+      // 2. Student code exact match
+      if (s.studentCode) {
+        const normStudentCode = s.studentCode.replace(/^[#№\s]+/, '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim();
+        if (s.studentCode === code || s.studentCode === normalizedCode || normStudentCode === normalizedCode) {
+          return true;
+        }
+        // Numeric value match (e.g. '0009' matches '9')
+        if (numValue !== null) {
+          const sDigits = normStudentCode.replace(/\D/g, '');
+          if (sDigits && parseInt(sDigits, 10) === numValue) return true;
+        }
+      }
+
+      // 3. Phone match
+      const sPhoneDigits = (s.phone || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).replace(/\D/g, '');
+      const sParentPhoneDigits = (s.parentPhone || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).replace(/\D/g, '');
+      if (cleanDigits && cleanDigits.length >= 7) {
+        if (sPhoneDigits.endsWith(cleanDigits) || sParentPhoneDigits.endsWith(cleanDigits)) {
+          return true;
+        }
+      }
+
+      // 4. Exact name match
+      if (s.name && (s.name.trim().toLowerCase() === code.toLowerCase() || s.name.trim().toLowerCase() === normalizedCode.toLowerCase())) {
+        return true;
+      }
+
+      return false;
+    };
+
+    const matchesCard = (c: any) => {
+      if (!c) return false;
+      const cNum = (c.cardNumber || '').toString().trim();
+      const cData = (c.qrCodeData || '').toString().trim();
+      if (cNum === code || cNum === normalizedCode || cData === code || cData === normalizedCode) return true;
+      if (numValue !== null) {
+        const cClean = cNum.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).replace(/\D/g, '');
+        if (cClean && parseInt(cClean, 10) === numValue) return true;
+      }
+      return false;
+    };
 
     // 1. Try finding in roster first
-    let foundStudent: any = rosterStudents.find(s => 
-      s.studentCode === code || 
-      (cleanDigits && s.studentCode === cleanDigits) ||
-      (cleanDigits && s.studentCode && parseInt(s.studentCode, 10) === parseInt(cleanDigits, 10)) ||
-      s.phone === code ||
-      s.id === code
-    );
+    let foundStudent: any = rosterStudents.find(matchesStudent);
 
-    // 2. If not found by student code, check qr cards
+    // 2. If not found by student code, check qr cards in roster
     if (!foundStudent) {
-      const card = qrCards?.find(c => 
-        c.cardNumber === code || 
-        c.qrCodeData === code ||
-        (cleanDigits && (c.cardNumber === cleanDigits || c.qrCodeData === cleanDigits)) ||
-        (cleanDigits && c.cardNumber && parseInt(c.cardNumber, 10) === parseInt(cleanDigits, 10))
-      );
+      const card = qrCards?.find(matchesCard);
       if (card && card.status === 'active' && card.studentId) {
         foundStudent = rosterStudents.find(s => s.id === card.studentId);
       } else if (card && card.status !== 'active') {
@@ -549,28 +611,15 @@ function AttendanceModal({
       }
     }
 
-    // 3. If still not found in roster, check all students in academy
+    // 3. If still not found in roster, check all students across the academy
     if (!foundStudent && allStudents) {
-      const globalStudent = allStudents.find(s => 
-        s.studentCode === code || 
-        (cleanDigits && s.studentCode === cleanDigits) ||
-        (cleanDigits && s.studentCode && parseInt(s.studentCode, 10) === parseInt(cleanDigits, 10)) ||
-        s.phone === code ||
-        s.id === code
-      );
+      const globalStudent = allStudents.find(matchesStudent);
 
       if (globalStudent) {
         foundStudent = globalStudent;
-        // add to guest students so it gets tracked and saved
         setExtraGuestStudents(prev => [...prev.filter(x => x.id !== globalStudent.id), globalStudent]);
       } else {
-        // check global qr card
-        const card = qrCards?.find(c => 
-          c.cardNumber === code || 
-          c.qrCodeData === code ||
-          (cleanDigits && (c.cardNumber === cleanDigits || c.qrCodeData === cleanDigits)) ||
-          (cleanDigits && c.cardNumber && parseInt(c.cardNumber, 10) === parseInt(cleanDigits, 10))
-        );
+        const card = qrCards?.find(matchesCard);
         if (card && card.status === 'active' && card.studentId) {
           const cardStudent = allStudents.find(s => s.id === card.studentId);
           if (cardStudent) {
@@ -582,7 +631,8 @@ function AttendanceModal({
     }
 
     if (!foundStudent) {
-      toast.error(`لم يتم العثور على طالب بكود (${code}) في النظام`);
+      toast.error(`لم يتم العثور على طالب بكود أو معرف (${code}) في النظام`);
+      qrInputRef.current?.focus();
       return;
     }
 
@@ -600,10 +650,30 @@ function AttendanceModal({
       }
     }
 
+    // Update local state
     setRecordMap(prev => ({ ...prev, [foundStudent.id]: 'present' }));
     
     // Switch to attended view so user immediately sees the success feedback
     setViewTab('attended');
+
+    // Persist immediately to database
+    const existingRec = allRecords.find(r => r.sessionId === session.id && r.studentId === foundStudent.id);
+    if (existingRec) {
+      if (existingRec.status !== 'present') {
+        updateRecord.mutate({
+          id: existingRec.id,
+          data: { status: 'present', markedAt: Date.now() }
+        });
+      }
+    } else {
+      createRecord.mutate({
+        sessionId: session.id,
+        studentId: foundStudent.id,
+        groupId: session.groupId,
+        status: 'present',
+        markedAt: Date.now()
+      });
+    }
 
     const sub = currentSubscriptions?.find(s => s.studentId === foundStudent.id);
     if (!session.isTrial && (!sub || sub.status !== 'paid')) {
@@ -611,16 +681,15 @@ function AttendanceModal({
     } else {
       toast.success(`تم تحضير الطالب: ${foundStudent.name} (#${foundStudent.studentCode || code})`);
     }
+
+    // Keep focus ready for next scan
+    setTimeout(() => {
+      qrInputRef.current?.focus();
+    }, 50);
   };
 
-  useEffect(() => {
-    handleQrScanRef.current = (e: any, overrideCode?: string) => {
-      if (e?.key === 'Enter') {
-        e.preventDefault();
-        processStudentCode(overrideCode || qrInput);
-      }
-    };
-  });
+  // Keep ref up to date to prevent stale closures
+  processStudentCodeRef.current = processStudentCode;
 
   useEffect(() => {
     // Focus barcode input on mount and when modal opens
@@ -652,7 +721,7 @@ function AttendanceModal({
         const code = buffer.trim();
         buffer = '';
         if (!code) return;
-        processStudentCode(code);
+        processStudentCodeRef.current(code);
       }
     };
 
@@ -667,66 +736,52 @@ function AttendanceModal({
     }
   };
 
-  useEffect(() => {
-    if (existingRecords) {
-      const map: Record<string, 'present' | 'absent'> = {};
-      existingRecords.forEach(r => {
-        map[r.studentId] = r.status;
-      });
-      setRecordMap(map);
-    }
-  }, [existingRecords]);
-
   const toggleStudentStatus = (studentId: string, status: 'present' | 'absent') => {
     setRecordMap(prev => ({
       ...prev,
       [studentId]: status
     }));
+
+    // Persist immediately
+    const existingRec = allRecords.find(r => r.sessionId === session.id && r.studentId === studentId);
+    if (existingRec) {
+      if (existingRec.status !== status) {
+        updateRecord.mutate({
+          id: existingRec.id,
+          data: { status, markedAt: Date.now() }
+        });
+      }
+    } else {
+      createRecord.mutate({
+        sessionId: session.id,
+        studentId,
+        groupId: session.groupId,
+        status,
+        markedAt: Date.now()
+      });
+    }
   };
 
   const markAll = (status: 'present' | 'absent') => {
+    if (combinedStudents.length === 0) {
+      toast.info('لا يوجد طلاب في هذه المجموعة لتسجيل حالتهم');
+      return;
+    }
+
     const nextMap: Record<string, 'present' | 'absent'> = {};
     combinedStudents.forEach(s => {
       nextMap[s.id] = status;
     });
     setRecordMap(nextMap);
-  };
 
-  const handleSave = async () => {
-    // If it's a trial session, prevent saving if limit exceeded for any present student
-    if (session.isTrial) {
-      const overLimitStudents = combinedStudents.filter(student => {
-        if (recordMap[student.id] === 'present') {
-          const pastTrials = allTrialRecords?.filter(r => 
-            r.studentId === student.id && 
-            r.status === 'present' && 
-            trialSessionIds.includes(r.sessionId) &&
-            r.sessionId !== session.id
-          ).length || 0;
-          
-          if (pastTrials >= freeSessionLimit) return true;
-        }
-        return false;
-      });
-
-      if (overLimitStudents.length > 0) {
-        toast.error(`يوجد ${overLimitStudents.length} طلاب استنفدوا حد حصص التجربة المسموح (${freeSessionLimit}). يرجى تغييبهم أو تعديل الإعدادات.`);
-        return;
-      }
-    }
-
-    for (const student of combinedStudents) {
-      const status = recordMap[student.id] || 'absent';
-      const existing = existingRecords?.find(r => r.studentId === student.id);
-      
+    // Persist immediately to database
+    combinedStudents.forEach(student => {
+      const existing = allRecords.find(r => r.sessionId === session.id && r.studentId === student.id);
       if (existing) {
         if (existing.status !== status) {
           updateRecord.mutate({
             id: existing.id,
-            data: {
-              status,
-              markedAt: Date.now()
-            }
+            data: { status, markedAt: Date.now() }
           });
         }
       } else {
@@ -738,13 +793,78 @@ function AttendanceModal({
           markedAt: Date.now()
         });
       }
+    });
+
+    if (status === 'present') {
+      setViewTab('attended');
+      toast.success(`تم تحضير جميع الطلاب (${combinedStudents.length}) بنجاح`);
+    } else {
+      setViewTab('absent');
+      toast.info(`تم رصد جميع الطلاب (${combinedStudents.length}) كغائبين`);
     }
-    
-    setIsSaved(true);
-    toast.success('تم حفظ كشف الحضور بنجاح');
-    setTimeout(() => {
-      onClose();
-    }, 800);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // If it's a trial session, prevent saving if limit exceeded for any present student
+      if (session.isTrial) {
+        const overLimitStudents = combinedStudents.filter(student => {
+          if (recordMap[student.id] === 'present') {
+            const pastTrials = allTrialRecords?.filter(r => 
+              r.studentId === student.id && 
+              r.status === 'present' && 
+              trialSessionIds.includes(r.sessionId) &&
+              r.sessionId !== session.id
+            ).length || 0;
+            
+            if (pastTrials >= freeSessionLimit) return true;
+          }
+          return false;
+        });
+
+        if (overLimitStudents.length > 0) {
+          toast.error(`يوجد ${overLimitStudents.length} طلاب استنفدوا حد حصص التجربة المسموح (${freeSessionLimit}). يرجى تغييبهم أو تعديل الإعدادات.`);
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      await Promise.all(combinedStudents.map(async (student) => {
+        const status = recordMap[student.id] || 'absent';
+        const existing = allRecords.find(r => r.sessionId === session.id && r.studentId === student.id);
+        
+        if (existing) {
+          if (existing.status !== status) {
+            await updateRecord.mutateAsync({
+              id: existing.id,
+              data: {
+                status,
+                markedAt: Date.now()
+              }
+            });
+          }
+        } else {
+          await createRecord.mutateAsync({
+            sessionId: session.id,
+            studentId: student.id,
+            groupId: session.groupId,
+            status,
+            markedAt: Date.now()
+          });
+        }
+      }));
+      
+      setIsSaved(true);
+      toast.success('تم حفظ كشف الحضور بنجاح');
+      setTimeout(() => {
+        onClose();
+      }, 600);
+    } catch (err: any) {
+      toast.error('حدث خطأ أثناء حفظ كشف الحضور: ' + (err?.message || 'فشل الحفظ'));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Split students into attended (present) and absent
@@ -1007,9 +1127,11 @@ function AttendanceModal({
             </button>
             <button 
               onClick={handleSave} 
-              className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-xs font-bold transition-colors shadow-2xs"
+              disabled={isSaving}
+              className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-xs font-bold transition-colors shadow-2xs disabled:opacity-50 flex items-center gap-2"
             >
-              حفظ كشف الحضور
+              {isSaving && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              <span>حفظ كشف الحضور</span>
             </button>
           </div>
         </div>

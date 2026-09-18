@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Plus, X, Trash2, Edit2, BookOpen, Users as UsersIcon, Check, MessageCircle, Eye, DollarSign, Tag, QrCode } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Plus, X, Trash2, Edit2, BookOpen, Users as UsersIcon, Check, MessageCircle, Eye, DollarSign, Tag, QrCode, Hash } from 'lucide-react';
 import { Student, Enrollment } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useSubscription } from '../../context/SubscriptionContext';
@@ -9,6 +9,7 @@ import { getWhatsAppUrl } from '../../utils/phone';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { EditPricingModal } from './StudentDetails';
 import { syncStudentMonthlySubscriptions } from '../../utils/pricing';
+import { getNextStudentCode, findStudentWithCode, normalizeStudentCode } from '../../utils/studentCode';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { useAuth } from '@clerk/clerk-react';
 
@@ -415,6 +416,8 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
   const { create: createEnrollment, update: updateEnrollment } = useApiMutation<Enrollment>('enrollments');
   const { getToken } = useAuth();
 
+  const suggestedNextCode = useMemo(() => getNextStudentCode(allStudents), [allStudents]);
+
   const [formData, setFormData] = useState({
     studentCode: existingStudent?.studentCode || '',
     name: existingStudent?.name || '', 
@@ -426,6 +429,20 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
     leadSource: existingStudent?.leadSource || 'فيسبوك', 
     isActive: existingStudent ? existingStudent.isActive : true
   });
+
+  // Automatically populate next sequential ID for new students
+  useEffect(() => {
+    if (!existingStudent && (!formData.studentCode || !formData.studentCode.trim())) {
+      setFormData(prev => ({ ...prev, studentCode: suggestedNextCode }));
+    }
+  }, [existingStudent, suggestedNextCode]);
+
+  // Real-time duplicate student code detection
+  const duplicateStudent = useMemo(() => {
+    const code = formData.studentCode.trim();
+    if (!code) return undefined;
+    return findStudentWithCode(code, allStudents, existingStudent?.id);
+  }, [formData.studentCode, allStudents, existingStudent?.id]);
 
   interface GroupPricingState {
     pricingMode: 'default' | 'custom' | 'discount' | 'free';
@@ -484,15 +501,17 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
     try {
       let finalStudentCode = formData.studentCode.trim();
       
-      if (!existingStudent && !finalStudentCode) {
-        let maxSeq = 0;
-        allStudents.forEach(s => {
-          if (s.studentCode && /^\d+$/.test(s.studentCode)) {
-            const num = parseInt(s.studentCode, 10);
-            if (num > maxSeq) maxSeq = num;
-          }
-        });
-        finalStudentCode = String(maxSeq + 1).padStart(4, '0');
+      if (!finalStudentCode) {
+        finalStudentCode = suggestedNextCode;
+      } else {
+        finalStudentCode = normalizeStudentCode(finalStudentCode);
+      }
+
+      // Strict duplicate validation to prevent any duplicate student IDs
+      const conflict = findStudentWithCode(finalStudentCode, allStudents, existingStudent?.id);
+      if (conflict) {
+        toast.error(`كود الطالب (${finalStudentCode}) مستخدم بالفعل للطالب: ${conflict.name}. غير مسموح بتكرار كود الطالب.`);
+        return;
       }
 
       const cleanPhone = (formData.phone || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim();
@@ -648,15 +667,57 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
           
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">كود الطالب (رقم الباركود)</label>
-              <input 
-                type="text" 
-                placeholder="تلقائي إذا تُرك فارغاً"
-                dir="ltr"
-                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono text-left"
-                value={formData.studentCode} 
-                onChange={e => setFormData({...formData, studentCode: e.target.value.replace(/\D/g, '')})} 
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                  <Hash className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  كود الطالب (ID / الباركود) *
+                </label>
+                {!existingStudent && (
+                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800/60">
+                    تسلسل تلقائي
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  required
+                  placeholder="0001"
+                  dir="ltr"
+                  className={`w-full pl-7 pr-3 py-1.5 bg-white dark:bg-slate-800 border rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 text-xs font-mono font-bold text-left transition-colors ${
+                    duplicateStudent 
+                      ? 'border-red-500 focus:ring-red-500 bg-red-50/30 dark:bg-red-950/30' 
+                      : 'border-slate-300 dark:border-slate-700 focus:ring-blue-500'
+                  }`}
+                  value={formData.studentCode} 
+                  onChange={e => setFormData({...formData, studentCode: e.target.value.replace(/\D/g, '')})} 
+                />
+                <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 pointer-events-none font-mono font-bold">
+                  #
+                </span>
+              </div>
+              {duplicateStudent ? (
+                <div className="mt-1.5 p-2 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300 flex flex-col gap-1">
+                  <div className="flex items-center gap-1 text-[11px] font-bold">
+                    <span>⚠️ هذا الكود مستخدم بالفعل للطالب:</span>
+                    <span className="underline">{duplicateStudent.name}</span>
+                  </div>
+                  <p className="text-[10px] text-red-600 dark:text-red-400">
+                    غير مسموح بتكرار كود الطالب لمنع تداخل كروت الـ QR والحضور.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, studentCode: suggestedNextCode }))}
+                    className="self-start text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/60 hover:bg-blue-200 dark:hover:bg-blue-800/80 px-2 py-0.5 rounded transition-colors"
+                  >
+                    استخدام الكود التالي المتاح (#{suggestedNextCode})
+                  </button>
+                </div>
+              ) : (
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  معرّف متسلسل فريد يستخدم في بطاقة الـ QR والباركود وكشف الحضور.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الطالب *</label>
@@ -1011,8 +1072,8 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
             </button>
             <button 
               type="submit" 
-              disabled={createStudent.isPending || updateStudent.isPending || createEnrollment.isPending || updateEnrollment.isPending}
-              className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
+              disabled={Boolean(duplicateStudent) || createStudent.isPending || updateStudent.isPending || createEnrollment.isPending || updateEnrollment.isPending}
+              className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {(createStudent.isPending || updateStudent.isPending || createEnrollment.isPending || updateEnrollment.isPending) && (
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
