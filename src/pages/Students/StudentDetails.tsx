@@ -18,6 +18,7 @@ import { StudentFormModal } from './Students';
 import { calculateEnrollmentFee, syncStudentMonthlySubscriptions, recordLedgerRevenue } from '../../utils/pricing';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { useAuth } from '@clerk/clerk-react';
+import { triggerPennyDrop } from '../../components/PennyDropAnimation';
 
 export function StudentDetails() {
   const { id } = useParams<{ id: string }>();
@@ -747,6 +748,7 @@ export function StudentDetails() {
         <PaymentModal
           bill={selectedBill}
           course={courses?.find(c => c.id === selectedBill.courseId)}
+          studentName={student?.name}
           onClose={() => setIsPaymentModalOpen(false)}
         />
       )}
@@ -997,7 +999,7 @@ export function EditPricingModal({
   );
 }
 
-function PaymentModal({ bill, course, onClose }: { bill: MonthlySubscription, course: any, onClose: () => void }) {
+function PaymentModal({ bill, course, studentName, onClose }: { bill: MonthlySubscription, course: any, studentName?: string, onClose: () => void }) {
   const toast = useToast();
   const { getToken } = useAuth();
   const { create: createSubscription, update: updateSubscription } = useApiMutation<MonthlySubscription>('monthlySubscriptions');
@@ -1060,6 +1062,20 @@ function PaymentModal({ bill, course, onClose }: { bill: MonthlySubscription, co
           description: `${reference ? 'رقم المرجع: ' + reference + ' | ' : ''}سداد اشتراك ${course?.name || ''} لشهر ${bill.month}/${bill.year}`,
           paymentMethod: paymentMethod as any,
           token
+        });
+
+        triggerPennyDrop({
+          amountMinor: paymentDiff,
+          studentName: studentName || 'طالب',
+          courseName: course?.name,
+          type: 'subscription'
+        });
+      } else if (pAmtMinor > 0 && derivedStatus === 'paid' && bill.amountPaid === 0) {
+        triggerPennyDrop({
+          amountMinor: pAmtMinor,
+          studentName: studentName || 'طالب',
+          courseName: course?.name,
+          type: 'subscription'
         });
       }
       

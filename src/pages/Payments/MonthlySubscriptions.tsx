@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { MonthlySubscription, Course, Student, Enrollment, Group } from '../../types';
-import { Search, Plus, Edit2, AlertTriangle, X, MessageCircle, Check, DollarSign, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, Edit2, AlertTriangle, X, MessageCircle, Check, DollarSign, CheckCircle2, Wallet, Coins, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { getWhatsAppUrl, formatPhoneDisplay } from '../../utils/phone';
 import { useToast } from '../../context/ToastContext';
 import { calculateEnrollmentFee, recordLedgerRevenue } from '../../utils/pricing';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
+import { triggerPennyDrop } from '../../components/PennyDropAnimation';
 
 export function MonthlySubscriptions() {
   const currentDate = new Date();
@@ -20,6 +22,10 @@ export function MonthlySubscriptions() {
   
   const [reminderSub, setReminderSub] = useState<any | null>(null);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+
+  const [recentlyPaidId, setRecentlyPaidId] = useState<string | null>(null);
+  const [walletPulse, setWalletPulse] = useState(false);
+  const [recentIncrement, setRecentIncrement] = useState<number | null>(null);
   
   const toast = useToast();
   const { getToken } = useAuth();
@@ -139,7 +145,21 @@ export function MonthlySubscriptions() {
   const totalRemaining = Math.max(0, totalExpected - totalCollected);
   const collectionRate = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 100;
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, isRecentlyPaid: boolean = false) => {
+    if (isRecentlyPaid) {
+      return (
+        <motion.span
+          initial={{ scale: 0.8, y: -4 }}
+          animate={{ scale: [0.8, 1.25, 1], y: 0 }}
+          transition={{ duration: 0.5, type: 'spring', stiffness: 400, damping: 15 }}
+          className="px-2 py-0.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/40 rounded text-[10px] font-bold shadow-xs inline-flex items-center gap-1"
+        >
+          <Coins className="w-3 h-3 text-amber-500 animate-spin" />
+          خالص
+        </motion.span>
+      );
+    }
+
     switch (status) {
       case 'paid': return <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded text-[10px] font-semibold">خالص</span>;
       case 'partial': return <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded text-[10px] font-semibold">جزء</span>;
@@ -199,6 +219,26 @@ export function MonthlySubscriptions() {
         token
       });
 
+      // Trigger the Penny Drop Animation!
+      triggerPennyDrop({
+        amountMinor: remainingMinor,
+        studentName: sub.studentName,
+        courseName: sub.courseName,
+        type: 'quick_settle'
+      });
+
+      // Visual feedback on row and KPI
+      const rowKey = `${sub.studentId}-${sub.courseId}`;
+      setRecentlyPaidId(rowKey);
+      setWalletPulse(true);
+      setRecentIncrement(remainingMinor);
+
+      setTimeout(() => {
+        setRecentlyPaidId(null);
+        setWalletPulse(false);
+        setRecentIncrement(null);
+      }, 1500);
+
       toast.success(`تم سداد كامل اشتراك ${sub.studentName} بقيمة ${toMajorUnits(remainingMinor)} ج.م وتسجيله بالإيرادات`);
     } catch (err) {
       console.error(err);
@@ -230,11 +270,31 @@ export function MonthlySubscriptions() {
           <span className="text-[11px] text-slate-400 mt-0.5 block">بعد احتساب الخصومات والمنح</span>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">المحصل الفعلي</span>
-          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-            {toMajorUnits(totalCollected).toLocaleString()} ج.م
-          </p>
+        <div className={`bg-white dark:bg-slate-900 p-4 rounded-xl border transition-all duration-300 shadow-2xs relative overflow-hidden ${
+          walletPulse 
+            ? 'border-emerald-500/60 ring-2 ring-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-950/20' 
+            : 'border-slate-200 dark:border-slate-800'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">المحصل الفعلي</span>
+            <motion.div 
+              animate={walletPulse ? { scale: [1, 1.25, 0.95, 1.1, 1], rotate: [0, -10, 10, -5, 0] } : {}}
+              transition={{ duration: 0.6 }}
+              className={`p-1.5 rounded-lg ${walletPulse ? 'bg-emerald-500 text-white shadow-sm' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'}`}
+            >
+              <Wallet className="w-4 h-4" />
+            </motion.div>
+          </div>
+          <div className="flex items-baseline gap-2 mt-1">
+            <motion.p 
+              key={totalCollected}
+              initial={walletPulse ? { scale: 1.15, color: '#10b981' } : false}
+              animate={{ scale: 1 }}
+              className="text-lg font-bold text-emerald-600 dark:text-emerald-400 font-mono"
+            >
+              {toMajorUnits(totalCollected).toLocaleString()} ج.م
+            </motion.p>
+          </div>
           <span className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-0.5 block font-medium">
             نسبة التحصيل: {collectionRate}%
           </span>
@@ -329,79 +389,89 @@ export function MonthlySubscriptions() {
                   </td>
                 </tr>
               ) : (
-                filteredSubs.map((sub, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                        <span>{sub.studentName}</span>
-                        {sub.pricingMode === 'discount' && (
-                          <span className="text-[10px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
-                            خصم {sub.discountPercentage || 50}%
+                filteredSubs.map((sub, idx) => {
+                  const isRecentlyPaid = `${sub.studentId}-${sub.courseId}` === recentlyPaidId;
+                  return (
+                    <tr 
+                      key={idx} 
+                      className={`transition-colors duration-500 ${
+                        isRecentlyPaid 
+                          ? 'bg-emerald-50/60 dark:bg-emerald-950/30' 
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                          <span>{sub.studentName}</span>
+                          {sub.pricingMode === 'discount' && (
+                            <span className="text-[10px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                              خصم {sub.discountPercentage || 50}%
+                            </span>
+                          )}
+                          {sub.pricingMode === 'free' && (
+                            <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                              منحة 100%
+                            </span>
+                          )}
+                          {sub.pricingMode === 'custom' && (
+                            <span className="text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800">
+                              سعر خاص
+                            </span>
+                          )}
+                        </div>
+                        {sub.studentPhone && (
+                          <div className="text-[11px] text-slate-400 font-mono mt-0.5">{sub.studentPhone}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-slate-900 dark:text-slate-100 font-medium">{sub.courseName}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{sub.groupName}</div>
+                      </td>
+                      <td className="px-4 py-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                        {toMajorUnits(sub.amountTotal)} ج.م
+                        {sub.pricingMode !== 'default' && sub.amountTotal !== sub.basePrice && (
+                          <span className="block text-[10px] text-slate-400 line-through font-normal">
+                            {toMajorUnits(sub.basePrice)} ج.م
                           </span>
                         )}
-                        {sub.pricingMode === 'free' && (
-                          <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                            منحة 100%
-                          </span>
-                        )}
-                        {sub.pricingMode === 'custom' && (
-                          <span className="text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800">
-                            سعر خاص
-                          </span>
-                        )}
-                      </div>
-                      {sub.studentPhone && (
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">{sub.studentPhone}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-slate-900 dark:text-slate-100 font-medium">{sub.courseName}</div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{sub.groupName}</div>
-                    </td>
-                    <td className="px-4 py-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
-                      {toMajorUnits(sub.amountTotal)} ج.م
-                      {sub.pricingMode !== 'default' && sub.amountTotal !== sub.basePrice && (
-                        <span className="block text-[10px] text-slate-400 line-through font-normal">
-                          {toMajorUnits(sub.basePrice)} ج.م
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      {toMajorUnits(sub.amountPaid)} ج.م
-                    </td>
-                    <td className="px-4 py-3 text-center text-slate-500 font-mono text-[11px]">{sub.dueDate}</td>
-                    <td className="px-4 py-3 text-center">{getStatusBadge(sub.status)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex justify-center items-center gap-1.5">
-                        {sub.status !== 'paid' && sub.amountTotal > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => handleQuickFullSettle(sub)}
-                            className="inline-flex items-center px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold shadow-xs transition-colors"
-                            title="سداد كامل المبلغ المتبقي وتسجيله بالإيرادات"
+                      </td>
+                      <td className="px-4 py-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {toMajorUnits(sub.amountPaid)} ج.م
+                      </td>
+                      <td className="px-4 py-3 text-center text-slate-500 font-mono text-[11px]">{sub.dueDate}</td>
+                      <td className="px-4 py-3 text-center">{getStatusBadge(sub.status, isRecentlyPaid)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex justify-center items-center gap-1.5">
+                          {sub.status !== 'paid' && sub.amountTotal > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickFullSettle(sub)}
+                              className="inline-flex items-center px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold shadow-xs transition-colors"
+                              title="سداد كامل المبلغ المتبقي وتسجيله بالإيرادات"
+                            >
+                              <DollarSign className="w-3 h-3 ml-0.5" />
+                              سداد كامل
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleOpenPayment(sub)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="تسجيل دفعة / تعديل"
                           >
-                            <DollarSign className="w-3 h-3 ml-0.5" />
-                            سداد كامل
+                            <Edit2 className="w-3.5 h-3.5" />
                           </button>
-                        )}
-                        <button 
-                          onClick={() => handleOpenPayment(sub)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                          title="تسجيل دفعة / تعديل"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button 
-                          onClick={() => handleOpenReminder(sub)}
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                          title="إرسال تذكير عبر واتساب"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <button 
+                            onClick={() => handleOpenReminder(sub)}
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="إرسال تذكير عبر واتساب"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -502,6 +572,21 @@ function PaymentModal({ sub, month, year, onClose }: { sub: any, month: number, 
           amountMinor: paymentDiffMinor,
           description: `سداد اشتراك شهر ${month}/${year} للطالب ${sub.studentName} (${sub.courseName})`,
           token
+        });
+
+        // Trigger the Penny Drop Animation!
+        triggerPennyDrop({
+          amountMinor: paymentDiffMinor,
+          studentName: sub.studentName,
+          courseName: sub.courseName,
+          type: 'subscription'
+        });
+      } else if (pAmtMinor > 0 && derivedStatus === 'paid' && previousPaidMinor === 0) {
+        triggerPennyDrop({
+          amountMinor: pAmtMinor,
+          studentName: sub.studentName,
+          courseName: sub.courseName,
+          type: 'subscription'
         });
       }
 

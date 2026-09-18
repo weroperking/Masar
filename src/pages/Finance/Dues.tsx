@@ -4,6 +4,7 @@ import { AlertCircle, MessageCircle, DollarSign, X, CheckCircle2 } from 'lucide-
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { getWhatsAppUrl } from '../../utils/phone';
 import { Student, Course, MonthlySubscription, SessionPayment, LedgerEntry } from '../../types';
+import { triggerPennyDrop } from '../../components/PennyDropAnimation';
 
 export function Dues() {
   const [settlingDue, setSettlingDue] = useState<any | null>(null);
@@ -239,6 +240,13 @@ function SettleDueModal({ due, onClose }: { due: any; onClose: () => void }) {
       relatedType: due.source === 'monthly' ? 'subscription' : 'session',
       relatedId: due.id
     } as LedgerEntry);
+
+    triggerPennyDrop({
+      amountMinor: payNum,
+      studentName: due.studentName,
+      courseName: due.title,
+      type: due.source === 'monthly' ? 'subscription' : 'session'
+    });
 
     onClose();
   };
