@@ -22,7 +22,8 @@ export function TourOverlay() {
   } = useTour();
 
   const isLastStep = currentStepIndex === totalSteps - 1;
-  const progressPercentage = Math.round(((currentStepIndex + 1) / totalSteps) * 100);
+  // Pre-fill Onboarding Progress: Don't start at 0%. Center owner receives 25% automatic credit for creating the center account
+  const progressPercentage = Math.min(100, Math.round(25 + (currentStepIndex / Math.max(1, totalSteps - 1)) * 75));
 
   // Compute card position based on target element bounding box
   const cardStyle = useMemo(() => {
@@ -120,7 +121,7 @@ export function TourOverlay() {
             <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 relative overflow-hidden">
               <motion.div
                 className="bg-blue-600 dark:bg-blue-500 h-full"
-                initial={{ width: `${((currentStepIndex) / totalSteps) * 100}%` }}
+                initial={{ width: '25%' }}
                 animate={{ width: `${progressPercentage}%` }}
                 transition={{ duration: 0.25 }}
               />
@@ -129,8 +130,10 @@ export function TourOverlay() {
             {/* Card Header */}
             <div className="px-6 py-4 flex items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-md">
-                  {currentStepIndex + 1} / {totalSteps}
+                <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-md flex items-center gap-1.5">
+                  <span className="font-bold">{progressPercentage}%</span>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <span>{currentStepIndex + 1} / {totalSteps}</span>
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 font-['Readex_Pro']">
                   {currentStep.title}
@@ -148,6 +151,17 @@ export function TourOverlay() {
 
             {/* Card Body - Minimalist & Spacious */}
             <div className="p-6 space-y-4 text-xs leading-relaxed max-h-[60vh] overflow-y-auto">
+              {/* Account Setup 25% Credit Notice on Step 0 */}
+              {currentStepIndex === 0 && (
+                <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-2.5 text-emerald-800 dark:text-emerald-300">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <div className="text-xs font-medium leading-snug">
+                    <span className="font-bold">رصيد التهيئة الأولية (25% مكتمل): </span>
+                    تم احتساب إنشاء حساب السنتر وتفعيله تلقائياً كأول إنجاز في رحلة الإعداد!
+                  </div>
+                </div>
+              )}
+
               {/* Primary explanation */}
               <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
                 {currentStep.whatIsIt}
