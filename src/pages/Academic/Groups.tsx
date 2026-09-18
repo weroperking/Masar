@@ -56,11 +56,13 @@ export function Groups() {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">إدارة المواعيد، القاعات، ومتابعة الفصول الحالية والمجدولة</p>
         </div>
         <button 
+          id="tour-groups-add-btn"
+          data-tour="tour-groups-add-btn"
           onClick={() => {
             setEditingGroup(null);
             setIsModalOpen(true);
           }}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-xs text-xs font-bold"
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-xs text-xs font-bold cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 ml-1.5" />
           إضافة مجموعة

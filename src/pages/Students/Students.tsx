@@ -116,8 +116,10 @@ export function Students() {
             </div>
           ) : (
             <button 
+              id="tour-students-add-btn"
+              data-tour="tour-students-add-btn"
               onClick={() => { setEditingStudent(null); setIsModalOpen(true); }}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-xs text-xs font-bold"
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-xs text-xs font-bold cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5 ml-1.5" />
               إضافة طالب جديد

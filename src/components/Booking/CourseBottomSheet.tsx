@@ -51,7 +51,7 @@ export function CourseBottomSheet({
       <div className="space-y-2.5 pt-1">
         {filteredCourses.length === 0 ? (
           <div className="text-center py-8 text-slate-400 text-sm">
-            لا توجد كورسات مطابقة لبحثك
+            {courses.length === 0 ? 'لا توجد كورسات مضافة حالياً' : 'لا توجد كورسات مطابقة لبحثك'}
           </div>
         ) : (
           filteredCourses.map((course) => {

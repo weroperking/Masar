@@ -17,42 +17,6 @@ import {
   RotateCcw,
 } from 'lucide-react';
 
-const DEFAULT_COURSES: Course[] = [
-  {
-    id: 'default-course-math',
-    name: 'مراجعة الرياضيات العامة والتفاضل',
-    subject: 'الرياضيات',
-    price: 0,
-    paymentType: 'monthly',
-    isActive: true,
-    created_at: Date.now(),
-    updated_at: Date.now(),
-    sync_status: 'synced',
-  },
-  {
-    id: 'default-course-eng',
-    name: 'كورس اللغة الإنجليزية التأسيسي والشامل',
-    subject: 'اللغة الإنجليزية',
-    price: 0,
-    paymentType: 'monthly',
-    isActive: true,
-    created_at: Date.now(),
-    updated_at: Date.now(),
-    sync_status: 'synced',
-  },
-  {
-    id: 'default-course-phys',
-    name: 'كورس الفيزياء المتقدم',
-    subject: 'الفيزياء',
-    price: 0,
-    paymentType: 'monthly',
-    isActive: true,
-    created_at: Date.now(),
-    updated_at: Date.now(),
-    sync_status: 'synced',
-  },
-];
-
 export function PublicBooking() {
   const [submitted, setSubmitted] = useState(false);
 
@@ -62,7 +26,7 @@ export function PublicBooking() {
     phone: '',
   });
 
-  const [selectedGrade, setSelectedGrade] = useState<string>('الصف الثالث الثانوي');
+  const [selectedGrade, setSelectedGrade] = useState<string>('');
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
 
@@ -88,10 +52,9 @@ export function PublicBooking() {
     );
   }, [settingsList]);
 
-  // Active courses
+  // Active courses - only actual courses added by the teacher
   const courses = useMemo(() => {
-    const active = allCourses.filter((c) => !c.deleted_at && c.isActive);
-    return active.length > 0 ? active : DEFAULT_COURSES;
+    return allCourses.filter((c) => !c.deleted_at && c.isActive);
   }, [allCourses]);
 
   // Current selected course object
@@ -100,7 +63,7 @@ export function PublicBooking() {
       const found = courses.find((c) => c.id === selectedCourseId);
       if (found) return found;
     }
-    return courses[0] || DEFAULT_COURSES[0];
+    return courses[0] || null;
   }, [courses, selectedCourseId]);
 
   // Enrollment counts for each group to determine available seats
@@ -114,61 +77,11 @@ export function PublicBooking() {
     return counts;
   }, [allEnrollments]);
 
-  // Course groups (with default schedule options if center has not defined groups yet)
+  // Course groups - only actual groups added by the teacher for this course
   const courseGroups = useMemo(() => {
-    const filtered = allGroups.filter((g) => !g.deleted_at && g.courseId === selectedCourse.id);
-    if (filtered.length > 0) return filtered;
-    return [
-      {
-        id: `default-grp-1-${selectedCourse.id}`,
-        courseId: selectedCourse.id,
-        name: 'مجموعة السبت والثلاثاء (4:00 عصراً)',
-        type: 'in_person' as const,
-        daysOfWeek: ['saturday', 'tuesday'],
-        startTime: '16:00',
-        endTime: '18:00',
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: '',
-        maxStudents: 25,
-        status: 'scheduled' as const,
-        sync_status: 'synced' as const,
-        created_at: Date.now(),
-        updated_at: Date.now(),
-      },
-      {
-        id: `default-grp-2-${selectedCourse.id}`,
-        courseId: selectedCourse.id,
-        name: 'مجموعة الأحد والأربعاء (6:00 مساءً)',
-        type: 'in_person' as const,
-        daysOfWeek: ['sunday', 'wednesday'],
-        startTime: '18:00',
-        endTime: '20:00',
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: '',
-        maxStudents: 20,
-        status: 'scheduled' as const,
-        sync_status: 'synced' as const,
-        created_at: Date.now(),
-        updated_at: Date.now(),
-      },
-      {
-        id: `default-grp-3-${selectedCourse.id}`,
-        courseId: selectedCourse.id,
-        name: 'مجموعة أونلاين مسائية (الجمعة 7:00 م)',
-        type: 'online' as const,
-        daysOfWeek: ['friday'],
-        startTime: '19:00',
-        endTime: '21:30',
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: '',
-        maxStudents: 35,
-        status: 'scheduled' as const,
-        sync_status: 'synced' as const,
-        created_at: Date.now(),
-        updated_at: Date.now(),
-      },
-    ];
-  }, [allGroups, selectedCourse.id]);
+    if (!selectedCourse?.id) return [];
+    return allGroups.filter((g) => !g.deleted_at && g.courseId === selectedCourse.id);
+  }, [allGroups, selectedCourse?.id]);
 
   // Selected Group Object
   const selectedGroup = useMemo(() => {
@@ -177,6 +90,10 @@ export function PublicBooking() {
   }, [courseGroups, selectedGroupId]);
 
   const handleSubmitBooking = async () => {
+    if (!selectedCourse) {
+      return;
+    }
+
     // If student details are not filled, open the student details bottomsheet
     if (!formData.name.trim() || !formData.phone.trim()) {
       setIsStudentDetailsSheetOpen(true);
@@ -189,7 +106,7 @@ export function PublicBooking() {
         phone: formData.phone.trim(),
         courseId: selectedCourse.id,
         groupId: selectedGroup?.id || undefined,
-        gradeLevel: selectedGrade,
+        gradeLevel: selectedGrade || undefined,
         declaredAmount: 0,
         requestDate: new Date().toISOString().split('T')[0],
         status: 'pending',
@@ -263,7 +180,7 @@ export function PublicBooking() {
                     الكورس المطلوب
                   </span>
                   <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
-                    {selectedCourse.name}
+                    {selectedCourse ? selectedCourse.name : 'لا توجد كورسات متاحة'}
                   </p>
                 </div>
               </button>
@@ -285,7 +202,7 @@ export function PublicBooking() {
                     المرحلة الدراسية
                   </span>
                   <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
-                    {selectedGrade}
+                    {selectedGrade || 'اختر المرحلة'}
                   </p>
                 </div>
               </button>
@@ -309,7 +226,7 @@ export function PublicBooking() {
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
-                    {selectedGroup ? selectedGroup.name : 'تنسيق مع السنتر'}
+                    {selectedGroup ? selectedGroup.name : (courseGroups.length > 0 ? 'اختر المجموعة' : 'لا توجد مجموعات متاحة')}
                   </p>
                 </div>
               </button>
@@ -348,7 +265,7 @@ export function PublicBooking() {
                   <span className="text-[11px] font-medium text-slate-400 dark:text-slate-400">حالة المقاعد</span>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
-                      متاح للتسجيل الفوري
+                      {!selectedCourse ? 'لا توجد كورسات متاحة' : (courseGroups.length > 0 && selectedGroup && (selectedGroup.maxStudents || 25) <= (enrollmentCounts[selectedGroup.id] || 0) ? 'اكتملت المقاعد' : 'متاح للتسجيل')}
                     </span>
                   </div>
                 </div>
@@ -372,8 +289,13 @@ export function PublicBooking() {
                 {/* Primary "Book Now" Button in Masar Blue */}
                 <button
                   type="button"
+                  disabled={!selectedCourse}
                   onClick={handleSubmitBooking}
-                  className="flex-1 sm:flex-initial px-8 sm:px-10 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold text-sm sm:text-base transition-all shadow-lg shadow-blue-600/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  className={`flex-1 sm:flex-initial px-8 sm:px-10 py-3.5 rounded-full font-bold text-sm sm:text-base transition-all shadow-lg flex items-center justify-center gap-2 ${
+                    !selectedCourse
+                      ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed shadow-none'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/25 active:scale-95 cursor-pointer'
+                  }`}
                 >
                   <Check className="w-4 h-4 stroke-[2.5]" />
                   <span>احجز الآن</span>
@@ -391,7 +313,7 @@ export function PublicBooking() {
         isOpen={isCourseSheetOpen}
         onClose={() => setIsCourseSheetOpen(false)}
         courses={courses}
-        selectedCourseId={selectedCourse.id}
+        selectedCourseId={selectedCourse?.id || ''}
         onSelect={(course) => {
           setSelectedCourseId(course.id);
           setSelectedGroupId('');
@@ -437,7 +359,7 @@ export function PublicBooking() {
         <BookingSuccessBottomSheet
           studentName={formData.name}
           studentPhone={formData.phone}
-          courseName={selectedCourse.name}
+          courseName={selectedCourse?.name || ''}
           groupName={selectedGroup ? selectedGroup.name : undefined}
           gradeLevel={selectedGrade}
           onReset={handleReset}

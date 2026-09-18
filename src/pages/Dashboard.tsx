@@ -146,7 +146,7 @@ export function Dashboard() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div id="tour-welcome-target" className="space-y-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">لوحة التحكم</h1>

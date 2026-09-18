@@ -48,6 +48,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './config/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { performHandshake } from './services/syncService';
+import { TourProvider } from './context/TourContext';
+import { TourOverlay } from './components/Tour/TourOverlay';
 
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
@@ -212,39 +214,42 @@ function AuthGate() {
   return (
     <ErrorBoundary>
       <SubscriptionProvider>
-        <HydrationGate>
-          <CheckUpdate />
-          <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="students" element={<Students />} />
-              <Route path="students/:id" element={<StudentDetails />} />
-              <Route path="courses" element={<Courses />} />
-              <Route path="payments" element={<MonthlySubscriptions />} />
-              
-              <Route path="groups" element={<Groups />} />
-              <Route path="groups/:id" element={<GroupDetails />} />
-              <Route path="attendance" element={<Attendance />} />
-              <Route path="schedule" element={<Schedule />} />
-              <Route path="assessments" element={<Assessments />} />
-              <Route path="courseProducts" element={<CourseProducts />} />
-              
-              <Route path="sessionPayments" element={<SessionPayments />} />
-              <Route path="ledgers" element={<Ledgers />} />
-              <Route path="dues" element={<Dues />} />
-              <Route path="booking" element={<Booking />} />
-              
-              <Route path="inventory" element={<Inventory />} />
-              <Route path="reports" element={<Reports />} />
-              
-              <Route path="users" element={<Users />} />
-              <Route path="messaging" element={<Navigate to="/students" replace />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="qrcards" element={<QrCards />} />
-              <Route path="upgrade" element={<Upgrade />} />
-            </Route>
-          </Routes>
-        </HydrationGate>
+        <TourProvider>
+          <HydrationGate>
+            <CheckUpdate />
+            <TourOverlay />
+            <Routes>
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="students" element={<Students />} />
+                <Route path="students/:id" element={<StudentDetails />} />
+                <Route path="courses" element={<Courses />} />
+                <Route path="payments" element={<MonthlySubscriptions />} />
+                
+                <Route path="groups" element={<Groups />} />
+                <Route path="groups/:id" element={<GroupDetails />} />
+                <Route path="attendance" element={<Attendance />} />
+                <Route path="schedule" element={<Schedule />} />
+                <Route path="assessments" element={<Assessments />} />
+                <Route path="courseProducts" element={<CourseProducts />} />
+                
+                <Route path="sessionPayments" element={<SessionPayments />} />
+                <Route path="ledgers" element={<Ledgers />} />
+                <Route path="dues" element={<Dues />} />
+                <Route path="booking" element={<Booking />} />
+                
+                <Route path="inventory" element={<Inventory />} />
+                <Route path="reports" element={<Reports />} />
+                
+                <Route path="users" element={<Users />} />
+                <Route path="messaging" element={<Navigate to="/students" replace />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="qrcards" element={<QrCards />} />
+                <Route path="upgrade" element={<Upgrade />} />
+              </Route>
+            </Routes>
+          </HydrationGate>
+        </TourProvider>
       </SubscriptionProvider>
     </ErrorBoundary>
   );

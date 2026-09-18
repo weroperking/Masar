@@ -1,14 +1,14 @@
 import React from 'react';
 import { BottomSheet } from './BottomSheet';
 import { Group } from '../../types';
-import { Calendar, Clock, MapPin, Check, Layers } from 'lucide-react';
+import { Calendar, Clock, MapPin, Check } from 'lucide-react';
 
 interface GroupBottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
   groups: Group[];
   selectedGroupId: string;
-  onSelect: (group: Group | null) => void;
+  onSelect: (group: Group) => void;
   enrollmentCounts?: Record<string, number>;
 }
 
@@ -44,56 +44,12 @@ export function GroupBottomSheet({
       cancelText="إلغاء التغيير"
     >
       <div className="space-y-2.5">
-        {/* Flexible general option */}
-        <button
-          type="button"
-          onClick={() => {
-            onSelect(null);
-            onClose();
-          }}
-          className={`w-full text-right p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer ${
-            !selectedGroupId
-              ? 'border-blue-600 bg-blue-50/70 dark:bg-blue-950/30 ring-1 ring-blue-500/40'
-              : 'border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                !selectedGroupId
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  تنسيق مع إدارة السنتر
-                </h4>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
-                  مرن
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                تحديد المجموعة بالتواصل المباشر مع إدارة السنتر
-              </p>
-            </div>
+        {groups.length === 0 ? (
+          <div className="text-center py-8 text-slate-400 text-sm">
+            لا توجد مجموعات مضافة حالياً
           </div>
-          <div
-            className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-              !selectedGroupId
-                ? 'bg-blue-600 text-white'
-                : 'border border-slate-300 dark:border-slate-700 text-transparent'
-            }`}
-          >
-            <Check className="w-3.5 h-3.5" />
-          </div>
-        </button>
-
-        {/* Existing Groups List */}
-        {groups.map((group) => {
+        ) : (
+          groups.map((group) => {
           const isSelected = group.id === selectedGroupId;
           const enrolledCount = enrollmentCounts[group.id] || 0;
           const capacity = group.maxStudents || 25;
@@ -189,7 +145,8 @@ export function GroupBottomSheet({
               </div>
             </button>
           );
-        })}
+        })
+      )}
       </div>
     </BottomSheet>
   );

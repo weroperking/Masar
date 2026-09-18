@@ -1,4 +1,4 @@
-import { Save, Sun, Moon, Keyboard, RefreshCw, User as UserIcon, Building2 } from 'lucide-react';
+import { Save, Sun, Moon, Keyboard, RefreshCw, User as UserIcon, Building2, Sparkles, HelpCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useUser, useOrganization } from '@clerk/clerk-react';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
@@ -6,6 +6,7 @@ import { Settings as SettingsType } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useTour } from '../../context/TourContext';
 
 export function Settings() {
   const toast = useToast();
@@ -13,6 +14,7 @@ export function Settings() {
   const { confirm } = useConfirm();
   const { user } = useUser();
   const { organization } = useOrganization();
+  const { startTour } = useTour();
 
   const { data: settingsData = [] } = useApiQuery<SettingsType>('settings', 60 * 1000);
   const { create: createSettings, update: updateSettings } = useApiMutation<SettingsType>('settings');
@@ -291,6 +293,34 @@ export function Settings() {
               />
             </div>
           )}
+        </section>
+
+        {/* Interactive Onboarding Tour Section */}
+        <section className="pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2 mb-2 text-blue-600 dark:text-blue-400">
+            <Sparkles className="w-5 h-5" />
+            <h2 className="text-base font-bold">الجولة التعريفية التفاعلية للمنصة</h2>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+            استكشف وتعرف على جميع أقسام وإمكانيات منصة مسار (Masar) خطوة بخطوة من خلال الجولة التفاعلية الشاملة لكافة وظائف النظام والأدوات المتاحة.
+          </p>
+          <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xs font-bold text-blue-900 dark:text-blue-200 mb-0.5">بدء الجولة التعريفية من جديد</h3>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                إعادة تشغيل الدليل التفاعلي لشرح الكورسات، المجموعات، الطلاب، التحضير بالباركود، والماليات.
+              </p>
+            </div>
+            <button
+              id="tour-retake-btn"
+              type="button"
+              onClick={() => startTour(0)}
+              className="shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>إعادة الجولة التعريفية</span>
+            </button>
+          </div>
         </section>
 
         {/* System Updates Section */}

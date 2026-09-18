@@ -90,10 +90,13 @@ interface SidebarNavItemProps {
 const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, isActive, onItemClick }) => {
   const [isHovered, setIsHovered] = useState(false);
   const Icon = item.icon;
+  const tourId = `tour-nav-${item.href.replace('/', '') || 'dashboard'}`;
 
   return (
     <Link
       to={item.href}
+      id={tourId}
+      data-tour={tourId}
       onClick={onItemClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -394,8 +397,10 @@ export function Layout() {
             {showNav && (
               <div className="hidden md:flex items-center gap-2">
                 <button
+                  id="tour-header-search"
+                  data-tour="tour-header-search"
                   onClick={() => setIsCommandPaletteOpen(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg text-xs font-medium transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg text-xs font-medium transition-colors cursor-pointer"
                   title="البحث والأوامر السريعة (Ctrl+K)"
                 >
                   <Search className="w-3.5 h-3.5 text-slate-400" />
@@ -411,10 +416,12 @@ export function Layout() {
           <div className="flex items-center gap-2">
             {/* Sync Status Pill */}
             <button
+              id="tour-header-sync"
+              data-tour="tour-header-sync"
               onClick={handleManualSyncClick}
               disabled={syncState.isSyncing}
               className={cn(
-                "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer",
                 syncState.breakerOpen || syncState.syncPillStatus === 'paused'
                   ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800 hover:bg-rose-100 cursor-pointer"
                   : !isOnline
@@ -475,7 +482,7 @@ export function Layout() {
             )}
 
             {/* User Profile & Signout */}
-            <div className="flex items-center gap-2 mr-1">
+            <div id="tour-header-user" data-tour="tour-header-user" className="flex items-center gap-2 mr-1">
               <CustomUserButton />
             </div>
           </div>
