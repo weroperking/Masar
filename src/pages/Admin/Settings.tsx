@@ -201,7 +201,7 @@ export function Settings() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
             {/* Toggle Card 1: autoStartEndSessions */}
             <ToggleCard
               icon={<Clock className="w-4 h-4" />}
@@ -218,15 +218,6 @@ export function Settings() {
               description="تسجيل وتأكيد تحصيل رسوم الحصة فورياً بمجرد قراءة QR كارت الطالب (نظام الدفع بالحصة)."
               checked={!!settings.autoConfirmPaymentOnAttendance}
               onChange={checked => setSettings({ ...settings, autoConfirmPaymentOnAttendance: checked })}
-            />
-
-            {/* Toggle Card 3: autoCreateAssignmentPerSession */}
-            <ToggleCard
-              icon={<BookOpen className="w-4 h-4" />}
-              title="إنشاء واجب تلقائياً مع كل حصة جديدة"
-              description="إضافة سجل واجب دراسي تلقائي في قائمة التقييمات فور إنشاء أو فتح حصة جديدة."
-              checked={!!settings.autoCreateAssignmentPerSession}
-              onChange={checked => setSettings({ ...settings, autoCreateAssignmentPerSession: checked })}
             />
           </div>
         </section>
