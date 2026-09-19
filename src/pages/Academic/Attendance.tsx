@@ -750,7 +750,7 @@ function AttendanceModal({
   const { data: qrCards = [] } = useApiQuery<any>("qrCards", 60 * 1000);
 
   const [recordMap, setRecordMap] = useState<
-    Record<string, "present" | "absent">
+    Record<string, "present" | "absent" | "compensation">
   >({});
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -792,7 +792,7 @@ function AttendanceModal({
       );
 
       setRecordMap((prev) => {
-        const map: Record<string, "present" | "absent"> = { ...prev };
+        const map: Record<string, "present" | "absent" | "compensation"> = { ...prev };
         sessionRecords.forEach((r) => {
           if (r.studentId && !map[r.studentId]) {
             map[r.studentId] = r.status;
@@ -977,8 +977,11 @@ function AttendanceModal({
       }
     }
 
+    const isGuest = !rosterStudents.some((s) => s.id === foundStudent.id);
+    const targetStatus = isGuest ? "compensation" : "present";
+
     // Update local state
-    setRecordMap((prev) => ({ ...prev, [foundStudent.id]: "present" }));
+    setRecordMap((prev) => ({ ...prev, [foundStudent.id]: targetStatus }));
 
     // Switch to attended view so user immediately sees the success feedback
     setViewTab("attended");
@@ -988,10 +991,10 @@ function AttendanceModal({
       (r) => r.sessionId === session.id && r.studentId === foundStudent.id,
     );
     if (existingRec) {
-      if (existingRec.status !== "present") {
+      if (existingRec.status !== targetStatus) {
         updateRecord.mutate({
           id: existingRec.id,
-          data: { status: "present", markedAt: Date.now() },
+          data: { status: targetStatus, markedAt: Date.now() },
         });
       }
     } else {
@@ -999,7 +1002,7 @@ function AttendanceModal({
         sessionId: session.id,
         studentId: foundStudent.id,
         groupId: session.groupId,
-        status: "present",
+        status: targetStatus,
         markedAt: Date.now(),
       });
     }
@@ -1013,8 +1016,8 @@ function AttendanceModal({
       (r) =>
         r.studentId === foundStudent.id &&
         (r.groupId === session.groupId || !r.groupId) &&
-        r.status === "present",
-    ).length + (existingRec?.status === "present" ? 0 : 1);
+        (r.status === "present" || r.status === "compensation"),
+    ).length + ((existingRec?.status === "present" || existingRec?.status === "compensation") ? 0 : 1);
 
     // Update last scanned student data to immediately trigger the BottomSheet / Desktop card
     setLastScannedData({
@@ -1027,7 +1030,8 @@ function AttendanceModal({
       coursePrice: currentCourse?.price,
       attendanceCountInGroup: attendedCount,
       isGuest: !rosterStudents.some((s) => s.id === foundStudent.id),
-    });
+      isCompensation: targetStatus === "compensation",
+    } as any);
 
     if (!session.isTrial && (!sub || sub.status !== "paid")) {
       toast.success(
@@ -1138,7 +1142,7 @@ function AttendanceModal({
 
   const toggleStudentStatus = (
     studentId: string,
-    status: "present" | "absent",
+    status: "present" | "absent" | "compensation",
   ) => {
     setRecordMap((prev) => ({
       ...prev,
@@ -1217,12 +1221,12 @@ function AttendanceModal({
       // If it's a trial session, prevent saving if limit exceeded for any present student
       if (session.isTrial) {
         const overLimitStudents = combinedStudents.filter((student) => {
-          if (recordMap[student.id] === "present") {
+          if (recordMap[student.id] === "present" || recordMap[student.id] === "compensation") {
             const pastTrials =
               allTrialRecords?.filter(
                 (r) =>
                   r.studentId === student.id &&
-                  r.status === "present" &&
+                  (r.status === "present" || r.status === "compensation") &&
                   trialSessionIds.includes(r.sessionId) &&
                   r.sessionId !== session.id,
               ).length || 0;
@@ -1284,12 +1288,12 @@ function AttendanceModal({
     }
   };
 
-  // Split students into attended (present) and absent
+  // Split students into attended (present or compensation) and absent
   const attendedStudents = combinedStudents.filter(
-    (s) => recordMap[s.id] === "present",
+    (s) => recordMap[s.id] === "present" || recordMap[s.id] === "compensation",
   );
   const absentStudents = combinedStudents.filter(
-    (s) => recordMap[s.id] !== "present",
+    (s) => recordMap[s.id] !== "present" && recordMap[s.id] !== "compensation",
   );
 
   const presentCount = attendedStudents.length;
@@ -1525,10 +1529,18 @@ function AttendanceModal({
                     return (
                       <div
                         key={student.id}
-                        className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200/80 dark:border-emerald-900/40 shadow-2xs flex items-center justify-between gap-3 hover:border-emerald-400 transition-colors"
+                        className={`p-3.5 bg-white dark:bg-slate-900 rounded-xl border shadow-2xs flex items-center justify-between gap-3 transition-colors ${
+                          recordMap[student.id] === "compensation"
+                            ? "border-amber-200/80 dark:border-amber-900/40 hover:border-amber-400 bg-amber-50/5 dark:bg-amber-950/5"
+                            : "border-emerald-200/80 dark:border-emerald-900/40 hover:border-emerald-400 bg-white dark:bg-slate-900"
+                        }`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0 border border-emerald-200/60 dark:border-emerald-800/40">
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 border ${
+                            recordMap[student.id] === "compensation"
+                              ? "bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/40"
+                              : "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/40"
+                          }`}>
                             ✓
                           </div>
                           <div>
@@ -1539,6 +1551,11 @@ function AttendanceModal({
                               {student.studentCode && (
                                 <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                                   #{student.studentCode}
+                                </span>
+                              )}
+                              {recordMap[student.id] === "compensation" && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                  تعويض
                                 </span>
                               )}
                             </div>
@@ -1560,16 +1577,38 @@ function AttendanceModal({
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            toggleStudentStatus(student.id, "absent")
-                          }
-                          className="px-2.5 py-1 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg text-[11px] font-semibold transition-colors shrink-0"
-                          title="إلغاء التحضير ورصده كغائب"
-                        >
-                          إلغاء التحضير
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {recordMap[student.id] === "present" ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleStudentStatus(student.id, "compensation")}
+                              className="px-2 py-1 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-lg text-[10px] font-bold transition-colors"
+                              title="تغيير الحالة إلى حضور تعويض"
+                            >
+                              تعويض
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => toggleStudentStatus(student.id, "present")}
+                              className="px-2 py-1 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded-lg text-[10px] font-bold transition-colors"
+                              title="تغيير الحالة إلى حضور عادي"
+                            >
+                              حضور عادي
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              toggleStudentStatus(student.id, "absent")
+                            }
+                            className="px-2 py-1 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg text-[10px] font-bold transition-colors"
+                            title="إلغاء التحضير ورصده كغائب"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
                       </div>
                     );
                   })}

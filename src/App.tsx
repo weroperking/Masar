@@ -187,7 +187,7 @@ function AuthGate() {
           src="/masar-loader.json"
           autoplay
           loop={false}
-          layout={{ fit: 'cover' }}
+          layout={{ fit: 'contain' }}
           className="w-full h-full"
           style={{ width: '100%', height: '100%', opacity: lottieError ? 0 : 1 }}
           dotLottieRefCallback={setDotLottie}

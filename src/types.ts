@@ -82,7 +82,7 @@ export interface AttendanceRecord extends BaseRecord {
   sessionId: string;
   studentId?: string;
   groupId: string; // ADDED THIS
-  status: 'present' | 'absent';
+  status: 'present' | 'absent' | 'compensation';
   markedAt: number;
 }
 

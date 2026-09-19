@@ -2,13 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { 
   FileText, Plus, Search, Edit2, Trash2, X, Users, CheckCircle, 
-  GraduationCap, Check, UserPlus, SlidersHorizontal, Calculator 
+  GraduationCap, Check, UserPlus, SlidersHorizontal, Calculator,
+  MessageCircle
 } from 'lucide-react';
 import { Assessment, Student, Course, Group, Enrollment, AssessmentGrade } from '../../types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { getWhatsAppUrl } from '../../utils/phone';
 
 export function Assessments() {
   const toast = useToast();
@@ -798,6 +800,39 @@ function GradingModal({
                     </div>
                     
                     <div className="flex items-center gap-2 shrink-0">
+                      {hasGrade && (student.parentPhone || student.phone) && (() => {
+                        const assessmentType = assessment.type === 'exam' ? 'اختبار' : 'واجب';
+                        const maxGrade = assessment.maxGrade;
+                        const isNumeric = assessment.gradingMethod === 'numeric';
+                        const studentGrade = gradesMap[student.id];
+
+                        let msg = `مرحباً بك، نود إحاطتكم بتقدير/درجة الطالب (${student.name}) في ${assessmentType} (${assessment.name}):`;
+                        if (isNumeric) {
+                          msg += `\nالدرجة: ${studentGrade} من ${maxGrade}`;
+                          if (pct !== null) {
+                            msg += ` (${pct}% - ${ratingDesc})`;
+                          }
+                        } else {
+                          msg += `\nالتقييم: ${studentGrade}`;
+                        }
+                        msg += `\nنتمنى له دوام التوفيق والنجاح.`;
+
+                        const whatsappUrl = getWhatsAppUrl(student.parentPhone || student.phone, msg);
+                        if (!whatsappUrl) return null;
+
+                        return (
+                          <a
+                            href={whatsappUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 transition-colors"
+                            title="إرسال الدرجة عبر واتساب"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </a>
+                        );
+                      })()}
+
                       {assessment.gradingMethod === 'numeric' ? (
                         <div className="flex items-center gap-1.5">
                           <input 
