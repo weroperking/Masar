@@ -503,58 +503,8 @@ function AcceptBookingModal({ booking, onClose }: { booking: BookingRequest; onC
             </div>
           </div>
 
-          {/* Sequential Student ID Code */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                <Hash className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                كود / رقم الطالب (ID) *
-              </label>
-              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60">
-                تسلسل تلقائي رسمي
-              </span>
-            </div>
-            <div className="relative">
-              <input
-                type="text"
-                required
-                value={studentCode}
-                onChange={e => setStudentCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="مثال: 0001"
-                className={`w-full pl-8 pr-3 py-2 border rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 transition-colors ${
-                  duplicateStudent
-                    ? 'border-red-500 focus:ring-red-500 bg-red-50/30 dark:bg-red-950/30'
-                    : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-emerald-500'
-                }`}
-                dir="ltr"
-              />
-              <span className="absolute left-3 top-2 text-xs text-slate-400 pointer-events-none font-mono font-bold">
-                #
-              </span>
-            </div>
-            {duplicateStudent ? (
-              <div className="mt-1.5 p-2 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300 flex flex-col gap-1">
-                <div className="flex items-center gap-1 text-[11px] font-bold">
-                  <span>⚠️ هذا الكود مستخدم بالفعل للطالب:</span>
-                  <span className="underline">{duplicateStudent.name}</span>
-                </div>
-                <p className="text-[10px] text-red-600 dark:text-red-400">
-                  غير مسموح بتكرار كود الطالب لمنع تداخل كروت الباركود والتحضير.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setStudentCode(nextSeqCode)}
-                  className="self-start text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 hover:bg-emerald-200 dark:hover:bg-emerald-800/80 px-2 py-0.5 rounded transition-colors"
-                >
-                  استخدام الكود التالي المتاح (#{nextSeqCode})
-                </button>
-              </div>
-            ) : (
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                يطابق نظام ترقيم الطلاب المضافين يدوياً، ويستخدم في طباعة الكروت وكود الباركود والتحضير السريع.
-              </p>
-            )}
-          </div>
+          {/* Automatic Invisible Student ID */}
+          <input type="hidden" value={studentCode} />
 
           {/* Highlight student's selected group */}
           {booking.groupId && (

@@ -667,71 +667,19 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
         
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-3.5">
           
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                  <Hash className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  كود الطالب (ID / الباركود) *
-                </label>
-                {!existingStudent && (
-                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800/60">
-                    تسلسل تلقائي
-                  </span>
-                )}
-              </div>
-              <div className="relative">
-                <input 
-                  type="text" 
-                  required
-                  placeholder="0001"
-                  dir="ltr"
-                  className={`w-full pl-7 pr-3 py-1.5 bg-white dark:bg-slate-800 border rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 text-xs font-mono font-bold text-left transition-colors ${
-                    duplicateStudent 
-                      ? 'border-red-500 focus:ring-red-500 bg-red-50/30 dark:bg-red-950/30' 
-                      : 'border-slate-300 dark:border-slate-700 focus:ring-blue-500'
-                  }`}
-                  value={formData.studentCode} 
-                  onChange={e => setFormData({...formData, studentCode: e.target.value.replace(/\D/g, '')})} 
-                />
-                <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 pointer-events-none font-mono font-bold">
-                  #
-                </span>
-              </div>
-              {duplicateStudent ? (
-                <div className="mt-1.5 p-2 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300 flex flex-col gap-1">
-                  <div className="flex items-center gap-1 text-[11px] font-bold">
-                    <span>⚠️ هذا الكود مستخدم بالفعل للطالب:</span>
-                    <span className="underline">{duplicateStudent.name}</span>
-                  </div>
-                  <p className="text-[10px] text-red-600 dark:text-red-400">
-                    غير مسموح بتكرار كود الطالب لمنع تداخل كروت الـ QR والحضور.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, studentCode: suggestedNextCode }))}
-                    className="self-start text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/60 hover:bg-blue-200 dark:hover:bg-blue-800/80 px-2 py-0.5 rounded transition-colors"
-                  >
-                    استخدام الكود التالي المتاح (#{suggestedNextCode})
-                  </button>
-                </div>
-              ) : (
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  معرّف متسلسل فريد يستخدم في بطاقة الـ QR والباركود وكشف الحضور.
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الطالب *</label>
-              <input 
-                required 
-                type="text" 
-                placeholder="الاسم ثلاثي أو رباعي"
-                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-                value={formData.name} 
-                onChange={e => setFormData({...formData, name: e.target.value})} 
-              />
-            </div>
+          {/* Automatically generated student ID (hidden field) */}
+          <input type="hidden" value={formData.studentCode} />
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الطالب *</label>
+            <input 
+              required 
+              type="text" 
+              placeholder="الاسم ثلاثي أو رباعي"
+              className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+              value={formData.name} 
+              onChange={e => setFormData({...formData, name: e.target.value})} 
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
