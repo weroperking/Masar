@@ -22,10 +22,10 @@ export function ShortcutsHelpModal({
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" dir="rtl">
       <div 
-        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl lg:max-w-3xl bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
               <Keyboard className="w-5 h-5" />
@@ -40,11 +40,11 @@ export function ShortcutsHelpModal({
           </button>
         </div>
 
-        <div className="p-5 space-y-3">
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
           {shortcuts.map((sc, i) => (
-            <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800/60 last:border-0">
+            <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800/60">
               <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{sc.desc}</span>
-              <kbd className="px-2.5 py-1 text-xs font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-lg border border-slate-200 dark:border-slate-700 dark:border-slate-700 shadow-2xs whitespace-nowrap">
+              <kbd className="px-2.5 py-1 text-xs font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs whitespace-nowrap mr-2">
                 {sc.key}
               </kbd>
             </div>

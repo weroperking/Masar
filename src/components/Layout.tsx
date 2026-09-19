@@ -445,13 +445,15 @@ export function Layout() {
                   id="tour-header-search"
                   data-tour="tour-header-search"
                   onClick={() => setIsCommandPaletteOpen(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                  className="flex items-center justify-between w-64 md:w-80 lg:w-[480px] px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer border border-transparent hover:border-slate-300 dark:hover:border-slate-700"
                   title="البحث والأوامر السريعة (Ctrl+K)"
                 >
-                  <Search className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="hidden lg:inline">بحث في مسار...</span>
-                  <span className="lg:hidden">بحث...</span>
-                  <kbd className="font-mono text-[10px] px-1 py-0.5 bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-700 dark:border-slate-600 mr-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="hidden lg:inline truncate">البحث في مسار (طلاب، كورسات، صفحات)...</span>
+                    <span className="lg:hidden truncate">بحث في مسار...</span>
+                  </div>
+                  <kbd className="font-mono text-[10px] px-1.5 py-0.5 bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-600 shrink-0 mr-1">
                     Ctrl+K
                   </kbd>
                 </button>

@@ -201,9 +201,9 @@ export function CommandPalette({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-16 sm:pt-24 p-4 bg-black/60 backdrop-blur-xs transition-opacity" dir="rtl">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-12 sm:pt-16 p-4 bg-black/60 backdrop-blur-xs transition-opacity" dir="rtl">
       <div 
-        className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[55vh] sm:max-h-[60vh] animate-in fade-in zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
       >
         {/* Search header */}

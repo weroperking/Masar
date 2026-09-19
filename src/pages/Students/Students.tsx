@@ -130,11 +130,11 @@ export function Students() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">
-        <div className="relative max-w-sm mb-4">
+        <div className="relative w-full max-w-lg lg:max-w-xl mb-4">
           <input
             type="text"
-            placeholder="بحث بالاسم أو رقم الهاتف..."
-            className="w-full pl-3 pr-9 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs placeholder-slate-400 dark:placeholder-slate-500"
+            placeholder="بحث بالاسم أو رقم الهاتف أو كود الطالب..."
+            className="w-full pl-3 pr-9 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs placeholder-slate-400 dark:placeholder-slate-500 transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
