@@ -27,6 +27,7 @@ import {
   ScannedStudentDesktopCard,
   ScannedStudentData,
 } from "../../components/Attendance/ScannedStudentInfo";
+import { CameraScanner } from "../../components/Attendance/CameraScanner";
 import { useApiQuery, useApiMutation } from "../../config/queryHooks";
 import {
   AttendanceSession,
@@ -758,13 +759,12 @@ function AttendanceModal({
 
   const [qrInput, setQrInput] = useState("");
   const [lastScannedData, setLastScannedData] = useState<ScannedStudentData | null>(null);
+  const [showLiveScanner, setShowLiveScanner] = useState(initialCameraOpen);
 
-  // Auto-launch device camera if modal was opened with camera mode
+  // Auto-launch live camera scanner if modal was opened with camera mode
   useEffect(() => {
     if (initialCameraOpen) {
-      setTimeout(() => {
-        directCameraInputRef.current?.click();
-      }, 300);
+      setShowLiveScanner(true);
     }
   }, [initialCameraOpen]);
 
@@ -1375,23 +1375,38 @@ function AttendanceModal({
               className="hidden"
             />
 
+            {/* Live Camera Stream Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowLiveScanner(!showLiveScanner)}
+              className={`px-4 py-3 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer shrink-0 border ${
+                showLiveScanner
+                  ? "bg-amber-600 hover:bg-amber-700 text-white border-amber-500"
+                  : "bg-blue-600 hover:bg-blue-700 text-white border-blue-500"
+              }`}
+              title="تشغيل البث الحي للكاميرا لمسح فوري للكود"
+            >
+              <Camera className={`w-4 h-4 ${showLiveScanner ? "animate-pulse" : ""}`} />
+              <span>{showLiveScanner ? "إغلاق الكاميرا المباشرة" : "تشغيل الكاميرا المباشرة"}</span>
+            </button>
+
             {/* Direct Device Native Camera Action Button */}
             <button
               type="button"
               onClick={() => directCameraInputRef.current?.click()}
               disabled={isProcessingDirectCamera}
-              className="px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer shrink-0 border border-blue-400/20"
+              className="px-4 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 border border-slate-200 dark:border-slate-700"
               title="فتح كاميرا الهاتف الحقيقية لالتقاط صورة للكارت"
             >
               {isProcessingDirectCamera ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-slate-700 dark:border-slate-300 border-t-transparent rounded-full animate-spin" />
                   <span>جاري القراءة...</span>
                 </>
               ) : (
                 <>
-                  <Camera className="w-4 h-4 animate-bounce" />
-                  <span>فتح كاميرا الجهاز الأساسية</span>
+                  <Camera className="w-4 h-4" />
+                  <span>تصوير الكارت (بديل)</span>
                 </>
               )}
             </button>
@@ -1456,7 +1471,18 @@ function AttendanceModal({
 
 
         {/* Content Body: DOES NOT list all students by default, shows live attended feed */}
-        <div className="p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-950/20">
+        <div className="p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-950/20 space-y-4">
+          {showLiveScanner && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
+              <div className="w-full h-full md:max-w-xl md:h-[82vh] md:max-h-[720px] bg-black border border-white/10 rounded-none md:rounded-2xl shadow-2xl overflow-hidden relative flex flex-col animate-in zoom-in-95 duration-150">
+                <CameraScanner
+                  onScan={processStudentCode}
+                  onClose={() => setShowLiveScanner(false)}
+                />
+              </div>
+            </div>
+          )}
+
           {viewTab === "attended" ? (
             attendedStudents.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
