@@ -81,11 +81,17 @@ export function QrPrintSheetModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 transition-opacity print:relative print:inset-auto print:bg-transparent print:p-0" onClick={onClose}>
       <div 
         dir="rtl"
-        className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 print:shadow-none print:border-none print:w-full print:max-w-none print:h-auto print:max-h-none print:overflow-visible print:p-0 print:m-0 animate-in fade-in zoom-in-95 duration-150"
+        className="bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-xl w-full max-w-5xl max-h-[85vh] sm:max-h-[92vh] flex flex-col overflow-hidden border-t sm:border border-slate-200 dark:border-slate-800 print:shadow-none print:border-none print:w-full print:max-w-none print:h-auto print:max-h-none print:overflow-visible print:p-0 print:m-0 animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
       >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden print:hidden bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
         {/* Header - Hidden in physical print */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 print:hidden">
           <div className="flex items-center gap-3">

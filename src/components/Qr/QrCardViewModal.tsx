@@ -48,14 +48,20 @@ export function QrCardViewModal({
   ).slice(0, 10);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 transition-opacity print:relative print:inset-auto print:bg-transparent print:p-0" onClick={onClose}>
       {/* Container with print styles */}
       <div 
         dir="rtl"
-        className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-xl overflow-hidden border border-slate-200 dark:border-slate-800 print:shadow-none print:border-none print:w-auto print:max-w-none print:p-0 animate-in fade-in zoom-in-95 duration-150"
+        className="bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-xl w-full max-w-xl max-h-[85vh] sm:max-h-[92vh] flex flex-col overflow-hidden border-t sm:border border-slate-200 dark:border-slate-800 print:shadow-none print:border-none print:w-auto print:max-w-none print:p-0 print:max-h-none animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
       >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden print:hidden bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
         {/* Modal Header - Hidden on physical print */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 print:hidden bg-white dark:bg-slate-900">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 print:hidden bg-white dark:bg-slate-900 shrink-0">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
               تفاصيل كرنيه QR الخاص بالطالب
@@ -73,7 +79,7 @@ export function QrCardViewModal({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-5 overflow-y-auto flex-1">
           {/* Card Badge Display Area */}
           <div className="flex justify-center p-4 sm:p-6 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-800 print:p-0 print:bg-transparent print:border-none">
             <QrCardBadge
@@ -218,7 +224,7 @@ export function QrCardViewModal({
         </div>
 
         {/* Modal Footer Actions - Hidden on print */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 print:hidden">
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 print:hidden shrink-0">
           <div className="flex items-center gap-2">
             <button
               onClick={() =>

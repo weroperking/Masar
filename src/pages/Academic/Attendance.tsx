@@ -20,7 +20,13 @@ import {
   ArrowRight,
   RefreshCw,
   Zap,
+  Camera,
 } from "lucide-react";
+import {
+  ScannedStudentBottomSheet,
+  ScannedStudentDesktopCard,
+  ScannedStudentData,
+} from "../../components/Attendance/ScannedStudentInfo";
 import { useApiQuery, useApiMutation } from "../../config/queryHooks";
 import {
   AttendanceSession,
@@ -49,6 +55,7 @@ export function Attendance() {
   >("live");
   const [markingSession, setMarkingSession] =
     useState<AttendanceSession | null>(null);
+  const [startWithCamera, setStartWithCamera] = useState(false);
   const [isAutoChecking, setIsAutoChecking] = useState(false);
   const { data: groups = [] } = useApiQuery<Group>("groups", 60 * 1000);
   const { data: courses = [] } = useApiQuery<Course>("courses", 60 * 1000);
@@ -419,14 +426,28 @@ export function Attendance() {
 
                       <div className="flex gap-2">
                         <button
-                          onClick={() => setMarkingSession(session)}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-md text-xs font-bold transition-colors shadow-xs"
+                          onClick={() => {
+                            setStartWithCamera(false);
+                            setMarkingSession(session);
+                          }}
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-md text-xs font-bold transition-colors shadow-xs cursor-pointer"
                         >
                           تسجيل الحضور والغياب
                         </button>
                         <button
+                          onClick={() => {
+                            setStartWithCamera(true);
+                            setMarkingSession(session);
+                          }}
+                          className="px-3 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 py-1.5 rounded-md text-xs font-bold border border-blue-200 dark:border-blue-800 transition-colors flex items-center gap-1 cursor-pointer"
+                          title="مسح مباشر بكاميرا الهاتف"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">مسح بالكاميرا</span>
+                        </button>
+                        <button
                           onClick={() => handleEndSession(session.id)}
-                          className="px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-1.5 rounded-md text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
+                          className="px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-1.5 rounded-md text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
                         >
                           إنهاء الحصة
                         </button>
@@ -639,6 +660,7 @@ export function Attendance() {
           session={markingSession}
           onClose={() => setMarkingSession(null)}
           groupName={groupMap.get(markingSession.groupId)?.name || ""}
+          initialCameraOpen={startWithCamera}
         />
       )}
     </div>
@@ -649,12 +671,17 @@ function AttendanceModal({
   session,
   onClose,
   groupName,
+  initialCameraOpen = false,
 }: {
   session: AttendanceSession;
   onClose: () => void;
   groupName: string;
+  initialCameraOpen?: boolean;
 }) {
   const toast = useToast();
+
+  const { data: allCourses = [] } = useApiQuery<Course>("courses", 60 * 1000);
+  const currentCourse = allCourses.find((c) => c.id === session.courseId);
 
   const { data: allEnrollments = [] } = useApiQuery<any>(
     "enrollments",
@@ -730,6 +757,20 @@ function AttendanceModal({
   const [extraGuestStudents, setExtraGuestStudents] = useState<Student[]>([]);
 
   const [qrInput, setQrInput] = useState("");
+  const [lastScannedData, setLastScannedData] = useState<ScannedStudentData | null>(null);
+
+  // Auto-launch device camera if modal was opened with camera mode
+  useEffect(() => {
+    if (initialCameraOpen) {
+      setTimeout(() => {
+        directCameraInputRef.current?.click();
+      }, 300);
+    }
+  }, [initialCameraOpen]);
+
+  // Direct native device camera capture states and ref
+  const directCameraInputRef = useRef<HTMLInputElement>(null);
+  const [isProcessingDirectCamera, setIsProcessingDirectCamera] = useState(false);
 
   const qrInputRef = useRef<HTMLInputElement>(null);
   const initializedSessionIdRef = useRef<string | null>(null);
@@ -966,6 +1007,28 @@ function AttendanceModal({
     const sub = currentSubscriptions?.find(
       (s) => s.studentId === foundStudent.id,
     );
+
+    // Compute attendance count for this student in this group
+    const attendedCount = allRecords.filter(
+      (r) =>
+        r.studentId === foundStudent.id &&
+        (r.groupId === session.groupId || !r.groupId) &&
+        r.status === "present",
+    ).length + (existingRec?.status === "present" ? 0 : 1);
+
+    // Update last scanned student data to immediately trigger the BottomSheet / Desktop card
+    setLastScannedData({
+      student: foundStudent,
+      markedAt: Date.now(),
+      session,
+      courseName: currentCourse?.name,
+      groupName,
+      subscription: sub,
+      coursePrice: currentCourse?.price,
+      attendanceCountInGroup: attendedCount,
+      isGuest: !rosterStudents.some((s) => s.id === foundStudent.id),
+    });
+
     if (!session.isTrial && (!sub || sub.status !== "paid")) {
       toast.success(
         `تم التحضير: ${foundStudent.name} (تنبيه: لم يسدد اشتراك الشهر)`,
@@ -984,6 +1047,46 @@ function AttendanceModal({
 
   // Keep ref up to date to prevent stale closures
   processStudentCodeRef.current = processStudentCode;
+
+  // Process File Captured from the Native Device Camera App (Direct Launch)
+  const handleDirectCameraFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingDirectCamera(true);
+    setQrInput(""); // clear manually entered text
+
+    // Create a temporary off-screen container for Html5Qrcode file decoding
+    const tempDivId = `direct-temp-scanner-${Math.random().toString(36).substring(2, 9)}`;
+    const tempContainer = document.createElement("div");
+    tempContainer.id = tempDivId;
+    tempContainer.style.display = "none";
+    document.body.appendChild(tempContainer);
+
+    try {
+      const { Html5Qrcode } = await import("html5-qrcode");
+      const tempScanner = new Html5Qrcode(tempDivId);
+      const decodedText = await tempScanner.scanFile(file, false);
+      
+      // Successfully decoded! Pass the decoded student ID/code to the processor
+      processStudentCode(decodedText);
+      
+      try {
+        tempScanner.clear();
+      } catch (e) {}
+    } catch (err: any) {
+      console.warn("Direct device camera decode failed:", err);
+      toast.error("لم يتم العثور على باركود أو كود QR واضح في الصورة. يرجى تصوير الكارت عن قرب وتحت إضاءة جيدة.");
+    } finally {
+      try {
+        document.body.removeChild(tempContainer);
+      } catch (e) {}
+      if (directCameraInputRef.current) {
+        directCameraInputRef.current.value = "";
+      }
+      setIsProcessingDirectCamera(false);
+    }
+  };
 
   useEffect(() => {
     // Focus barcode input on mount and when modal opens
@@ -1237,7 +1340,7 @@ function AttendanceModal({
         </div>
 
         {/* Clean, Prominent Scanner Input Bar */}
-        <div className="p-5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+        <div className="p-4 sm:p-5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="relative flex-1">
               <QrCode className="w-5 h-5 text-blue-600 dark:text-blue-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -1253,10 +1356,42 @@ function AttendanceModal({
               />
             </div>
 
+            {/* Hidden Input for Direct Native Camera Launch */}
+            <input
+              type="file"
+              ref={directCameraInputRef}
+              accept="image/*"
+              capture="environment"
+              onChange={handleDirectCameraFile}
+              className="hidden"
+            />
+
+            {/* Direct Device Native Camera Action Button */}
+            <button
+              type="button"
+              onClick={() => directCameraInputRef.current?.click()}
+              disabled={isProcessingDirectCamera}
+              className="px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer shrink-0 border border-blue-400/20"
+              title="فتح كاميرا الهاتف الحقيقية لالتقاط صورة للكارت"
+            >
+              {isProcessingDirectCamera ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>جاري القراءة...</span>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-4 h-4 animate-bounce" />
+                  <span>فتح كاميرا الجهاز الأساسية</span>
+                </>
+              )}
+            </button>
+
+
             <button
               type="button"
               onClick={() => processStudentCode(qrInput)}
-              className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-colors shadow-sm shrink-0"
+              className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-colors shadow-sm shrink-0 cursor-pointer"
             >
               <Check className="w-4 h-4" />
               <span>تسجيل الحضور (Enter)</span>
@@ -1309,6 +1444,7 @@ function AttendanceModal({
             </div>
           </div>
         </div>
+
 
         {/* Content Body: DOES NOT list all students by default, shows live attended feed */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-950/20">
@@ -1500,6 +1636,25 @@ function AttendanceModal({
           </div>
         </div>
       </div>
+
+      {/* 1. Mobile Bottom Sheet: Slides up from bottom upon scan with general info & payment status */}
+      <div className="block sm:hidden">
+        <ScannedStudentBottomSheet
+          data={lastScannedData}
+          onClose={() => setLastScannedData(null)}
+        />
+      </div>
+
+      {/* 2. Desktop Floating Card: Displayed when a student is scanned */}
+      {lastScannedData && (
+        <div className="hidden sm:block">
+          <ScannedStudentDesktopCard
+            data={lastScannedData}
+            onClose={() => setLastScannedData(null)}
+            mode="floating"
+          />
+        </div>
+      )}
     </div>
   );
 }

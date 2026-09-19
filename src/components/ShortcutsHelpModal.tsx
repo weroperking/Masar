@@ -20,12 +20,17 @@ export function ShortcutsHelpModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" dir="rtl">
+    <div className="fixed inset-0 z-[110] flex items-end sm:items-start justify-center pt-0 sm:pt-12 sm:pt-16 p-0 sm:p-4 bg-black/60 backdrop-blur-xs" dir="rtl" onClick={onClose}>
       <div 
-        className="w-full max-w-2xl lg:max-w-3xl bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
+        <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
               <Keyboard className="w-5 h-5" />
@@ -40,7 +45,7 @@ export function ShortcutsHelpModal({
           </button>
         </div>
 
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 overflow-y-auto flex-1">
           {shortcuts.map((sc, i) => (
             <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800/60">
               <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{sc.desc}</span>

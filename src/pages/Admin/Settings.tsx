@@ -144,7 +144,7 @@ export function Settings() {
       <div className="space-y-6">
         
         {/* Profile Section */}
-        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
               <UserIcon className="w-4 h-4" />
@@ -185,7 +185,7 @@ export function Settings() {
         </section>
 
         {/* 1. Automation Section (أتمتة الجلسات والحضور) */}
-        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
@@ -223,7 +223,7 @@ export function Settings() {
         </section>
 
         {/* 2. Free & Trial Sessions Section (ضوابط الحصص التجريبية والمجانية) */}
-        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
               <Gift className="w-4 h-4" />
@@ -234,7 +234,7 @@ export function Settings() {
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50/60 dark:bg-slate-800/40 rounded-xl border border-slate-200/80 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="p-4 bg-slate-50/60 dark:bg-slate-800/40 rounded-xl border border-slate-200/80 dark:border-slate-800/80 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-900 dark:text-slate-100">الحد الأقصى لكل طالب:</span>
@@ -245,9 +245,9 @@ export function Settings() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0 w-full lg:w-auto">
               {/* Presets */}
-              <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-700">
+              <div className="flex flex-wrap items-center gap-1.5 pb-2.5 sm:pb-0 border-b sm:border-b-0 sm:border-l border-slate-200 dark:border-slate-700 pl-0 sm:pl-2.5 w-full sm:w-auto justify-start sm:justify-end">
                 {[0, 1, 2, 3].map(preset => (
                   <button
                     key={preset}
@@ -302,7 +302,7 @@ export function Settings() {
         </section>
 
         {/* 3. Grading Method Section (طريقة تقييم الواجبات) */}
-        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
@@ -387,7 +387,7 @@ export function Settings() {
 
           {/* Conditional Max Grade Input for Numeric Grading */}
           {settings.assignmentGradingMethod === 'numeric' && (
-            <div className="p-4 bg-blue-50/30 dark:bg-blue-950/20 rounded-xl border border-blue-200/60 dark:border-blue-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+            <div className="p-4 bg-blue-50/30 dark:bg-blue-950/20 rounded-xl border border-blue-200/60 dark:border-blue-900/40 flex flex-col lg:flex-row lg:items-center justify-between gap-3 animate-in fade-in duration-200">
               <div className="space-y-0.5">
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                   الدرجة العظمى الافتراضية للواجبات:
@@ -397,8 +397,8 @@ export function Settings() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1">
                   {[10, 20, 50, 100].map(val => (
                     <button
                       key={val}
@@ -432,7 +432,7 @@ export function Settings() {
         </section>
 
         {/* 4. Interactive Platform Tour Section (الجولة التعريفية التفاعلية للمنصة) */}
-        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
               <Compass className="w-4 h-4" />
@@ -467,7 +467,7 @@ export function Settings() {
         </section>
 
         {/* Theme Settings Section */}
-        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
@@ -517,7 +517,7 @@ export function Settings() {
         </section>
 
         {/* Keyboard Shortcuts Guide */}
-        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
               <Keyboard className="w-4 h-4" />
@@ -545,7 +545,7 @@ export function Settings() {
         </section>
 
         {/* System Updates Section */}
-        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
               <RefreshCw className="w-4 h-4" />

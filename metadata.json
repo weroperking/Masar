@@ -1,6 +1,6 @@
 {
   "name": "مسار — حصصك من غير دوشة",
   "description": "مسار — حصصك من غير دوشة",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

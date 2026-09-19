@@ -27,6 +27,20 @@ export function TourOverlay() {
 
   // Compute card position based on target element bounding box
   const cardStyle = useMemo(() => {
+    const viewportWidth = window.innerWidth;
+    const isMobile = viewportWidth < 640;
+
+    if (isMobile) {
+      return {
+        bottom: '16px',
+        left: '3vw',
+        right: '3vw',
+        width: '94vw',
+        position: 'fixed' as const,
+        zIndex: 10000,
+      };
+    }
+
     if (!targetRect || currentStep.preferredPosition === 'center') {
       return {
         top: '50%',
@@ -39,7 +53,6 @@ export function TourOverlay() {
     const padding = 16;
     const cardWidth = 680;
     const cardEstimatedHeight = 280;
-    const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
     let top = 0;
@@ -107,7 +120,7 @@ export function TourOverlay() {
       )}
 
       {/* Interactive Tooltip / Explanation Card */}
-      <div style={cardStyle} className="z-[10000] w-[94vw] max-w-[680px] pointer-events-auto">
+      <div style={cardStyle} className="z-[10000] w-[94vw] sm:w-[94vw] max-w-[680px] pointer-events-auto">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStep.id}
@@ -128,7 +141,7 @@ export function TourOverlay() {
             </div>
 
             {/* Card Header */}
-            <div className="px-6 py-4 flex items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-3">
                 <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-md flex items-center gap-1.5">
                   <span className="font-bold">{progressPercentage}%</span>
@@ -150,7 +163,7 @@ export function TourOverlay() {
             </div>
 
             {/* Card Body - Minimalist & Spacious */}
-            <div className="p-6 space-y-4 text-xs leading-relaxed max-h-[60vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 space-y-4 text-xs leading-relaxed max-h-[45vh] sm:max-h-[60vh] overflow-y-auto">
               {/* Account Setup 25% Credit Notice on Step 0 */}
               {currentStepIndex === 0 && (
                 <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-2.5 text-emerald-800 dark:text-emerald-300">
@@ -190,7 +203,7 @@ export function TourOverlay() {
             </div>
 
             {/* Card Footer Navigation Controls */}
-            <div className="px-6 py-3.5 bg-slate-50/80 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+            <div className="px-4 sm:px-6 py-3 sm:py-3.5 bg-slate-50/80 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={skipTour}

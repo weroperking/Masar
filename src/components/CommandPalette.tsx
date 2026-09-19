@@ -201,11 +201,16 @@ export function CommandPalette({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-12 sm:pt-16 p-4 bg-black/60 backdrop-blur-xs transition-opacity" dir="rtl">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-start justify-center pt-0 sm:pt-12 sm:pt-16 p-0 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity" dir="rtl" onClick={onClose}>
       <div 
-        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[55vh] sm:max-h-[60vh] animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
       >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
         {/* Search header */}
         <div className="flex items-center px-4 py-3.5 border-b border-slate-100 dark:border-slate-800 gap-3">
           <Search className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />

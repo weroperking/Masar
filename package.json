@@ -28,6 +28,7 @@
     "esbuild": "^0.25.0",
     "express": "^4.21.2",
     "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.41.0",
     "motion": "^12.23.24",

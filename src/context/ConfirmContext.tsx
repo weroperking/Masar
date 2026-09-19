@@ -80,16 +80,21 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       {dialog && (
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150"
           dir="rtl"
           onClick={() => handleClose(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-800 w-full sm:max-w-md overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
           >
+            {/* Grab Handle for mobile */}
+            <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden bg-white dark:bg-slate-900">
+              <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+            </div>
+
             {/* Header with Icon and Close Button */}
             <div className="p-6 pb-4 flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
