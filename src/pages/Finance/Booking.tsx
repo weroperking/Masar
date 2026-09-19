@@ -289,73 +289,86 @@ function CreateBookingModal({ onClose, courses }: { onClose: () => void; courses
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">إضافة طلب حجز يدوي</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
-            <X className="w-4 h-4" />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" dir="rtl" onClick={onClose}>
+      <div 
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">إضافة طلب حجز يدوي</h2>
+            <p className="text-xs text-slate-500 mt-0.5">تسجيل طلب حجز لطالب جديد لمتابعة انضمامه للمجموعات</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg cursor-pointer">
+            <X className="w-5 h-5" />
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الطالب *</label>
-            <input 
-              required
-              type="text"
-              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-            />
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto flex-1 space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الطالب *</label>
+              <input 
+                required
+                type="text"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                value={formData.name}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">رقم الهاتف *</label>
+              <input 
+                required
+                type="tel"
+                dir="ltr"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
+                value={formData.phone}
+                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">الكورس المطلوب *</label>
+              <select
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                value={formData.courseId}
+                onChange={e => setFormData({ ...formData, courseId: e.target.value })}
+              >
+                {courses.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">تاريخ الحجز</label>
+              <input 
+                type="date"
+                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                value={formData.requestDate}
+                onChange={e => setFormData({ ...formData, requestDate: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">رقم الهاتف *</label>
-            <input 
-              required
-              type="tel"
-              dir="ltr"
-              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
-              value={formData.phone}
-              onChange={e => setFormData({ ...formData, phone: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">الكورس المطلوب *</label>
-            <select
-              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              value={formData.courseId}
-              onChange={e => setFormData({ ...formData, courseId: e.target.value })}
-            >
-              {courses.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">تاريخ الحجز</label>
-            <input 
-              type="date"
-              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              value={formData.requestDate}
-              onChange={e => setFormData({ ...formData, requestDate: e.target.value })}
-            />
-          </div>
-
-          <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors cursor-pointer"
             >
               إلغاء
             </button>
             <button 
               type="submit" 
-              className="px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs"
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs cursor-pointer"
             >
               حفظ الحجز
             </button>
@@ -473,81 +486,91 @@ function AcceptBookingModal({ booking, onClose }: { booking: BookingRequest; onC
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" dir="rtl" onClick={onClose}>
+      <div 
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">قبول الطالب وتسكينه في مجموعة</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">سيتم إنشاء حساب طالب جديد برقم ID متسلسل رسمي</p>
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">قبول الطالب وتسكينه في مجموعة</h2>
+            <p className="text-xs text-slate-500 mt-0.5">سيتم إنشاء حساب طالب جديد برقم ID متسلسل رسمي وتسكينه في المجموعة</p>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
-            <X className="w-4 h-4" />
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg cursor-pointer">
+            <X className="w-5 h-5" />
           </button>
         </div>
         
-        <form onSubmit={handleConfirm} className="p-5 space-y-4">
-          {/* Student Info Card */}
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-blue-600" />
-                {booking.name}
-              </span>
-              <span className="text-[11px] font-mono font-medium text-slate-600 dark:text-slate-400" dir="ltr">
-                {booking.phone}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
-              <span>الكورس: <strong className="text-slate-700 dark:text-slate-300">{courseMap.get(booking.courseId) || 'عام'}</strong></span>
-              {booking.gradeLevel && <span>الصف: <strong className="text-slate-700 dark:text-slate-300">{booking.gradeLevel}</strong></span>}
-            </div>
-          </div>
-
-          {/* Automatic Invisible Student ID */}
-          <input type="hidden" value={studentCode} />
-
-          {/* Highlight student's selected group */}
-          {booking.groupId && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 rounded-xl flex items-center gap-2 text-xs text-blue-800 dark:text-blue-200">
-              <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
-              <div>
-                <span className="font-bold">المجموعة المطلوبة من الطالب: </span>
-                <span className="font-semibold">{groupMap.get(booking.groupId) || booking.groupId}</span>
+        <form onSubmit={handleConfirm} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto flex-1 space-y-4">
+            {/* Student Info Card */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <User className="w-4 h-4 text-blue-600" />
+                  {booking.name}
+                </span>
+                <span className="text-xs font-mono font-medium text-slate-600 dark:text-slate-400" dir="ltr">
+                  {booking.phone}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                <span>الكورس: <strong className="text-slate-700 dark:text-slate-300">{courseMap.get(booking.courseId) || 'عام'}</strong></span>
+                {booking.gradeLevel && <span>الصف: <strong className="text-slate-700 dark:text-slate-300">{booking.gradeLevel}</strong></span>}
               </div>
             </div>
-          )}
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">تسكين في المجموعة *</label>
-            <select
-              required
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              value={selectedGroupId}
-              onChange={e => setSelectedGroupId(e.target.value)}
-            >
-              <option value="" disabled>-- اختر المجموعة المناسبة --</option>
-              {booking.groupId && !groups.some(g => g.id === booking.groupId) && (
-                <option value={booking.groupId}>
-                  {groupMap.get(booking.groupId) || booking.groupId} (اختيار الطالب)
-                </option>
-              )}
-              {groups?.map(g => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
+            {/* Automatic Invisible Student ID */}
+            <input type="hidden" value={studentCode} />
+
+            {/* Highlight student's selected group */}
+            {booking.groupId && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 rounded-xl flex items-center gap-2 text-xs text-blue-800 dark:text-blue-200">
+                <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                <div>
+                  <span className="font-bold">المجموعة المطلوبة من الطالب: </span>
+                  <span className="font-semibold">{groupMap.get(booking.groupId) || booking.groupId}</span>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">تسكين في المجموعة *</label>
+              <select
+                required
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                value={selectedGroupId}
+                onChange={e => setSelectedGroupId(e.target.value)}
+              >
+                <option value="" disabled>-- اختر المجموعة المناسبة --</option>
+                {booking.groupId && !groups.some(g => g.id === booking.groupId) && (
+                  <option value={booking.groupId}>
+                    {groupMap.get(booking.groupId) || booking.groupId} (اختيار الطالب)
+                  </option>
+                )}
+                {groups?.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors cursor-pointer"
             >
               إلغاء
             </button>
             <button 
               type="submit" 
-              className="px-4 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-xs font-bold transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5" 
+              className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-xs font-bold transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer" 
               disabled={!selectedGroupId || createStudent.isPending || Boolean(duplicateStudent)}
             >
               <Check className="w-3.5 h-3.5" />

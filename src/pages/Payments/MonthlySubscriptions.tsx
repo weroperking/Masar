@@ -598,81 +598,95 @@ function PaymentModal({ sub, month, year, onClose }: { sub: any, month: number, 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden">
-        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">تسجيل دفعة اشتراك</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
-            <X className="w-4 h-4" />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" dir="rtl" onClick={onClose}>
+      <div 
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">تسجيل دفعة اشتراك</h2>
+            <p className="text-xs text-slate-500 mt-0.5">تسجيل وتحديث بيانات سداد اشتراك الطالب الشهري</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg cursor-pointer">
+            <X className="w-5 h-5" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
-          <div className="text-xs bg-slate-50 dark:bg-slate-800/60 p-3 rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 space-y-1">
-            <p><span className="font-semibold text-slate-500 dark:text-slate-400">الطالب:</span> {sub.studentName}</p>
-            <p><span className="font-semibold text-slate-500 dark:text-slate-400">الكورس:</span> {sub.courseName} ({month}/{year})</p>
-          </div>
+        
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto flex-1 space-y-4">
+            <div className="text-xs bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 space-y-1.5">
+              <p><span className="font-semibold text-slate-500 dark:text-slate-400">الطالب:</span> <strong className="text-slate-900 dark:text-slate-100">{sub.studentName}</strong></p>
+              <p><span className="font-semibold text-slate-500 dark:text-slate-400">الكورس:</span> {sub.courseName} ({month}/{year})</p>
+            </div>
 
-          <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">المبلغ المطلوب (ج.م) *</label>
+                <input 
+                  type="number"
+                  required min="0"
+                  value={amountTotal} onChange={e => setAmountTotal(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">المبلغ المدفوع (ج.م) *</label>
+                <input 
+                  type="number"
+                  required min="0"
+                  value={paidAmount} onChange={e => setPaidAmount(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">المبلغ المطلوب (ج.م)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">تاريخ الاستحقاق *</label>
               <input 
-                type="number"
-                required min="0"
-                value={amountTotal} onChange={e => setAmountTotal(e.target.value)}
-                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                type="date"
+                required
+                value={dueDate} onChange={e => setDueDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">المبلغ المدفوع (ج.م)</label>
-              <input 
-                type="number"
-                required min="0"
-                value={paidAmount} onChange={e => setPaidAmount(e.target.value)}
-                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">ملاحظات</label>
+              <textarea 
+                value={notes} onChange={e => setNotes(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                rows={2}
               />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input 
+                type="checkbox" 
+                id="rejected"
+                checked={isRejected} onChange={e => setIsRejected(e.target.checked)}
+                className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <label htmlFor="rejected" className="text-xs text-slate-700 dark:text-slate-300 cursor-pointer">تعليم كـ "مرفوض / ملغى"</label>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">تاريخ الاستحقاق</label>
-            <input 
-              type="date"
-              required
-              value={dueDate} onChange={e => setDueDate(e.target.value)}
-              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">ملاحظات</label>
-            <textarea 
-              value={notes} onChange={e => setNotes(e.target.value)}
-              className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              rows={2}
-            />
-          </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            <input 
-              type="checkbox" 
-              id="rejected"
-              checked={isRejected} onChange={e => setIsRejected(e.target.checked)}
-              className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
-            />
-            <label htmlFor="rejected" className="text-xs text-slate-700 dark:text-slate-300">تعليم كـ "مرفوض / ملغى"</label>
-          </div>
-
-          <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors cursor-pointer"
             >
               إلغاء
             </button>
             <button 
               type="submit" 
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold transition-colors shadow-xs"
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
             >
               حفظ الدفعة
             </button>
@@ -716,87 +730,101 @@ function ReminderModal({ sub, month, year, onClose }: { sub: any, month: number,
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" dir="rtl" onClick={onClose}>
+      <div 
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-2">
-            <MessageCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">تذكير عبر واتساب</h2>
+            <MessageCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">تذكير عبر واتساب</h2>
+              <p className="text-xs text-slate-500 mt-0.5">إرسال رسالة تذكير مخصصة بسداد الاشتراك الشهري</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
-            <X className="w-4 h-4" />
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg cursor-pointer">
+            <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-5 space-y-4">
-          {/* Recipient Selector if parent phone is available */}
-          {sub.parentPhone && (
+
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto flex-1 space-y-4">
+            {/* Recipient Selector if parent phone is available */}
+            {sub.parentPhone && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">إرسال التذكير إلى:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRecipient('student')}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                      recipient === 'student'
+                        ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-700 dark:text-blue-300'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    الطالب ({sub.studentName})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecipient('parent')}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                      recipient === 'parent'
+                        ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-700 dark:text-blue-300'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    ولي الأمر ({sub.parentName || 'مسجل'})
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">إرسال التذكير إلى:</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRecipient('student')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    recipient === 'student'
-                      ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-700 dark:text-blue-300'
-                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  الطالب ({sub.studentName})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRecipient('parent')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    recipient === 'parent'
-                      ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-700 dark:text-blue-300'
-                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  ولي الأمر ({sub.parentName || 'مسجل'})
-                </button>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                رقم الهاتف المستهدف (بتنسيق الواتساب التلقائي)
+              </label>
+              <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-between">
+                <span className="text-slate-900 dark:text-slate-100 font-mono text-xs font-bold" dir="ltr">
+                  {activePhone || 'لا يوجد رقم مسجل'}
+                </span>
+                {activePhone && (
+                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800" dir="ltr">
+                    واتساب: {formattedDisplay}
+                  </span>
+                )}
               </div>
             </div>
-          )}
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              رقم الهاتف المستهدف (بتنسيق الواتساب التلقائي)
-            </label>
-            <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-between">
-              <span className="text-slate-900 dark:text-slate-100 font-mono text-xs font-bold" dir="ltr">
-                {activePhone || 'لا يوجد رقم مسجل'}
-              </span>
-              {activePhone && (
-                <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800" dir="ltr">
-                  واتساب: {formattedDisplay}
-                </span>
-              )}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">معاينة نص الرسالة</label>
+              <textarea 
+                rows={5}
+                className="w-full p-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-lg text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-sans focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                value={preview}
+                onChange={e => setTemplate(e.target.value)}
+              />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">معاينة الرسالة</label>
-            <textarea 
-              rows={5}
-              className="w-full p-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-lg text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-sans focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              value={preview}
-              onChange={e => setTemplate(e.target.value)}
-            />
-          </div>
-
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors"
+              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors cursor-pointer"
             >
               إلغاء
             </button>
             <button 
               onClick={handleSend}
               disabled={!activePhone}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50 transition-colors shadow-2xs"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50 transition-colors shadow-2xs cursor-pointer"
             >
               <MessageCircle className="w-4 h-4" />
               <span>إرسال عبر واتساب</span>

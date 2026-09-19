@@ -252,9 +252,17 @@ function AssessmentFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
-        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" dir="rtl" onClick={onClose}>
+      <div 
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
               <GraduationCap className="w-5 h-5" />
@@ -266,102 +274,104 @@ function AssessmentFormModal({
               <p className="text-xs text-slate-500">حدد بيانات الاختبار أو الواجب لربطه بدرجات الطلاب</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">اسم الاختبار / الواجب *</label>
-            <input 
-              required 
-              type="text" 
-              placeholder="مثال: امتحان الشهر الأول - فيزياء"
-              className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs"
-              value={formData.name} 
-              onChange={e => setFormData({ ...formData, name: e.target.value })} 
-            />
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto flex-1 space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">النوع *</label>
-              <select 
-                className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs"
-                value={formData.type} 
-                onChange={e => setFormData({ ...formData, type: e.target.value as any })}
-              >
-                <option value="exam">امتحان / اختبار رسمي</option>
-                <option value="assignment">واجب منزلي / كويز سريع</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">الكورس التابع له *</label>
-              <select 
-                required
-                className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs"
-                value={formData.courseId} 
-                onChange={e => setFormData({ ...formData, courseId: e.target.value })}
-              >
-                {courses.length === 0 && <option value="">لا يوجد كورسات متاحة</option>}
-                {courses.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">تاريخ الاختبار</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">اسم الاختبار / الواجب *</label>
               <input 
-                type="date" 
+                required 
+                type="text" 
+                placeholder="مثال: امتحان الشهر الأول - فيزياء"
                 className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs"
-                value={formData.date} 
-                onChange={e => setFormData({ ...formData, date: e.target.value })} 
+                value={formData.name} 
+                onChange={e => setFormData({ ...formData, name: e.target.value })} 
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">نظام التقييم *</label>
-              <select 
-                className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs"
-                value={formData.gradingMethod} 
-                onChange={e => setFormData({ ...formData, gradingMethod: e.target.value as 'numeric' | 'rating' })}
-              >
-                <option value="numeric">درجات رقمية (أرقام ومعدلات)</option>
-                <option value="rating">تقييم وصفي (ممتاز، جيد جداً، إلخ)</option>
-              </select>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">النوع *</label>
+                <select 
+                  className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs"
+                  value={formData.type} 
+                  onChange={e => setFormData({ ...formData, type: e.target.value as any })}
+                >
+                  <option value="exam">امتحان / اختبار رسمي</option>
+                  <option value="assignment">واجب منزلي / كويز سريع</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">الكورس التابع له *</label>
+                <select 
+                  required
+                  className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs"
+                  value={formData.courseId} 
+                  onChange={e => setFormData({ ...formData, courseId: e.target.value })}
+                >
+                  {courses.length === 0 && <option value="">لا يوجد كورسات متاحة</option>}
+                  {courses.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">تاريخ الاختبار</label>
+                <input 
+                  type="date" 
+                  className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs"
+                  value={formData.date} 
+                  onChange={e => setFormData({ ...formData, date: e.target.value })} 
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">نظام التقييم *</label>
+                <select 
+                  className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs"
+                  value={formData.gradingMethod} 
+                  onChange={e => setFormData({ ...formData, gradingMethod: e.target.value as 'numeric' | 'rating' })}
+                >
+                  <option value="numeric">درجات رقمية (أرقام ومعدلات)</option>
+                  <option value="rating">تقييم وصفي (ممتاز، جيد جداً، إلخ)</option>
+                </select>
+              </div>
+            </div>
+
+            {formData.gradingMethod === 'numeric' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">الدرجة العظمى (النهائية) *</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  step="any"
+                  required
+                  placeholder="مثال: 20 أو 50 أو 100"
+                  className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs font-mono font-bold"
+                  value={formData.maxGrade} 
+                  onChange={e => setFormData({ ...formData, maxGrade: Number(e.target.value) })} 
+                />
+              </div>
+            )}
           </div>
 
-          {formData.gradingMethod === 'numeric' && (
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">الدرجة العظمى (النهائية) *</label>
-              <input 
-                type="number" 
-                min="1"
-                step="any"
-                required
-                placeholder="مثال: 20 أو 50 أو 100"
-                className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-2xs font-mono font-bold"
-                value={formData.maxGrade} 
-                onChange={e => setFormData({ ...formData, maxGrade: Number(e.target.value) })} 
-              />
-            </div>
-          )}
-
-          <div className="mt-6 flex justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold transition-colors"
+              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors cursor-pointer"
             >
               إلغاء
             </button>
             <button 
               type="submit" 
-              className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-xs font-bold shadow-2xs transition-colors"
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-bold shadow-xs transition-colors cursor-pointer"
             >
               {existingAssessment ? 'حفظ التعديلات' : 'إنشاء التقييم'}
             </button>
@@ -537,8 +547,15 @@ function GradingModal({
   const gradedCount = Object.keys(gradesMap).filter(k => gradesMap[k] !== '' && gradesMap[k] !== undefined).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl h-[85vh] max-h-[850px] min-h-[580px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-start justify-center pt-0 sm:pt-12 sm:pt-16 p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" dir="rtl" onClick={onClose}>
+      <div 
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
         
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">

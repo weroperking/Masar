@@ -180,85 +180,97 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
   const isPending = create.isPending || update.isPending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" dir="rtl" onClick={onClose}>
+      <div 
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
             {initialData ? 'تعديل الكورس' : 'إضافة كورس جديد'}
           </h2>
-          <button onClick={onClose} disabled={isPending} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md disabled:opacity-50">
-            <X className="w-4 h-4" />
+          <button onClick={onClose} disabled={isPending} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg disabled:opacity-50 cursor-pointer">
+            <X className="w-5 h-5" />
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الكورس *</label>
-            <input 
-              required 
-              type="text" 
-              placeholder="مثال: رياضيات - الصف الثالث الثانوي"
-              className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-              value={formData.name} 
-              onChange={e => setFormData({...formData, name: e.target.value})} 
-              disabled={isPending}
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto flex-1 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">اسم الكورس *</label>
+                <input 
+                  required 
+                  type="text" 
+                  placeholder="مثال: رياضيات - الصف الثالث الثانوي"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                  value={formData.name} 
+                  onChange={e => setFormData({...formData, name: e.target.value})} 
+                  disabled={isPending}
+                />
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">السعر (ج.م) *</label>
-            <input 
-              required 
-              type="number" 
-              min="0"
-              placeholder="مثال: 300"
-              className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono"
-              value={formData.price} 
-              onChange={e => setFormData({...formData, price: e.target.value})} 
-              disabled={isPending}
-            />
-          </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">السعر (ج.م) *</label>
+                <input 
+                  required 
+                  type="number" 
+                  min="0"
+                  placeholder="مثال: 300"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono"
+                  value={formData.price} 
+                  onChange={e => setFormData({...formData, price: e.target.value})} 
+                  disabled={isPending}
+                />
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">نظام الدفع</label>
-            <select 
-              className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-              value={formData.paymentType} 
-              onChange={e => setFormData({...formData, paymentType: e.target.value as any})}
-              disabled={isPending}
-            >
-              <option value="monthly">شهري (تجديد كل شهر)</option>
-              {subscription?.limits?.combined_packages !== false && <option value="package">باقة كاملة (ترم أو كورس كامل)</option>}
-            </select>
-          </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">نظام الدفع</label>
+                <select 
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                  value={formData.paymentType} 
+                  onChange={e => setFormData({...formData, paymentType: e.target.value as any})}
+                  disabled={isPending}
+                >
+                  <option value="monthly">شهري (تجديد كل شهر)</option>
+                  {subscription?.limits?.combined_packages !== false && <option value="package">باقة كاملة (ترم أو كورس كامل)</option>}
+                </select>
+              </div>
+            </div>
 
-          <div className="flex items-center pt-1">
-            <input 
-              type="checkbox" 
-              id="courseActive" 
-              className="rounded text-blue-600 focus:ring-blue-500 ml-2 w-3.5 h-3.5" 
-              checked={formData.isActive} 
-              onChange={e => setFormData({...formData, isActive: e.target.checked})} 
-              disabled={isPending}
-            />
-            <label htmlFor="courseActive" className="text-xs font-medium text-slate-700 dark:text-slate-300">
-              كورس متاح للتسجيل (نشط)
-            </label>
+            <div className="flex items-center pt-2">
+              <input 
+                type="checkbox" 
+                id="courseActive" 
+                className="rounded text-blue-600 focus:ring-blue-500 ml-2 w-4 h-4" 
+                checked={formData.isActive} 
+                onChange={e => setFormData({...formData, isActive: e.target.checked})} 
+                disabled={isPending}
+              />
+              <label htmlFor="courseActive" className="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                كورس متاح للتسجيل (نشط)
+              </label>
+            </div>
           </div>
           
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
             <button 
               type="button" 
               onClick={onClose} 
               disabled={isPending}
-              className="px-3 py-1.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
             >
               إلغاء
             </button>
             <button 
               type="submit" 
               disabled={isPending}
-              className="px-4 py-1.5 text-white bg-blue-600 rounded-md hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs disabled:opacity-50 flex items-center justify-center gap-2"
+              className="px-5 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 text-xs font-bold transition-colors shadow-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {isPending && (
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />

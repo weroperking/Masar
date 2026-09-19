@@ -848,20 +848,29 @@ export function EditPricingModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-800">
-        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" dir="rtl" onClick={onClose}>
+      <div 
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">تعديل رسوم واشتراك الطالب</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">{course?.name}</p>
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">تعديل رسوم واشتراك الطالب</h2>
+            <p className="text-xs text-slate-500 mt-0.5">{course?.name}</p>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded">
-            <X className="w-4 h-4" />
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg cursor-pointer">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-xs flex justify-between border border-slate-100 dark:border-slate-700">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto flex-1 space-y-4">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-xs flex justify-between border border-slate-100 dark:border-slate-700">
             <span className="text-slate-500">السعر الأساسي المعتمد للكورس:</span>
             <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{basePrice} ج.م شهرياً</span>
           </div>
@@ -978,17 +987,19 @@ export function EditPricingModal({
             </span>
           </label>
 
-          <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+          </div>
+
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800"
+              className="px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             >
               إلغاء
             </button>
             <button
               type="submit"
-              className="px-5 py-1.5 text-xs font-bold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors shadow-xs"
+              className="px-5 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
             >
               حفظ التسعير والخصم
             </button>
@@ -1087,72 +1098,84 @@ function PaymentModal({ bill, course, studentName, onClose }: { bill: MonthlySub
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" dir="rtl">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-sm overflow-hidden border border-slate-200 dark:border-slate-800">
-        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">سداد الفاتورة الشهرية</h2>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded">
-            <X className="w-4 h-4" />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity" dir="rtl" onClick={onClose}>
+      <div 
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Grab Handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
+          <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+        </div>
+
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">سداد الفاتورة الشهرية</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              كورس: <span className="font-semibold text-slate-800 dark:text-slate-200">{course?.name}</span> (شهر {bill.month}/{bill.year})
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg cursor-pointer">
+            <X className="w-5 h-5" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="text-xs text-slate-500 mb-2">
-            كورس: <span className="font-semibold text-slate-800 dark:text-slate-200">{course?.name}</span> (شهر {bill.month}/{bill.year})
+
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto flex-1 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">طريقة الدفع</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800">
+                  <option value="نقدي">نقدي (كاش)</option>
+                  <option value="فيزا / كارت">فيزا / كارت</option>
+                  <option value="فودافون كاش">فودافون كاش</option>
+                  <option value="إنستا باي">إنستا باي</option>
+                  <option value="تحويل بنكي">تحويل بنكي</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">الرقم المرجعي (اختياري)</label>
+                <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="رقم التحويل أو الإيصال" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono bg-white dark:bg-slate-800" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">المبلغ المطلوب (ج.م)</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={amountTotal}
+                  onChange={(e) => setAmountTotal(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold bg-white dark:bg-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">إجمالي المدفوع (ج.م)</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-emerald-600 bg-white dark:bg-slate-800"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">طريقة الدفع</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md text-xs bg-white dark:bg-slate-800">
-                <option value="نقدي">نقدي (كاش)</option>
-                <option value="فيزا / كارت">فيزا / كارت</option>
-                <option value="فودافون كاش">فودافون كاش</option>
-                <option value="إنستا باي">إنستا باي</option>
-                <option value="تحويل بنكي">تحويل بنكي</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">الرقم المرجعي (اختياري)</label>
-              <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="رقم التحويل أو الإيصال" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md text-xs font-mono bg-white dark:bg-slate-800" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">المبلغ المطلوب (ج.م)</label>
-              <input
-                type="number"
-                min="0"
-                required
-                value={amountTotal}
-                onChange={(e) => setAmountTotal(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md text-xs font-mono font-bold bg-white dark:bg-slate-800"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">إجمالي المدفوع (ج.م)</label>
-              <input
-                type="number"
-                min="0"
-                required
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md text-xs font-mono font-bold text-emerald-600 bg-white dark:bg-slate-800"
-              />
-            </div>
-          </div>
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800 mt-4">
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50"
+              className="px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             >
               إلغاء
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              className="px-5 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
             >
               تسجيل السداد
             </button>

@@ -84,7 +84,7 @@ export function QrPrintSheetModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 transition-opacity print:relative print:inset-auto print:bg-transparent print:p-0" onClick={onClose}>
       <div 
         dir="rtl"
-        className="bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-xl w-full max-w-5xl max-h-[85vh] sm:max-h-[92vh] flex flex-col overflow-hidden border-t sm:border border-slate-200 dark:border-slate-800 print:shadow-none print:border-none print:w-full print:max-w-none print:h-auto print:max-h-none print:overflow-visible print:p-0 print:m-0 animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150 print:shadow-none print:border-none print:w-full print:max-w-none print:h-auto print:max-h-none print:overflow-visible print:p-0 print:m-0"
         onClick={e => e.stopPropagation()}
       >
         {/* Grab Handle for mobile */}
