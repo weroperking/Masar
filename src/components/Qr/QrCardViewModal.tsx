@@ -52,7 +52,7 @@ export function QrCardViewModal({
       {/* Container with print styles */}
       <div 
         dir="rtl"
-        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150 print:shadow-none print:border-none print:w-auto print:max-w-none print:p-0 print:max-h-none"
+        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-auto max-h-[85vh] sm:max-h-[90vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150 print:shadow-none print:border-none print:w-auto print:max-w-none print:p-0 print:max-h-none"
         onClick={e => e.stopPropagation()}
       >
         {/* Grab Handle for mobile */}

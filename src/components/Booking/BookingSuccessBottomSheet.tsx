@@ -36,7 +36,7 @@ export function BookingSuccessBottomSheet({
         initial={{ y: '100%', opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-        className="relative w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] flex flex-col z-10 overflow-y-auto p-6 sm:p-8 animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150 text-center"
+        className="relative w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 h-auto max-h-[85vh] sm:max-h-[90vh] flex flex-col z-10 overflow-y-auto p-6 sm:p-8 animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150 text-center"
       >
         {/* Top Handle for mobile */}
         <div className="sm:hidden w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto -mt-2 mb-4" />

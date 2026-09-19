@@ -68,7 +68,7 @@ export function BottomSheet({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-            className="relative w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 h-[85vh] sm:h-[60vh] max-h-[85vh] sm:max-h-[60vh] flex flex-col z-10 overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
+            className="relative w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200/80 dark:border-slate-800 h-auto max-h-[85vh] sm:max-h-[90vh] flex flex-col z-10 overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
           >
             {/* Grab Handle for mobile */}
             <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden">
