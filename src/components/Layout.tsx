@@ -210,7 +210,12 @@ export function Layout() {
 
   const [syncState, setSyncState] = useState(getSyncState());
   useEffect(() => {
-    const handleSyncChange = () => setSyncState(getSyncState());
+    console.log('[PILL] initial state on mount', getSyncState());
+    const handleSyncChange = (e: any) => {
+      const detail = e?.detail;
+      console.log('[PILL] status event received', detail?.status);
+      setSyncState(getSyncState());
+    };
     window.addEventListener('masar_sync_status_change', handleSyncChange);
     return () => window.removeEventListener('masar_sync_status_change', handleSyncChange);
   }, []);

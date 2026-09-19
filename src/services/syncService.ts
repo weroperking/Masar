@@ -12,6 +12,16 @@ import {
 } from './cryptoService';
 import { fetchWithAuth, syncHeaders } from '../config/api';
 
+const __syncTrace: Array<{ t: number; msg: string; extra?: any }> = [];
+function trace(msg: string, extra?: any) {
+  __syncTrace.push({ t: Date.now(), msg, extra });
+  if (__syncTrace.length > 200) __syncTrace.shift();
+  console.log('[SYNC TRACE]', msg, extra ?? '');
+}
+if (typeof window !== 'undefined') {
+  (window as any).__syncTrace = () => __syncTrace;
+}
+
 export type SyncPillStatus = 'synced' | 'pending' | 'paused' | 'syncing';
 
 const MAX_ATTEMPTS = 6;
@@ -84,6 +94,7 @@ export function resetCircuitBreaker() {
 }
 
 function updateSyncStatus(status: SyncPillStatus) {
+  trace('updateSyncStatus called', { status });
   syncPillStatus = status;
   window.dispatchEvent(new CustomEvent('masar_sync_status_change', { detail: { status } }));
 }
@@ -93,17 +104,22 @@ export function getSyncPillStatus(): SyncPillStatus {
 }
 
 export async function processSyncQueue(getToken: () => Promise<string | null>) {
+  trace('processSyncQueue entry', { isSyncing, breakerOpen, online: navigator.onLine });
   if (breakerOpen) {
+    trace('early return', { reason: 'breakerOpen' });
     updateSyncStatus('paused');
     return;
   }
 
   if (isSyncing || !navigator.onLine) {
+    trace('early return', { reason: isSyncing ? 'isSyncing' : 'offline' });
     return;
   }
 
   if (typeof navigator !== 'undefined' && navigator.locks) {
+    trace('locks: acquiring');
     await navigator.locks.request('masar_sync_leader', { ifAvailable: true }, async (lock) => {
+      trace('locks: acquired', { hasLock: !!lock });
       if (lock) {
         await executeSyncLoop(getToken);
       }
@@ -114,8 +130,10 @@ export async function processSyncQueue(getToken: () => Promise<string | null>) {
 }
 
 async function executeSyncLoop(getToken: () => Promise<string | null>) {
+  trace('executeSyncLoop entry');
   isSyncing = true;
   updateSyncStatus('syncing');
+  trace('status -> syncing');
 
   try {
     const token = await getToken();
@@ -222,8 +240,10 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
     syncError = null;
 
     const remaining = await db.syncQueue.count();
+    trace('terminal status reached', { remaining });
     updateSyncStatus(remaining > 0 ? 'pending' : 'synced');
   } catch (err: any) {
+    trace('executeSyncLoop catch', { message: err?.message, consecutiveFailures });
     consecutiveFailures++;
     console.warn(`[syncService] Sync failure (${consecutiveFailures}/${BREAKER_THRESHOLD}):`, err?.message || err);
     syncError = err?.message || 'Sync error';
@@ -251,6 +271,7 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
       processSyncQueue(getToken).catch(console.warn);
     }, delay);
   } finally {
+    trace('executeSyncLoop finally', { isSyncing });
     isSyncing = false;
   }
 }
