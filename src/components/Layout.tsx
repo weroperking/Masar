@@ -7,7 +7,8 @@ import {
   UserCheck, Calendar, FileText, Library, Wallet, 
   FileSpreadsheet, Globe, Package, 
   BarChart3, UserCog, MessageSquare, QrCode, LogOut,
-  Search, Sun, Moon, Plus, Keyboard, RefreshCw, CheckCircle2, WifiOff, Menu, X, ArrowUpCircle, AlertCircle
+  Search, Sun, Moon, Plus, Keyboard, RefreshCw, CheckCircle2, WifiOff, Menu, X, ArrowUpCircle, AlertCircle,
+  PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -85,10 +86,11 @@ interface SidebarNavItemProps {
     icon: React.ComponentType<{ className?: string }>;
   };
   isActive: boolean;
+  isCollapsed?: boolean;
   onItemClick?: () => void;
 }
 
-const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, isActive, onItemClick }) => {
+const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, isActive, isCollapsed = false, onItemClick }) => {
   const [isHovered, setIsHovered] = useState(false);
   const Icon = item.icon;
   const tourId = `tour-nav-${item.href.replace('/', '') || 'dashboard'}`;
@@ -101,14 +103,16 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, isActive, onItemC
       onClick={onItemClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      title={isCollapsed ? item.name : undefined}
       className={cn(
         isActive
           ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/70 dark:text-blue-400 font-bold shadow-xs'
           : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80',
-        'group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150 relative active:scale-[0.98]'
+        'group flex items-center text-sm font-medium rounded-lg transition-all duration-150 relative active:scale-[0.98]',
+        isCollapsed ? 'justify-center p-2.5 my-1' : 'px-3 py-2'
       )}
     >
-      <div className="ml-3 shrink-0 h-5 w-5 flex items-center justify-center relative overflow-hidden">
+      <div className={cn("shrink-0 h-5 w-5 flex items-center justify-center relative overflow-hidden", isCollapsed ? "ml-0" : "ml-3")}>
         <AnimatePresence mode="popLayout" initial={false}>
           {isActive || isHovered ? (
             <motion.div
@@ -135,7 +139,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, isActive, onItemC
           )}
         </AnimatePresence>
       </div>
-      <span className="truncate">{item.name}</span>
+      {!isCollapsed && <span className="truncate">{item.name}</span>}
       {isActive && (
         <div className="absolute right-0 top-2 bottom-2 w-1 bg-blue-600 dark:bg-blue-400 rounded-l-full" />
       )}
@@ -154,6 +158,14 @@ export function Layout() {
   const [isQuickNewOpen, setIsQuickNewOpen] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Tablet-friendly sidebar collapse state (defaults to collapsed on tablet screens 768px-1024px)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768 && window.innerWidth < 1024;
+    }
+    return false;
+  });
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [hideTrialBanner, setHideTrialBanner] = useState(false);
@@ -267,9 +279,9 @@ export function Layout() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [theme, toggleTheme, toast]);
 
-  const renderNavContent = (onItemClick?: () => void) => (
+  const renderNavContent = (onItemClick?: () => void, isCollapsed = false) => (
     <>
-      <nav className="flex-1 px-4 py-4 overflow-y-auto space-y-6 scrollbar-thin">
+      <nav className={cn("flex-1 py-4 overflow-y-auto space-y-6 scrollbar-thin", isCollapsed ? "px-2" : "px-4")}>
         {navigationGroups.map((group) => {
           // If blocked, only show groups that have 'upgrade' or 'settings' related items
           // or just filter the items inside
@@ -281,9 +293,13 @@ export function Layout() {
 
           return (
             <div key={group.title}>
-              <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3">
-                {group.title}
-              </h2>
+              {!isCollapsed ? (
+                <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-3">
+                  {group.title}
+                </h2>
+              ) : (
+                <div className="h-px bg-slate-200 dark:bg-slate-800 my-2 mx-1" />
+              )}
               <div className="space-y-1">
                 {filteredItems.map((item) => {
                   const isActive =
@@ -294,6 +310,7 @@ export function Layout() {
                       key={item.name}
                       item={item}
                       isActive={isActive}
+                      isCollapsed={isCollapsed}
                       onItemClick={onItemClick}
                     />
                   );
@@ -304,40 +321,55 @@ export function Layout() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
-        <div className="flex flex-col text-xs flex-1 truncate">
-          {!isOnline && (
-            <div className="flex items-center space-x-2 space-x-reverse text-rose-500">
-              <WifiOff className="w-3.5 h-3.5" />
-              <span className="truncate">غير متصل</span>
-            </div>
-          )}
-          {isOnline && (
-            <div className="flex items-center space-x-2 space-x-reverse text-emerald-500">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span className="truncate">متصل</span>
-            </div>
-          )}
-        </div>
+      <div className={cn("p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900", isCollapsed && "p-2 justify-center")}>
+        {!isCollapsed ? (
+          <div className="flex flex-col text-xs flex-1 truncate">
+            {!isOnline && (
+              <div className="flex items-center space-x-2 space-x-reverse text-rose-500">
+                <WifiOff className="w-3.5 h-3.5" />
+                <span className="truncate">غير متصل</span>
+              </div>
+            )}
+            {isOnline && (
+              <div className="flex items-center space-x-2 space-x-reverse text-emerald-500">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span className="truncate">متصل</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-1" title={isOnline ? "متصل بالإنترنت" : "غير متصل بالإنترنت"}>
+            {isOnline ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            ) : (
+              <WifiOff className="w-4 h-4 text-rose-500" />
+            )}
+          </div>
+        )}
       </div>
     </>
   );
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex overflow-hidden font-cairo" dir="rtl">
-      {/* Desktop Sidebar */}
+      {/* Desktop/Tablet Sidebar */}
       {showNav && (
-        <aside className="w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col hidden md:flex shrink-0">
-          <div className="py-5 px-6 flex flex-col items-center justify-center border-b border-slate-200 dark:border-slate-700 shrink-0 gap-2">
+        <aside className={cn(
+          "bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col hidden md:flex shrink-0 transition-all duration-300 relative",
+          isSidebarCollapsed ? "w-20" : "w-64"
+        )}>
+          <div className={cn("py-5 flex flex-col items-center justify-center border-b border-slate-200 dark:border-slate-700 shrink-0 gap-2 transition-all duration-200", isSidebarCollapsed ? "px-2" : "px-6")}>
             <Link to="/" className="flex flex-col items-center gap-1.5 group">
-              <MasarLogo size="md" className="transition-transform duration-300 group-hover:scale-105" />
-              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 tracking-tight animate-slogan-glow text-center select-none">
-                مسار — حصصك من غير دوشة
-              </span>
+              <MasarLogo size={isSidebarCollapsed ? "sm" : "md"} showText={!isSidebarCollapsed} className="transition-transform duration-300 group-hover:scale-105" />
+              {!isSidebarCollapsed && (
+                <span className="text-xs font-bold text-slate-900 dark:text-slate-100 tracking-tight animate-slogan-glow text-center select-none">
+                  مسار — حصصك من غير دوشة
+                </span>
+              )}
             </Link>
           </div>
 
-          {renderNavContent()}
+          {renderNavContent(undefined, isSidebarCollapsed)}
         </aside>
       )}
 
@@ -376,8 +408,8 @@ export function Layout() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Top Header Bar (Desktop & Mobile) */}
-        <header className="bg-white dark:bg-slate-900 h-16 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 md:px-8 shrink-0">
-          <div className="flex items-center gap-3">
+        <header className="bg-white dark:bg-slate-900 h-16 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-3 sm:px-4 md:px-6 lg:px-8 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Mobile Hamburger Menu Toggle */}
             {showNav && (
               <button
@@ -389,12 +421,24 @@ export function Layout() {
               </button>
             )}
 
+            {/* Tablet & Desktop Sidebar Toggle */}
+            {showNav && (
+              <button
+                onClick={() => setIsSidebarCollapsed(prev => !prev)}
+                className="hidden md:flex p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                aria-label={isSidebarCollapsed ? "توسيع القائمة الجانبية" : "طي القائمة الجانبية"}
+                title={isSidebarCollapsed ? "توسيع القائمة الجانبية (شاشة كاملة)" : "طي القائمة الجانبية (وضع التابلت)"}
+              >
+                {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" /> : <PanelLeftClose className="w-5 h-5 text-slate-500 dark:text-slate-400" />}
+              </button>
+            )}
+
             {/* Mobile logo or Blocked Logo */}
             <Link to="/" className={cn("flex items-center shrink-0", showNav && "md:hidden")}>
               <MasarLogo size="sm" showText={!showNav} />
             </Link>
 
-            {/* Desktop Quick Search */}
+            {/* Quick Search */}
             {showNav && (
               <div className="hidden md:flex items-center gap-2">
                 <button
@@ -405,7 +449,8 @@ export function Layout() {
                   title="البحث والأوامر السريعة (Ctrl+K)"
                 >
                   <Search className="w-3.5 h-3.5 text-slate-400" />
-                  <span>بحث في مسار...</span>
+                  <span className="hidden lg:inline">بحث في مسار...</span>
+                  <span className="lg:hidden">بحث...</span>
                   <kbd className="font-mono text-[10px] px-1 py-0.5 bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-700 dark:border-slate-600 mr-1">
                     Ctrl+K
                   </kbd>
@@ -446,22 +491,26 @@ export function Layout() {
               {syncState.breakerOpen || syncState.syncPillStatus === 'paused' ? (
                 <>
                   <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                  <span>المزامنة متوقفة (انقر للإعادة)</span>
+                  <span className="hidden md:inline">المزامنة متوقفة (انقر للإعادة)</span>
+                  <span className="md:hidden">متوقفة</span>
                 </>
               ) : !isOnline ? (
                 <>
                   <WifiOff className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>غير متصل (محلي)</span>
+                  <span className="hidden md:inline">غير متصل (محلي)</span>
+                  <span className="md:hidden">محلي</span>
                 </>
               ) : syncState.isSyncing ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600 dark:text-amber-400" />
-                  <span>جاري المزامنة...</span>
+                  <span className="hidden md:inline">جاري المزامنة...</span>
+                  <span className="md:hidden">مزامنة...</span>
                 </>
               ) : (pendingQueueCount || 0) > 0 ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>بانتظار المزامنة ({pendingQueueCount})</span>
+                  <span className="hidden md:inline">بانتظار المزامنة ({pendingQueueCount})</span>
+                  <span className="md:hidden">({pendingQueueCount})</span>
                 </>
               ) : (
                 <>
@@ -528,9 +577,9 @@ export function Layout() {
           </div>
         )}
         
-        {/* Page Content */}
-        <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-150">
-          <div className="w-full h-full min-h-full pb-12">
+        {/* Page Content Container (Extra responsive for tablets) */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-5 lg:p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-150 scrollbar-thin">
+          <div className="w-full h-full min-h-full pb-10 sm:pb-12 md:pb-16 max-w-[1600px] mx-auto">
             <Outlet />
           </div>
         </div>

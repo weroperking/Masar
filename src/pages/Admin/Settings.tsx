@@ -201,7 +201,7 @@ export function Settings() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
             {/* Toggle Card 1: autoStartEndSessions */}
             <ToggleCard
               icon={<Clock className="w-4 h-4" />}
@@ -254,15 +254,15 @@ export function Settings() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
               {/* Presets */}
-              <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-700">
+              <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-700">
                 {[0, 1, 2, 3].map(preset => (
                   <button
                     key={preset}
                     type="button"
                     onClick={() => setSettings({ ...settings, freeSessionLimitPerStudent: preset })}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                       settings.freeSessionLimitPerStudent === preset
                         ? 'bg-blue-600 text-white shadow-xs'
                         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/60'
