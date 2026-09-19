@@ -1,4 +1,27 @@
-import { Save, Sun, Moon, Keyboard, RefreshCw, User as UserIcon, Building2, HelpCircle } from 'lucide-react';
+import { 
+  Save, 
+  Sun, 
+  Moon, 
+  Keyboard, 
+  RefreshCw, 
+  User as UserIcon, 
+  HelpCircle,
+  Zap,
+  Clock,
+  CreditCard,
+  BookOpen,
+  Gift,
+  Award,
+  Sliders,
+  Check,
+  Plus,
+  Minus,
+  Sparkles,
+  Compass,
+  ShieldCheck,
+  Hash,
+  CheckCircle2
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useUser, useOrganization } from '@clerk/clerk-react';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
@@ -93,24 +116,46 @@ export function Settings() {
   };
 
   return (
-    <div className="space-y-6 w-full">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">إعدادات النظام</h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">تخصيص المظهر، أتمتة الجلسات، وقواعد التقييم</p>
+    <div className="space-y-6 w-full max-w-5xl mx-auto pb-12">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="p-1.5 bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 rounded-lg">
+              <Sliders className="w-5 h-5" />
+            </span>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">إعدادات النظام</h1>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            تخصيص قواعد الأتمتة، تقييم الواجبات، الحصص التجريبية، والمظهر العام للمنصة
+          </p>
+        </div>
+
+        <button 
+          onClick={handleSave} 
+          type="button"
+          className="inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-blue-500/20 active:scale-[0.98] gap-2 shrink-0 cursor-pointer"
+        >
+          <Save className="w-4 h-4" />
+          <span>حفظ التغييرات</span>
+        </button>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 space-y-8">
+      <div className="space-y-6">
         
-        {/* Academy & Teacher Profile Section */}
-        <section>
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
-            <UserIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <span>بيانات المعلم والسنتر التعليمي</span>
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-            الاسم الظاهر في أعلى المنصة وعلى كروت الطلاب وتقارير الحضور والغياب.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Profile Section */}
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
+              <UserIcon className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">بيانات المعلم والسنتر التعليمي</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">تظهر هذه البيانات على تقارير الطلاب وكروت QR ومراسلات الواتساب</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                 اسم المعلم / المحاضر الرئيسي
@@ -120,7 +165,7 @@ export function Settings() {
                 value={settings.teacherName || ''}
                 onChange={e => setSettings({ ...settings, teacherName: e.target.value })}
                 placeholder="أ/ محمد خالد"
-                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                className="w-full px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all"
               />
             </div>
 
@@ -133,18 +178,318 @@ export function Settings() {
                 value={settings.academyName || ''}
                 onChange={e => setSettings({ ...settings, academyName: e.target.value })}
                 placeholder="سنتر الأوائل التعليمي"
-                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                className="w-full px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all"
               />
             </div>
           </div>
         </section>
 
+        {/* 1. Automation Section (أتمتة الجلسات والحضور) */}
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
+                <Zap className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">أتمتة الجلسات والحضور</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">تفعيل الإجراءات التلقائية لتسريع تسجيل الحضور وإدارة المجموعات</p>
+              </div>
+            </div>
+            <span className="hidden sm:inline-flex px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-full text-[11px] font-semibold">
+              توفير الوقت والجهد
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+            {/* Toggle Card 1: autoStartEndSessions */}
+            <ToggleCard
+              icon={<Clock className="w-4 h-4" />}
+              title="بدء وإنهاء الجلسات تلقائياً في موعدها"
+              description="بدء وإغلاق الجلسة الدراسية تلقائياً بناءً على مواعيد الجدول الزمني للمجموعة."
+              checked={!!settings.autoStartEndSessions}
+              onChange={checked => setSettings({ ...settings, autoStartEndSessions: checked })}
+            />
+
+            {/* Toggle Card 2: autoConfirmPaymentOnAttendance */}
+            <ToggleCard
+              icon={<CreditCard className="w-4 h-4" />}
+              title="تأكيد دفع الحصة تلقائياً عند تسجيل الحضور"
+              description="تسجيل وتأكيد تحصيل رسوم الحصة فورياً بمجرد قراءة QR كارت الطالب (نظام الدفع بالحصة)."
+              checked={!!settings.autoConfirmPaymentOnAttendance}
+              onChange={checked => setSettings({ ...settings, autoConfirmPaymentOnAttendance: checked })}
+            />
+
+            {/* Toggle Card 3: autoCreateAssignmentPerSession */}
+            <ToggleCard
+              icon={<BookOpen className="w-4 h-4" />}
+              title="إنشاء واجب تلقائياً مع كل حصة جديدة"
+              description="إضافة سجل واجب دراسي تلقائي في قائمة التقييمات فور إنشاء أو فتح حصة جديدة."
+              checked={!!settings.autoCreateAssignmentPerSession}
+              onChange={checked => setSettings({ ...settings, autoCreateAssignmentPerSession: checked })}
+            />
+          </div>
+        </section>
+
+        {/* 2. Free & Trial Sessions Section (ضوابط الحصص التجريبية والمجانية) */}
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
+              <Gift className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">ضوابط الحصص التجريبية والمجانية</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">تحديد عدد الحصص المجانية المسموح بها للطلاب الجدد قبل الدفع</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50/60 dark:bg-slate-800/40 rounded-xl border border-slate-200/80 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-900 dark:text-slate-100">الحد الأقصى لكل طالب:</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">(أدخل 0 للحد غير المحدود)</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                عند تجاوز هذا العدد، سيتطلب النظام سداد الرسوم قبل تسجيل الحضور.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              {/* Presets */}
+              <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-700">
+                {[0, 1, 2, 3].map(preset => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setSettings({ ...settings, freeSessionLimitPerStudent: preset })}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      settings.freeSessionLimitPerStudent === preset
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                    }`}
+                  >
+                    {preset === 0 ? 'غير محدود' : `${preset} ${preset === 1 ? 'حصة' : 'حصص'}`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Number stepper input */}
+              <div className="inline-flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setSettings({
+                    ...settings,
+                    freeSessionLimitPerStudent: Math.max(0, (settings.freeSessionLimitPerStudent || 0) - 1)
+                  })}
+                  className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  title="إنقاص العدد"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={settings.freeSessionLimitPerStudent ?? 1}
+                  onChange={e => setSettings({ ...settings, freeSessionLimitPerStudent: Math.max(0, parseInt(e.target.value) || 0) })}
+                  className="w-12 text-center text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none bg-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSettings({
+                    ...settings,
+                    freeSessionLimitPerStudent: (settings.freeSessionLimitPerStudent || 0) + 1
+                  })}
+                  className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  title="زيادة العدد"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. Grading Method Section (طريقة تقييم الواجبات) */}
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
+                <Award className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">طريقة تقييم الواجبات</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">اختيار أسلوب الدرجات والتقييم للأنشطة والواجبات المنزلية</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {/* Rating Option (1-5) */}
+            <div
+              onClick={() => setSettings({ ...settings, assignmentGradingMethod: 'rating' })}
+              className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                settings.assignmentGradingMethod === 'rating'
+                  ? 'bg-blue-50/40 dark:bg-blue-950/20 border-blue-500/80 dark:border-blue-600/80 ring-2 ring-blue-500/20 shadow-2xs'
+                  : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                settings.assignmentGradingMethod === 'rating'
+                  ? 'bg-blue-600 text-white dark:bg-blue-500'
+                  : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700'
+              }`}>
+                <Sparkles className="w-4 h-4" />
+              </div>
+
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    بالتقدير النصي (1 - 5)
+                  </span>
+                  {settings.assignmentGradingMethod === 'rating' && (
+                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px]">
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  تقييم سريع وسهل (ممتاز، جيد جداً، مقبول...) بنظام 5 نجوم أو مستويات.
+                </p>
+              </div>
+            </div>
+
+            {/* Numeric Option (Percentage / Marks) */}
+            <div
+              onClick={() => setSettings({ ...settings, assignmentGradingMethod: 'numeric' })}
+              className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                settings.assignmentGradingMethod === 'numeric'
+                  ? 'bg-blue-50/40 dark:bg-blue-950/20 border-blue-500/80 dark:border-blue-600/80 ring-2 ring-blue-500/20 shadow-2xs'
+                  : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                settings.assignmentGradingMethod === 'numeric'
+                  ? 'bg-blue-600 text-white dark:bg-blue-500'
+                  : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700'
+              }`}>
+                <Hash className="w-4 h-4" />
+              </div>
+
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    بالأرقام (درجة مئوية / مخصصة)
+                  </span>
+                  {settings.assignmentGradingMethod === 'numeric' && (
+                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px]">
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  تقييم رقمي دقيق برصد الدرجة الفعلية من أصل الحد الأقصى الافتراضي.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Conditional Max Grade Input for Numeric Grading */}
+          {settings.assignmentGradingMethod === 'numeric' && (
+            <div className="p-4 bg-blue-50/30 dark:bg-blue-950/20 rounded-xl border border-blue-200/60 dark:border-blue-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  الدرجة العظمى الافتراضية للواجبات:
+                </span>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  الدرجة القصوى المحسوبة تلقائياً عند إنشاء أي واجب جديد
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  {[10, 20, 50, 100].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setSettings({ ...settings, numericMaxGrade: val })}
+                      className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
+                        settings.numericMaxGrade === val
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1">
+                  <input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={settings.numericMaxGrade ?? 100}
+                    onChange={e => setSettings({ ...settings, numericMaxGrade: Math.max(1, parseInt(e.target.value) || 100) })}
+                    className="w-12 text-center text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none bg-transparent"
+                  />
+                  <span className="text-[11px] text-slate-400 font-semibold">درجة</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* 4. Interactive Platform Tour Section (الجولة التعريفية التفاعلية للمنصة) */}
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
+              <Compass className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">الجولة التعريفية التفاعلية للمنصة</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">إرشادات تفاعلية لشرح وظائف المجموعات، الحضور بالباركود، والماليات</p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-blue-200/70 dark:border-blue-900/40 bg-gradient-to-r from-blue-50/50 via-white to-blue-50/30 dark:from-blue-950/30 dark:via-slate-900 dark:to-blue-950/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-xs font-bold text-blue-950 dark:text-blue-200">إعادة تشغيل الدليل التفاعلي الشامل</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 max-w-xl leading-relaxed">
+                استكشف كافة أقسام منصة مسار (Masar) خطوة بخطوة من خلال الجولة التعريفية التفاعلية التي توضح كيفية إضافة الكورسات، تسجيل الحضور بالبار كود، وإدارة الاشتراكات والماليات.
+              </p>
+            </div>
+
+            <button
+              id="tour-retake-btn"
+              type="button"
+              onClick={() => startTour(0)}
+              className="shrink-0 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs shadow-blue-500/20 active:scale-[0.98]"
+            >
+              <Compass className="w-4 h-4" />
+              <span>بدء الجولة الآن</span>
+            </button>
+          </div>
+        </section>
+
         {/* Theme Settings Section */}
-        <section>
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center justify-between">
-            <span>مظهر التطبيق (Theme)</span>
-            <span className="text-xs font-normal text-slate-500 dark:text-slate-400">اختصار التبديل السريع: Ctrl+J</span>
-          </h2>
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
+                <Sun className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">مظهر المنصة (Theme)</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">التبديل بين المظهر الفاتح والداكن المريح للعين</p>
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono font-medium">Ctrl + J</span>
+          </div>
+
           <div className="grid grid-cols-2 gap-3 max-w-md">
             <button
               type="button"
@@ -152,10 +497,10 @@ export function Settings() {
                 setTheme('light');
                 toast.info('تم تفعيل المظهر الفاتح');
               }}
-              className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-sm font-semibold transition-all ${
+              className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                 theme === 'light'
-                  ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300'
-                  : 'border-slate-200 dark:border-slate-700 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900 dark:hover:bg-slate-800'
+                  ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 ring-2 ring-blue-500/20'
+                  : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
               }`}
             >
               <Sun className="w-4 h-4 text-amber-500" />
@@ -168,10 +513,10 @@ export function Settings() {
                 setTheme('dark');
                 toast.info('تم تفعيل المظهر الداكن');
               }}
-              className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-sm font-semibold transition-all ${
+              className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                 theme === 'dark'
-                  ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300'
-                  : 'border-slate-200 dark:border-slate-700 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900 dark:hover:bg-slate-800'
+                  ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 ring-2 ring-blue-500/20'
+                  : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
               }`}
             >
               <Moon className="w-4 h-4 text-blue-400" />
@@ -180,161 +525,52 @@ export function Settings() {
           </div>
         </section>
 
-        {/* Keyboard Shortcuts Guide Section */}
-        <section>
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
-            <Keyboard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <span>اختصارات لوحة المفاتيح السريعة</span>
-          </h2>
-          <div className="bg-slate-50 dark:bg-slate-900 dark:bg-slate-800/60 rounded-xl p-4 space-y-2 text-xs">
-            <div className="flex justify-between items-center py-1">
-              <span className="text-slate-600 dark:text-slate-300">البحث الشامل والأوامر السريعة</span>
-              <kbd className="px-2 py-1 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-200 border border-slate-200 dark:border-slate-700 dark:border-slate-600 rounded font-mono font-bold">Ctrl + K</kbd>
+        {/* Keyboard Shortcuts Guide */}
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
+              <Keyboard className="w-4 h-4" />
             </div>
-            <div className="flex justify-between items-center py-1">
-              <span className="text-slate-600 dark:text-slate-300">نافذة إدخال جديد فوري</span>
-              <kbd className="px-2 py-1 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-200 border border-slate-200 dark:border-slate-700 dark:border-slate-600 rounded font-mono font-bold">Ctrl + N</kbd>
-            </div>
-            <div className="flex justify-between items-center py-1">
-              <span className="text-slate-600 dark:text-slate-300">التبديل الفوري بين الوضع الفاتح والداكن</span>
-              <kbd className="px-2 py-1 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 dark:text-slate-200 border border-slate-200 dark:border-slate-700 dark:border-slate-600 rounded font-mono font-bold">Ctrl + J</kbd>
-            </div>
-          </div>
-        </section>
-
-        {/* Automation Section */}
-        <section>
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
-            أتمتة الجلسات والحضور
-          </h2>
-          <div className="space-y-4">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input 
-                type="checkbox" 
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" 
-                checked={settings.autoStartEndSessions} 
-                onChange={e => setSettings({...settings, autoStartEndSessions: e.target.checked})} 
-              />
-              <span className="text-sm text-slate-700 dark:text-slate-300">بدء وإنهاء الجلسات تلقائياً في موعدها</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input 
-                type="checkbox" 
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" 
-                checked={settings.autoConfirmPaymentOnAttendance} 
-                onChange={e => setSettings({...settings, autoConfirmPaymentOnAttendance: e.target.checked})} 
-              />
-              <span className="text-sm text-slate-700 dark:text-slate-300">تأكيد دفع الحصة تلقائياً عند تسجيل الحضور (للدفع بالحصة)</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input 
-                type="checkbox" 
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" 
-                checked={settings.autoCreateAssignmentPerSession} 
-                onChange={e => setSettings({...settings, autoCreateAssignmentPerSession: e.target.checked})} 
-              />
-              <span className="text-sm text-slate-700 dark:text-slate-300">إنشاء واجب تلقائياً مع كل حصة جديدة</span>
-            </label>
-          </div>
-        </section>
-
-        {/* Free Sessions */}
-        <section>
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
-            ضوابط الحصص التجريبية والمجانية
-          </h2>
-          <div className="flex items-center gap-4 max-w-sm">
-            <label className="text-sm text-slate-700 dark:text-slate-300">الحد الأقصى لكل طالب:</label>
-            <input 
-              type="number" 
-              className="w-24 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
-              value={settings.freeSessionLimitPerStudent} 
-              onChange={e => setSettings({...settings, freeSessionLimitPerStudent: Number(e.target.value)})} 
-            />
-            <span className="text-xs text-slate-500 dark:text-slate-400">(0 = غير محدود)</span>
-          </div>
-        </section>
-
-        {/* Grading Method */}
-        <section>
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
-            طريقة تقييم الواجبات
-          </h2>
-          <div className="flex items-center gap-6">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input 
-                type="radio" 
-                name="grading" 
-                className="text-blue-600 focus:ring-blue-500" 
-                checked={settings.assignmentGradingMethod === 'rating'} 
-                onChange={() => setSettings({...settings, assignmentGradingMethod: 'rating'})} 
-              />
-              <span className="text-sm text-slate-700 dark:text-slate-300">بالتقدير النصي (1-5)</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input 
-                type="radio" 
-                name="grading" 
-                className="text-blue-600 focus:ring-blue-500" 
-                checked={settings.assignmentGradingMethod === 'numeric'} 
-                onChange={() => setSettings({...settings, assignmentGradingMethod: 'numeric'})} 
-              />
-              <span className="text-sm text-slate-700 dark:text-slate-300">بالأرقام (درجة مئوية)</span>
-            </label>
-          </div>
-          {settings.assignmentGradingMethod === 'numeric' && (
-            <div className="mt-4 flex items-center gap-4">
-              <label className="text-sm text-slate-700 dark:text-slate-300">الدرجة العظمى الافتراضية:</label>
-              <input 
-                type="number" 
-                className="w-24 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
-                value={settings.numericMaxGrade} 
-                onChange={e => setSettings({...settings, numericMaxGrade: Number(e.target.value)})} 
-              />
-            </div>
-          )}
-        </section>
-
-        {/* Interactive Onboarding Tour Section */}
-        <section className="pt-4 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2 mb-2 text-blue-600 dark:text-blue-400">
-            <HelpCircle className="w-5 h-5" />
-            <h2 className="text-base font-bold">الجولة التعريفية التفاعلية للمنصة</h2>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-            استكشف وتعرف على جميع أقسام وإمكانيات منصة مسار (Masar) خطوة بخطوة من خلال الجولة التفاعلية الشاملة لكافة وظائف النظام والأدوات المتاحة.
-          </p>
-          <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-xs font-bold text-blue-900 dark:text-blue-200 mb-0.5">بدء الجولة التعريفية من جديد</h3>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                إعادة تشغيل الدليل التفاعلي لشرح الكورسات، المجموعات، الطلاب، التحضير بالباركود، والماليات.
-              </p>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">اختصارات لوحة المفاتيح السريعة</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">اختصارات للتنقل ومباشرة المهام بدون الماوس</p>
             </div>
-            <button
-              id="tour-retake-btn"
-              type="button"
-              onClick={() => startTour(0)}
-              className="shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <HelpCircle className="w-4 h-4" />
-              <span>إعادة الجولة التعريفية</span>
-            </button>
+          </div>
+
+          <div className="bg-slate-50/60 dark:bg-slate-800/40 rounded-xl p-4 divide-y divide-slate-200/50 dark:divide-slate-700/50 text-xs">
+            <div className="flex justify-between items-center py-2">
+              <span className="text-slate-700 dark:text-slate-300 font-medium">البحث الشامل وموجه الأوامر</span>
+              <kbd className="px-2.5 py-1 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg font-mono font-bold shadow-2xs">Ctrl + K</kbd>
+            </div>
+            <div className="flex justify-between items-center py-2">
+              <span className="text-slate-700 dark:text-slate-300 font-medium">نافذة الإدخال السريع الفوري</span>
+              <kbd className="px-2.5 py-1 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg font-mono font-bold shadow-2xs">Ctrl + N</kbd>
+            </div>
+            <div className="flex justify-between items-center py-2">
+              <span className="text-slate-700 dark:text-slate-300 font-medium">التبديل السريع بين المظهر الفاتح والداكن</span>
+              <kbd className="px-2.5 py-1 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg font-mono font-bold shadow-2xs">Ctrl + J</kbd>
+            </div>
           </div>
         </section>
 
         {/* System Updates Section */}
-        <section className="pt-4 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2 mb-2 text-blue-600 dark:text-blue-400">
-            <RefreshCw className="w-5 h-5" />
-            <h2 className="text-base font-bold">تحديث ملفات النظام المؤقتة</h2>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-            في حالة عدم ظهور التحديثات الأخيرة للمنصة أو وجود مشاكل في العرض، استخدم هذا الخيار لمسح الملفات المؤقتة وملفات تعريف الارتباط الخاصة بالمنصة وإجبار المتصفح على جلب أحدث إصدار (لن يتم مسح بيانات الطلاب أو المجموعات).
-          </p>
-          <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
+              <RefreshCw className="w-4 h-4" />
+            </div>
             <div>
-              <h3 className="text-xs font-bold text-blue-900 dark:text-blue-200">مسح الكاش وفرض التحديث</h3>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">تحديث ملفات النظام المؤقتة</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">إصلاح المشاكل الفنية ومسح الكاش لجلب التحديثات الجديدة</p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100">مسح الكاش وفرض التحديث</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                إفراغ ذاكرة التخزين المؤقت للمتصفح دون المساس ببيانات الطلاب أو المجموعات
+              </p>
             </div>
             <button
               type="button"
@@ -347,23 +583,18 @@ export function Settings() {
                 });
                 
                 if (ok) {
-                  // 1. Clear Caches
                   if ('caches' in window) {
                     const cacheNames = await caches.keys();
                     for (const name of cacheNames) {
                       await caches.delete(name);
                     }
                   }
-                  
-                  // 2. Unregister Service Workers
                   if ('serviceWorker' in navigator) {
                     const registrations = await navigator.serviceWorker.getRegistrations();
                     for (const registration of registrations) {
                       await registration.unregister();
                     }
                   }
-                  
-                  // 3. Clear Cookies for masar.top domains
                   const cookies = document.cookie.split(";");
                   for (let i = 0; i < cookies.length; i++) {
                       const cookie = cookies[i];
@@ -374,29 +605,106 @@ export function Settings() {
                       document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;domain=.masar.top;path=/";
                       document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;domain=masar.top;path=/";
                   }
-                  
-                  // 4. Force Reload
                   window.location.reload();
                 }
               }}
-              className="shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="shrink-0 px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <RefreshCw className="w-4 h-4" />
-              <span>تحديث النظام</span>
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>تحديث ملفات الكاش</span>
             </button>
           </div>
         </section>
 
-        <div className="pt-4 flex justify-end">
+        {/* Bottom Floating Save Bar */}
+        <div className="pt-2 flex justify-end">
           <button 
+            type="button"
             onClick={handleSave} 
-            className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm"
+            className="flex items-center px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] gap-2 cursor-pointer"
           >
-            <Save className="w-4 h-4 ml-2" />
-            حفظ الإعدادات
+            <Save className="w-4 h-4" />
+            <span>حفظ الإعدادات</span>
           </button>
         </div>
       </div>
     </div>
   );
 }
+
+/**
+ * Custom Minimalist Toggle Card Component inspired by the uploaded asset spec
+ */
+interface ToggleCardProps {
+  icon?: React.ReactNode;
+  title: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}
+
+function ToggleCard({ icon, title, description, checked, onChange, disabled }: ToggleCardProps) {
+  return (
+    <div 
+      onClick={() => !disabled && onChange(!checked)}
+      className={`group relative flex flex-col justify-between p-4 rounded-xl border transition-all cursor-pointer select-none ${
+        checked 
+          ? 'bg-blue-50/40 dark:bg-blue-950/20 border-blue-400/80 dark:border-blue-600/80 ring-1 ring-blue-500/20 shadow-2xs' 
+          : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+    >
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          {icon && (
+            <div className={`p-1.5 rounded-lg shrink-0 transition-colors ${
+              checked 
+                ? 'bg-blue-600 text-white dark:bg-blue-500' 
+                : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700'
+            }`}>
+              {icon}
+            </div>
+          )}
+
+          {/* Toggle Switch */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={checked}
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!disabled) onChange(!checked);
+            }}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
+              checked ? 'bg-blue-600 dark:bg-blue-500' : 'bg-slate-300 dark:bg-slate-700'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-xs transform ring-0 transition duration-200 ease-in-out ${
+                checked ? 'translate-x-4 rtl:-translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug">
+            {title}
+          </h3>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-1">
+            {description}
+          </p>
+        </div>
+      </div>
+
+      <div className="pt-2.5 mt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px]">
+        <span className={`font-semibold ${checked ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
+          {checked ? 'مُفعّل تلقائياً' : 'مُعطّل'}
+        </span>
+        {checked && <CheckCircle2 className="w-3 h-3 text-blue-600 dark:text-blue-400" />}
+      </div>
+    </div>
+  );
+}
+
