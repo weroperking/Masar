@@ -136,11 +136,11 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
   trace('status -> syncing');
 
   try {
-    const token = await getToken();
-    if (!token) {
-      isSyncing = false;
-      updateSyncStatus('pending');
-      return;
+    let token: string | null = null;
+    try {
+      token = await getToken();
+    } catch {
+      token = null;
     }
 
     await performHandshake(getToken);
@@ -366,5 +366,8 @@ export function getSyncState() {
 
 export async function triggerManualSync(getToken: () => Promise<string | null>) {
   resetCircuitBreaker();
-  return processSyncQueue(getToken);
+  await processSyncQueue(getToken);
+  if (breakerOpen && syncError) {
+    throw new Error(syncError);
+  }
 }

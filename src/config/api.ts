@@ -30,12 +30,27 @@ export async function fetchWithAuth(url: string, token: string | null, options: 
 
   console.log('[SYNC REQUEST]', url, options.method || 'GET', JSON.stringify([...headers.entries()]));
 
-  const response = await fetch(`${API_BASE_URL}${url}`, {
+  // First attempt the local/current application backend (where /api/sync endpoints are implemented on server.ts)
+  try {
+    const localRes = await fetch(url, {
+      ...options,
+      headers,
+    });
+    if (localRes.ok) {
+      console.log('[SYNC RESPONSE local]', localRes.status, localRes.headers.get('content-type'));
+      return await localRes.json();
+    }
+  } catch (localErr) {
+    console.warn('[SYNC REQUEST local failed, trying upstream]', localErr);
+  }
+
+  const targetUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  const response = await fetch(targetUrl, {
     ...options,
     headers,
   });
 
-  console.log('[SYNC RESPONSE]', response.status, response.headers.get('content-type'));
+  console.log('[SYNC RESPONSE upstream]', response.status, response.headers.get('content-type'));
 
   if (!response.ok) {
     const errorText = await response.text();

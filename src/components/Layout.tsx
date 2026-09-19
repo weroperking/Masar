@@ -474,14 +474,16 @@ export function Layout() {
               onClick={handleManualSyncClick}
               disabled={syncState.isSyncing}
               className={cn(
-                "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer",
+                "flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer shadow-xs active:scale-95 select-none whitespace-nowrap focus:outline-hidden focus:ring-2 focus:ring-blue-500/20",
                 syncState.breakerOpen || syncState.syncPillStatus === 'paused'
-                  ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800 hover:bg-rose-100 cursor-pointer"
+                  ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 dark:hover:bg-rose-900/60"
                   : !isOnline
-                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
-                  : syncState.isSyncing || (pendingQueueCount || 0) > 0 || syncState.syncPillStatus === 'pending'
-                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
-                  : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800"
+                  ? "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700/80"
+                  : syncState.isSyncing
+                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                  : (pendingQueueCount || 0) > 0 || syncState.syncPillStatus === 'pending'
+                  ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 dark:hover:bg-amber-900/60"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 dark:hover:bg-emerald-900/60"
               )}
               title={
                 syncState.breakerOpen || syncState.syncPillStatus === 'paused'
@@ -497,31 +499,35 @@ export function Layout() {
             >
               {syncState.breakerOpen || syncState.syncPillStatus === 'paused' ? (
                 <>
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
                   <span className="hidden md:inline">المزامنة متوقفة (انقر للإعادة)</span>
                   <span className="md:hidden">متوقفة</span>
                 </>
               ) : !isOnline ? (
                 <>
-                  <WifiOff className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                  <WifiOff className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                   <span className="hidden md:inline">غير متصل (محلي)</span>
                   <span className="md:hidden">محلي</span>
                 </>
               ) : syncState.isSyncing ? (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600 dark:text-amber-400" />
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
                   <span className="hidden md:inline">جاري المزامنة...</span>
                   <span className="md:hidden">مزامنة...</span>
                 </>
               ) : (pendingQueueCount || 0) > 0 ? (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                   <span className="hidden md:inline">بانتظار المزامنة ({pendingQueueCount})</span>
                   <span className="md:hidden">({pendingQueueCount})</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span>متزامن</span>
                 </>
               )}
