@@ -17,6 +17,8 @@ export function CameraScanner({ onScan, onClose }: CameraScannerProps) {
   const [selectedCameraId, setSelectedCameraId] = useState<string>('');
   const [isScanning, setIsScanning] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const [permissionDeniedPermanently, setPermissionDeniedPermanently] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [successCode, setSuccessCode] = useState<string | null>(null);
 
@@ -172,6 +174,81 @@ export function CameraScanner({ onScan, onClose }: CameraScannerProps) {
       setIsStarting(false);
     }
   };
+
+  // Request camera permission explicitly via browser mediaDevices API
+  const requestCameraPermission = async () => {
+    setIsRequestingPermission(true);
+    setInitError(null);
+
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("المتصفح لا يدعم الوصول المباشر للكاميرا");
+      }
+
+      // Explicitly trigger browser camera permission prompt
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+      }).catch(async () => {
+        // Fallback to basic video constraint
+        return await navigator.mediaDevices.getUserMedia({ video: true });
+      });
+
+      // Permission granted! Stop test stream tracks to free hardware for scanner
+      stream.getTracks().forEach((track) => track.stop());
+      setPermissionDeniedPermanently(false);
+      setInitError(null);
+
+      // Start scanner
+      await initializeLiveScanner();
+    } catch (err: any) {
+      console.error("Camera permission request failed:", err);
+      let friendlyError = "عذراً، فشل تشغيل الكاميرا المباشرة.";
+      if (
+        err?.name === "NotAllowedError" ||
+        err?.name === "PermissionDeniedError" ||
+        err?.message?.includes("Permission denied") ||
+        err?.message?.includes("NotAllowed")
+      ) {
+        friendlyError = "تم رفض إذن الكاميرا. يرجى تفعيل إذن الكاميرا للموقع من إعدادات المتصفح أو شريط العنوان.";
+        setPermissionDeniedPermanently(true);
+      } else if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
+        friendlyError = "لم يتم العثور على كاميرا متصلة بهذا الجهاز.";
+      } else if (err?.name === "NotReadableError" || err?.message?.includes("Could not start video source")) {
+        friendlyError = "الكاميرا قيد الاستخدام حالياً في تطبيق آخر على جهازك.";
+      }
+      setInitError(friendlyError);
+      setIsScanning(false);
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
+
+  useEffect(() => {
+    let permissionStatus: PermissionStatus | null = null;
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions
+        .query({ name: 'camera' as PermissionName })
+        .then((status) => {
+          permissionStatus = status;
+          status.onchange = () => {
+            if (status.state === 'granted') {
+              setPermissionDeniedPermanently(false);
+              setInitError(null);
+              initializeLiveScanner();
+            }
+          };
+        })
+        .catch(() => {
+          // Ignore browsers that don't support camera permission query
+        });
+    }
+
+    return () => {
+      if (permissionStatus) {
+        permissionStatus.onchange = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Instantiate the engine once
@@ -350,28 +427,80 @@ export function CameraScanner({ onScan, onClose }: CameraScannerProps) {
           </div>
         )}
 
-        {/* Live camera stream error view */}
+        {/* Live camera stream error view & Minimalist Permission Opener */}
         {!useFileFallback && initError && !isStarting && (
-          <div className="flex flex-col items-center justify-center gap-3 bg-black/85 p-6 rounded-2xl border border-red-500/20 backdrop-blur-md max-w-xs text-center animate-in fade-in duration-200">
-            <AlertCircle className="w-9 h-9 text-red-500 shrink-0" />
-            <h4 className="text-xs font-bold text-slate-100">تعذر بدء بث الكاميرا المباشر</h4>
-            <p className="text-[10px] text-slate-400 leading-relaxed">{initError}</p>
-            <div className="flex gap-2 w-full mt-2">
-              <button
-                type="button"
-                onClick={initializeLiveScanner}
-                className="flex-1 py-1.5 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold rounded-lg border border-white/10 cursor-pointer"
-              >
-                إعادة المحاولة
-              </button>
-              <button
-                type="button"
-                onClick={() => setUseFileFallback(true)}
-                className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg cursor-pointer"
-              >
-                وضع تصوير الكارت
-              </button>
+          <div className="flex flex-col items-center justify-center gap-3.5 bg-slate-900/95 p-6 rounded-2xl border border-white/10 backdrop-blur-xl max-w-sm w-full text-center shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Minimalist Icon Indicator */}
+            <div className="w-12 h-12 rounded-full bg-slate-800 border border-white/10 text-blue-400 flex items-center justify-center shadow-inner">
+              <Camera className="w-6 h-6" />
             </div>
+
+            {/* Title & Concise Description */}
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-white tracking-wide">
+                الكاميرا بحاجة إلى إذن التشغيل
+              </h4>
+              <p className="text-xs text-slate-400 leading-relaxed max-w-[280px] mx-auto">
+                {initError}
+              </p>
+            </div>
+
+            {/* Minimalist Actions Container */}
+            <div className="w-full space-y-2 pt-1">
+              {/* Minimalist Primary Button: Open Camera Permission */}
+              <button
+                type="button"
+                id="request-camera-permission-btn"
+                onClick={requestCameraPermission}
+                disabled={isRequestingPermission}
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-60 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm hover:shadow-blue-500/20"
+              >
+                {isRequestingPermission ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>جاري طلب الإذن...</span>
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-4 h-4" />
+                    <span>منح إذن الكاميرا</span>
+                  </>
+                )}
+              </button>
+
+              {/* Secondary Minimalist Action Buttons */}
+              <div className="flex items-center gap-2 w-full">
+                <button
+                  type="button"
+                  id="retry-camera-btn"
+                  onClick={initializeLiveScanner}
+                  disabled={isRequestingPermission}
+                  className="flex-1 py-2 px-3 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white text-[11px] font-medium rounded-xl border border-white/5 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>إعادة المحاولة</span>
+                </button>
+                <button
+                  type="button"
+                  id="fallback-photo-btn"
+                  onClick={() => setUseFileFallback(true)}
+                  className="flex-1 py-2 px-3 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white text-[11px] font-medium rounded-xl border border-white/5 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Image className="w-3.5 h-3.5" />
+                  <span>تصوير كارت</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Subtle Minimalist Helper Tip if browser blocked permissions */}
+            {permissionDeniedPermanently && (
+              <div className="mt-1 pt-3 border-t border-white/5 text-[10px] text-slate-400 flex items-start gap-1.5 text-right w-full bg-slate-950/40 p-2.5 rounded-lg leading-relaxed">
+                <span className="text-blue-400 text-xs shrink-0">💡</span>
+                <span>
+                  إذا كان المتصفح يحظر الكاميرا تلقائياً، اضغط على أيقونة القفل أو الكاميرا بجوار رابط الصفحة بالأعلى واختر <strong>سماح (Allow)</strong> ثم أعد الضغط على زر منح الإذن.
+                </span>
+              </div>
+            )}
           </div>
         )}
 

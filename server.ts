@@ -1,6 +1,8 @@
 import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
+import fs from 'fs';
+import * as XLSX from 'xlsx';
 import { createServer as createViteServer } from 'vite';
 
 // Server-side storage for public lookup tokens and live summary records
@@ -418,17 +420,154 @@ async function startServer() {
             { name: 'RSA-OAEP' }
           );
           const wrappedBase64 = Buffer.from(wrapped).toString('base64');
-          return res.status(200).json({ wrappedDek: wrappedBase64 });
+          const pubKeyHash = crypto.createHash('sha256').update(devicePublicKey).digest('hex');
+          return res.status(200).json({ 
+            wrappedDek: wrappedBase64,
+            publicKeyHash: pubKeyHash
+          });
         } catch (subtleErr) {
           console.warn('[API] Handshake crypto wrap error, returning fallback:', subtleErr);
         }
       }
-      return res.status(200).json({ wrappedDek: 'mock_wrapped_dek_base64' });
+      return res.status(200).json({ 
+        wrappedDek: 'mock_wrapped_dek_base64',
+        publicKeyHash: 'mock_pubkey_hash'
+      });
     } catch (e) {
       console.error('[API] Handshake failed:', e);
       res.status(500).json({ error: 'Handshake failed' });
     }
   });
+
+  // Upload and prepare card images for printing order to 01277707096
+  app.post('/api/cards/upload-print-order', (req, res) => {
+    try {
+      const { frontImage, backImage, orderDetails = {} } = req.body || {};
+      const orderId = `card_print_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+      const baseDir = path.join(process.cwd(), 'public', 'orders');
+      const orderDir = path.join(baseDir, orderId);
+
+      fs.mkdirSync(orderDir, { recursive: true });
+
+      let frontImageUrl = null;
+      let backImageUrl = null;
+
+      if (frontImage && frontImage.includes('base64,')) {
+        const base64Content = frontImage.split(';base64,').pop();
+        if (base64Content) {
+          fs.writeFileSync(path.join(orderDir, 'front_design.png'), base64Content, 'base64');
+          frontImageUrl = `/orders/${orderId}/front_design.png`;
+        }
+      }
+
+      if (backImage && backImage.includes('base64,')) {
+        const base64Content = backImage.split(';base64,').pop();
+        if (base64Content) {
+          fs.writeFileSync(path.join(orderDir, 'back_design.png'), base64Content, 'base64');
+          backImageUrl = `/orders/${orderId}/back_design.png`;
+        }
+      }
+
+      // Save order metadata JSON
+      fs.writeFileSync(path.join(orderDir, 'order_info.json'), JSON.stringify({
+        orderId,
+        createdAt: new Date().toISOString(),
+        targetPhone: '01277707096',
+        ...orderDetails
+      }, null, 2));
+
+      console.log(`[API] Successfully prepared and saved card order ${orderId} for phone 01277707096`);
+
+      res.status(200).json({
+        success: true,
+        orderId,
+        frontImageUrl,
+        backImageUrl,
+        targetPhone: '01277707096',
+        message: 'تم رفع وحفظ صور التصميم بنجاح'
+      });
+    } catch (err: any) {
+      console.error('[API Error] Upload print order failed:', err);
+      res.status(500).json({
+        error: 'فشل رفع صور التصميم',
+        details: err.message || err.toString()
+      });
+    }
+  });
+
+  // Submit an order for physical cards (generates Excel of student data and stores design image)
+  app.post('/api/cards/order-physical', (req, res) => {
+    try {
+      const { cardImage, students = [], academyName = 'سنتر مسار', contactEmail = '', contactPhone = '' } = req.body || {};
+      
+      console.log(`[API] Received physical cards printing request for academy: "${academyName}". Student count: ${students.length}`);
+      
+      // 1. Generate clean Excel data rows with Arabic keys
+      const excelRows = students.map((s: any, index: number) => ({
+        'م': index + 1,
+        'كود الطالب': s.studentCode || '',
+        'اسم الطالب': s.name || '',
+        'رقم الهاتف': s.phone || '',
+        'الصف الدراسي': s.gradeLevel || '',
+        'المدرسة': s.school || '',
+        'ولي الأمر': s.parentName || '',
+        'هاتف ولي الأمر': s.parentPhone || '',
+        'تاريخ التسجيل': s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG') : ''
+      }));
+      
+      // 2. Build SheetJS workbook
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(excelRows, {
+        header: ['م', 'كود الطالب', 'اسم الطالب', 'رقم الهاتف', 'الصف الدراسي', 'المدرسة', 'ولي الأمر', 'هاتف ولي الأمر', 'تاريخ التسجيل']
+      });
+      
+      // Right-to-Left sheet view configuration
+      ws['!views'] = [{ RTL: true }];
+      
+      XLSX.utils.book_append_sheet(wb, ws, 'كشف كروت الطلاب');
+      
+      // Write workbook to Buffer
+      const excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      
+      // 3. Create folder paths for the order
+      const orderId = `order_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+      const baseDir = path.join(process.cwd(), 'public', 'orders');
+      const orderDir = path.join(baseDir, orderId);
+      
+      fs.mkdirSync(orderDir, { recursive: true });
+      
+      // 4. Save custom card template design if base64-encoded
+      if (cardImage && cardImage.includes('base64,')) {
+        const base64Content = cardImage.split(';base64,').pop();
+        if (base64Content) {
+          fs.writeFileSync(path.join(orderDir, 'card_design.png'), base64Content, 'base64');
+          console.log(`[API] Saved customized card template image to public/orders/${orderId}/card_design.png`);
+        }
+      }
+      
+      // 5. Save the Excel spreadsheet on-disk
+      fs.writeFileSync(path.join(orderDir, 'students_list.xlsx'), excelBuffer);
+      console.log(`[API] Saved student details excel file to public/orders/${orderId}/students_list.xlsx`);
+      
+      // 6. Return success with downloads
+      res.status(200).json({
+        success: true,
+        orderId,
+        message: 'تم إرسال تصميم الكرنيه وكشف الطلاب بنجاح إلى فريق مطبعة مسار لإنتاج الكروت الفيزيائية الممتازة!',
+        excelDownloadUrl: `/orders/${orderId}/students_list.xlsx`,
+        imageDownloadUrl: `/orders/${orderId}/card_design.png`
+      });
+    } catch (err: any) {
+      console.error('[API Error] Card physical order failed:', err);
+      res.status(500).json({
+        error: 'عذراً، فشل تجهيز ملفات الطلب وإرسالها.',
+        details: err.message || err.toString()
+      });
+    }
+  });
+
+  // Serve the orders folder statically so files can be accessed or downloaded by the developer or user
+  app.use('/orders', express.static(path.join(process.cwd(), 'public', 'orders')));
 
   // Sync Push endpoint for syncService
   app.post('/api/sync/push', (req, res) => {

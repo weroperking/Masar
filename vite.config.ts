@@ -5,6 +5,11 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
+    build: {
+      outDir: 'dist',
+      emptyOutDir: false,
+      chunkSizeWarningLimit: 1500,
+    },
     plugins: [
       react(), 
       VitePWA({

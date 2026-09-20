@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Printer, User, ShieldAlert, CheckCircle2, UserPlus, Phone, Calendar } from 'lucide-react';
-import { QrCard, Student } from '../../types';
+import { QrCard, Student, CardCustomDesign } from '../../types';
 import { QrCardBadge, CardThemeColor } from './QrCardBadge';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -14,6 +14,7 @@ interface QrCardViewModalProps {
   onLinkStudent: (cardId: string, studentId: string) => Promise<void>;
   onToggleStatus: (cardId: string, newStatus: 'active' | 'revoked') => Promise<void>;
   onMarkPrinted: (cardId: string) => Promise<void>;
+  customDesign?: CardCustomDesign;
 }
 
 export function QrCardViewModal({
@@ -24,11 +25,13 @@ export function QrCardViewModal({
   allStudents,
   onLinkStudent,
   onToggleStatus,
-  onMarkPrinted
+  onMarkPrinted,
+  customDesign
 }: QrCardViewModalProps) {
   const [isLinking, setIsLinking] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeFace, setActiveFace] = useState<'back' | 'front'>('back');
 
   if (!isOpen || !card) return null;
 
@@ -80,6 +83,32 @@ export function QrCardViewModal({
 
         {/* Modal Body */}
         <div className="p-6 space-y-5 overflow-y-auto flex-1">
+          {/* Face Switcher (Print: hidden) */}
+          <div className="flex items-center justify-center gap-2 print:hidden">
+            <button
+              type="button"
+              onClick={() => setActiveFace('front')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                activeFace === 'front'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-800'
+              }`}
+            >
+              الوجه الأمامي (التصميم)
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveFace('back')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                activeFace === 'back'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-800'
+              }`}
+            >
+              الوجه الخلفي (الرمز والباركود)
+            </button>
+          </div>
+
           {/* Card Badge Display Area */}
           <div className="flex justify-center p-4 sm:p-6 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-800 print:p-0 print:bg-transparent print:border-none">
             <QrCardBadge
@@ -93,6 +122,8 @@ export function QrCardViewModal({
               themeColor={(card.themeColor as CardThemeColor) || 'blue'}
               status={card.status}
               size="large"
+              face={activeFace}
+              customDesign={customDesign}
             />
           </div>
 

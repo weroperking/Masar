@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Barcode from 'react-barcode';
-import { User, Phone, GraduationCap, School, ShieldCheck, QrCode as QrIcon } from 'lucide-react';
+import QRCode from 'qrcode';
+import { CardCustomDesign, CardOverlayElement } from '../../types';
 
 export type CardThemeColor = 'blue' | 'emerald' | 'indigo' | 'amber' | 'rose' | 'slate';
 
@@ -12,7 +13,7 @@ export interface QrCardBadgeProps {
   studentGrade?: string | null;
   studentSchool?: string | null;
   centerName?: string;
-  themeColor?: CardThemeColor;
+  themeColor?: CardThemeColor | 'custom';
   showPhone?: boolean;
   showGrade?: boolean;
   showCenterName?: boolean;
@@ -21,9 +22,11 @@ export interface QrCardBadgeProps {
   size?: 'normal' | 'large' | 'compact' | 'print';
   backgroundImage?: string;
   className?: string;
+  customDesign?: CardCustomDesign;
+  face?: 'front' | 'back'; // Render active face, defaults to 'front'
+  id?: string;
 }
 
-// Sophisticated, human-crafted architectural color themes (no arbitrary multi-color gradients)
 const themeStyles: Record<CardThemeColor, {
   headerBg: string;
   headerText: string;
@@ -112,19 +115,262 @@ export function QrCardBadge({
   status = 'active',
   size = 'normal',
   backgroundImage,
-  className = ''
+  className = '',
+  customDesign,
+  face = 'front',
+  id
 }: QrCardBadgeProps) {
-  
-
   const isPrint = size === 'print';
   const isCompact = size === 'compact';
   const isLarge = size === 'large';
 
+  // Customize config extraction
+  const design = customDesign || {};
+  const activeThemeColor: any = design.themeColor || themeColor || 'blue';
+  const isCustomTheme = activeThemeColor === 'custom';
+
+  const activeCenterName = design.centerName ?? centerName ?? 'سنتر مسار التعليمي';
+  const activeShowPhone = design.showPhone ?? showPhone ?? true;
+  const activeShowGrade = design.showGrade ?? showGrade ?? true;
+  const activeShowSchool = design.showSchool ?? true;
+  const activeShowCenterName = design.showCenterName ?? showCenterName ?? true;
+  const activeShowCardNumber = design.showCardNumber ?? showCardNumber ?? true;
+  const activeCardFormat = design.codeFormat || design.cardFormat || 'barcode';
+  const activeFontFamily = design.fontFamily ?? 'Cairo, sans-serif';
+  const activeBorderRadius = design.borderRadius ?? 12;
+  const activeBorderWidth = design.borderWidth ?? 1;
+  const activeBorderColor = design.borderColor ?? '#cbd5e1';
+  const activeSubtitleLabel = design.subtitleLabel ?? (studentName ? 'بطاقة طالب' : 'بطاقة حضور');
+  const activeShowLogo = design.showLogo ?? true;
+  const activeLogoPosition = design.logoPosition ?? 'right';
+
+  // Generate QR
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const isQrCode = activeCardFormat === 'qrcode';
+  const cleanCode = String(cardNumber || qrCodeData || '0001').replace(/\D/g, '') || '0001';
+
+  useEffect(() => {
+    if (isQrCode) {
+      QRCode.toDataURL(
+        cleanCode,
+        { margin: 1, width: 120, color: { dark: '#000000', light: '#ffffff' } },
+        (err, url) => {
+          if (!err && url) {
+            setQrCodeUrl(url);
+          }
+        }
+      );
+    }
+  }, [cleanCode, isQrCode]);
+
+  // Is a custom template uploaded for this specific face?
+  const hasFrontTemplate = !!design.frontImage;
+  const hasBackTemplate = !!design.backImage;
+
+  // Render the template image behind overlays
+  const getObjectFit = (fit?: 'cover' | 'contain' | 'stretch'): any => {
+    if (fit === 'stretch') return 'fill';
+    if (fit === 'contain') return 'contain';
+    return 'cover';
+  };
+
+  const renderFaceTemplate = () => {
+    if (face === 'front' && hasFrontTemplate) {
+      return (
+        <img
+          src={design.frontImage}
+          alt="Front template"
+          className="absolute inset-0 z-0 pointer-events-none select-none"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: getObjectFit(design.frontFit),
+            opacity: design.frontOpacity ?? 1,
+            transform: `scale(${design.frontScale ?? 1}) translate(${design.frontOffsetX ?? 0}px, ${design.frontOffsetY ?? 0}px)`,
+          }}
+          referrerPolicy="no-referrer"
+        />
+      );
+    }
+    if (face === 'back' && hasBackTemplate) {
+      return (
+        <img
+          src={design.backImage}
+          alt="Back template"
+          className="absolute inset-0 z-0 pointer-events-none select-none"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: getObjectFit(design.backFit),
+            opacity: design.backOpacity ?? 1,
+            transform: `scale(${design.backScale ?? 1}) translate(${design.backOffsetX ?? 0}px, ${design.backOffsetY ?? 0}px)`,
+          }}
+          referrerPolicy="no-referrer"
+        />
+      );
+    }
+    return null;
+  };
+
+  // Helper to resolve overlay placement style
+  const getElementStyle = (elem: CardOverlayElement) => {
+    const align = elem.align || 'center';
+    const tx = align === 'center' ? '-50%' : align === 'left' ? '0%' : '-100%';
+    return {
+      position: 'absolute' as const,
+      left: `${elem.x}%`,
+      top: `${elem.y}%`,
+      transform: `translate(${tx}, -50%)`,
+      fontSize: `${elem.fontSize}px`,
+      color: elem.color,
+      fontFamily: activeFontFamily,
+      whiteSpace: 'nowrap' as const,
+      zIndex: 20,
+    };
+  };
+
+  // Overlay element rendering
+  const renderOverlayElement = (elem: CardOverlayElement | undefined, text: string | null | undefined, defaultElem?: Partial<CardOverlayElement>) => {
+    const fallback = defaultElem || {};
+    const merged: CardOverlayElement = {
+      visible: elem?.visible ?? (fallback.visible ?? false),
+      x: elem?.x ?? (fallback.x ?? 50),
+      y: elem?.y ?? (fallback.y ?? 50),
+      fontSize: elem?.fontSize ?? (fallback.fontSize ?? 12),
+      color: elem?.color ?? (fallback.color ?? '#000000'),
+      align: elem?.align ?? (fallback.align ?? 'center'),
+      showBackground: elem?.showBackground ?? (fallback.showBackground ?? false),
+      backgroundColor: elem?.backgroundColor ?? (fallback.backgroundColor ?? '#ffffff'),
+      backgroundOpacity: elem?.backgroundOpacity ?? (fallback.backgroundOpacity ?? 1),
+      backgroundPadding: elem?.backgroundPadding ?? (fallback.backgroundPadding ?? 6),
+      backgroundRadius: elem?.backgroundRadius ?? (fallback.backgroundRadius ?? 6),
+    };
+
+    if (!merged.visible || !text) return null;
+    const style = getElementStyle(merged);
+
+    if (merged.showBackground) {
+      return (
+        <div
+          style={{
+            ...style,
+            backgroundColor: merged.backgroundColor,
+            opacity: merged.backgroundOpacity,
+            padding: `${merged.backgroundPadding}px ${merged.backgroundPadding * 2}px`,
+            borderRadius: `${merged.backgroundRadius}px`,
+            border: '1px solid rgba(0,0,0,0.08)',
+            boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+            color: merged.color,
+            transform: style.transform,
+          }}
+        >
+          {text}
+        </div>
+      );
+    }
+
+    return (
+      <div style={style}>
+        {text}
+      </div>
+    );
+  };
+
+  // Setup styles
+  const cardBorderRadius = `${activeBorderRadius}px`;
+  const borderStyle = {
+    borderRadius: cardBorderRadius,
+    borderWidth: `${activeBorderWidth}px`,
+    borderColor: isCustomTheme ? activeBorderColor : undefined,
+    fontFamily: activeFontFamily
+  };
+
+  // Custom core background (legacy gradient or customColor)
+  const legacyBodyStyle = design.gradientBg 
+    ? { backgroundImage: `linear-gradient(${design.gradientAngle ?? 135}deg, ${design.gradientFrom ?? '#eff6ff'}, ${design.gradientTo ?? '#dbeafe'})` }
+    : isCustomTheme && design.customColor
+    ? { backgroundColor: design.customColor }
+    : undefined;
+
+  // Base background if template is missing
+  const fallbackBgStyle = backgroundImage 
+    ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', ...borderStyle } 
+    : borderStyle;
+
+  // Render barcode or QR code absolutely (matching physical card sticker: barcode + id underneath)
+  const renderCodeOverlay = () => {
+    const codeX = design.codeX ?? 50;
+    const codeY = design.codeY ?? (face === 'back' ? 55 : 80);
+    const codeScale = (design.codeScale ?? 100) / 100;
+    const codeWidthVal = design.codeWidth ?? (isQrCode ? 85 : 135);
+    const codeHeightVal = design.codeHeight ?? (isQrCode ? 85 : 42);
+    const showDigits = design.showCodeDigits ?? true;
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: `${codeX}%`,
+          top: `${codeY}%`,
+          transform: `translate(-50%, -50%) scale(${codeScale})`,
+          transformOrigin: 'center center',
+          zIndex: 30,
+        }}
+      >
+        <div 
+          className="bg-white px-3 py-2 rounded-lg border border-slate-300 shadow-sm flex flex-col items-center justify-center overflow-hidden"
+          style={{
+            minWidth: isQrCode ? `${codeWidthVal}px` : `${codeWidthVal + 10}px`,
+          }}
+        >
+          {isQrCode ? (
+            qrCodeUrl ? (
+              <img 
+                src={qrCodeUrl} 
+                alt="QR Code" 
+                style={{ width: `${codeWidthVal - 10}px`, height: `${codeHeightVal - 10}px`, objectFit: 'contain' }}
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-12 h-12 bg-slate-100 rounded animate-pulse" />
+            )
+          ) : (
+            <div className="flex flex-col items-center justify-center">
+              <Barcode 
+                value={cleanCode} 
+                format="CODE128" 
+                width={1.2} 
+                height={codeHeightVal} 
+                displayValue={false} 
+                margin={0}
+                background="#ffffff"
+                lineColor="#000000"
+              />
+            </div>
+          )}
+          {showDigits && (
+            <span 
+              className="font-mono text-[10px] sm:text-[11px] font-bold tracking-widest text-slate-900 mt-1 text-center select-all"
+            >
+              * {cleanCode} *
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
+      id={id}
       dir="rtl"
-      style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
-      className={`relative select-none rounded-xl overflow-hidden border transition-all duration-150 text-right ${
+      style={{
+        ...fallbackBgStyle,
+        borderColor: isCustomTheme ? activeBorderColor : undefined,
+        borderWidth: `${activeBorderWidth}px`,
+        borderRadius: cardBorderRadius,
+      }}
+      className={`relative select-none overflow-hidden transition-all duration-150 text-right ${
         isPrint
           ? 'w-[340px] h-[215px] bg-white text-slate-900 border-slate-300 shadow-none'
           : isLarge
@@ -134,133 +380,48 @@ export function QrCardBadge({
           : 'w-[350px] sm:w-[360px] h-[225px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm'
       } ${className}`}
     >
-      {/* Background Overlay if image is used */}
-      {backgroundImage && (
-        <div className="absolute inset-0 bg-white/90 dark:bg-slate-900/90 z-0"></div>
+      {/* Background Overlay if custom color/gradient or legacy background is active */}
+      {!hasFrontTemplate && !hasBackTemplate && (
+        <>
+          {backgroundImage && <div className="absolute inset-0 bg-white/92 dark:bg-slate-950/92 z-0" />}
+          <div className="absolute inset-0 z-0 opacity-80" style={legacyBodyStyle} />
+        </>
       )}
-      
-      {/* Top Header Strip - Clean Architectural Header */}
-      <div className={`relative z-10 px-4 py-2.5 flex items-center justify-between border-b border-slate-800/20 dark:border-slate-800 ${themeStyles[themeColor].headerBg} ${themeStyles[themeColor].headerText}`}>
-        <div className="flex items-center gap-2">
-          <div className={`w-5 h-5 rounded flex items-center justify-center font-black text-[11px] ${themeStyles[themeColor].brandMark}`}>
-            م
-          </div>
-          {showCenterName && (
-            <span className="font-semibold text-xs tracking-wide truncate max-w-[170px] text-slate-200">
-              {centerName}
-            </span>
-          )}
-        </div>
 
-        <div className="flex items-center gap-1.5">
-          {(status === 'revoked') ? (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-              موقوفة
-            </span>
+      {/* Render custom template image face if available */}
+      {renderFaceTemplate()}
+
+      {/* Front Face: ONLY the teacher's uploaded design */}
+      {face === 'front' && (
+        <div className="absolute inset-0 w-full h-full z-10 pointer-events-none">
+          {hasFrontTemplate ? (
+            // Full teacher design without any overlays, text, or elements
+            null
           ) : (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${themeStyles[themeColor].tagBg} ${themeStyles[themeColor].tagText} flex items-center gap-1`}>
-              <ShieldCheck className="w-3 h-3" />
-              {studentName ? 'بطاقة طالب' : 'بطاقة حضور'}
-            </span>
+            // Placeholder when front design has not been uploaded yet
+            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center select-none bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800/90 dark:to-slate-900 border border-dashed border-slate-300 dark:border-slate-700">
+              <span className="font-bold text-xs text-slate-800 dark:text-slate-200">
+                تصميم الوجه الأمامي (Front)
+              </span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-[240px] leading-relaxed">
+                يظهر هنا تصميم المعلم بالكامل بدون أي نصوص أو بيانات إضافية
+              </span>
+            </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* Solid subtle accent hairline */}
-      <div className={`relative z-10 h-[2px] w-full ${themeStyles[themeColor].accentBorder.replace('border-', 'bg-')}`} />
-
-      {/* Card Body */}
-      <div className="relative z-10 p-4 flex items-center justify-between gap-3 h-[calc(100%-46px)]">
-        {/* Student Details / Identification Info */}
-        <div className="flex-1 flex flex-col justify-between h-full min-w-0 pr-0.5">
-          <div className="space-y-1.5">
-            {studentName ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0">
-                    <User className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate leading-tight">
-                      {studentName}
-                    </h3>
-                  </div>
-                </div>
-
-                {showGrade && (studentGrade || studentSchool) && (
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 pr-0.5">
-                    {studentGrade && (
-                      <span className="flex items-center gap-1 truncate">
-                        <GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        {studentGrade}
-                      </span>
-                    )}
-                    {studentSchool && (
-                      <span className="flex items-center gap-1 truncate text-slate-400">
-                        • {studentSchool}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {showPhone && studentPhone && (
-                  <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 pr-0.5 font-mono">
-                    <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                    <span>{studentPhone}</span>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="space-y-1 py-1">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold">
-                  <QrIcon className="w-3.5 h-3.5 text-slate-400" />
-                  بطاقة عضوية غير مخصصة
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                  جاهزة للربط الفوري بأي طالب عند التوزيع أو مسح الكود
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Bottom Card Number & Guidance */}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            {showCardNumber && (
-              <div>
-                <span className="text-[10px] text-slate-400 block leading-none mb-0.5 font-sans">رقم الطالب (الباركود)</span>
-                <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 tracking-wider">
-                  {String(cardNumber || qrCodeData || '0001').replace(/\D/g, '') || '0001'}
-                </span>
-              </div>
-            )}
-            <div className="text-[10px] text-slate-400 font-bold">
-              مسار
+      {/* Back Face: Back design + Barcode or QR Code with student ID */}
+      {face === 'back' && (
+        <div className="absolute inset-0 w-full h-full z-10 pointer-events-none">
+          {!hasBackTemplate && (
+            <div className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-slate-900/90 flex flex-col items-center justify-start pt-6 pointer-events-none">
+              <span className="text-[10px] text-slate-400 font-bold">الوجه الخلفي للبطاقة (Back)</span>
             </div>
-          </div>
+          )}
+          {renderCodeOverlay()}
         </div>
-
-        {/* Barcode Container - Strict numeric encoding only */}
-        <div className="shrink-0 flex flex-col items-center justify-center">
-          <div className="bg-white p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs flex flex-col items-center justify-center overflow-hidden w-28 sm:w-32 h-20 sm:h-24">
-            <Barcode 
-              value={String(cardNumber || qrCodeData || '0001').replace(/\D/g, '') || '0001'} 
-              format="CODE128" 
-              width={1.5} 
-              height={38} 
-              displayValue={false} 
-              margin={0}
-              background="#ffffff"
-              lineColor="#0f172a"
-            />
-            <span className="font-mono text-[10px] font-bold text-slate-900 tracking-wider mt-0.5">
-              {String(cardNumber || qrCodeData || '0001').replace(/\D/g, '') || '0001'}
-            </span>
-          </div>
-          <span className="text-[9px] text-slate-500 dark:text-slate-400 mt-1 font-medium text-center">
-            امسح الباركود
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

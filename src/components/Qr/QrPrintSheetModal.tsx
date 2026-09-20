@@ -3,7 +3,7 @@ import { X, Printer, Layers } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Download } from 'lucide-react';
-import { QrCard, Student } from '../../types';
+import { QrCard, Student, CardCustomDesign } from '../../types';
 import { QrCardBadge, CardThemeColor } from './QrCardBadge';
 
 interface QrPrintSheetModalProps {
@@ -13,6 +13,7 @@ interface QrPrintSheetModalProps {
   students: Student[];
   title?: string;
   onConfirmPrinted?: () => Promise<void>;
+  customDesign?: CardCustomDesign;
 }
 
 export function QrPrintSheetModal({
@@ -21,7 +22,8 @@ export function QrPrintSheetModal({
   cards,
   students,
   title = 'طباعة بطاقات QR للطلاب',
-  onConfirmPrinted
+  onConfirmPrinted,
+  customDesign
 }: QrPrintSheetModalProps) {
   if (!isOpen || cards.length === 0) return null;
 
@@ -160,6 +162,7 @@ export function QrPrintSheetModal({
                     themeColor={(card.themeColor as CardThemeColor) || 'blue'}
                     status={card.status}
                     size="print"
+                    customDesign={customDesign}
                   />
                   {/* Subtle cut indicators */}
                   <div className="text-[9px] text-slate-400 font-mono text-center mt-1 print:block hidden">

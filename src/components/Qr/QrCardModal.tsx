@@ -5,7 +5,7 @@ import {
   Printer, Save, Search, CheckCircle2, AlertCircle, Palette, QrCode, CreditCard, SlidersHorizontal,
   Image
 } from 'lucide-react';
-import { Student, QrCard } from '../../types';
+import { Student, QrCard, CardCustomDesign } from '../../types';
 import { useApiMutation } from '../../config/queryHooks';
 import { QrCardBadge, CardThemeColor } from './QrCardBadge';
 
@@ -16,6 +16,7 @@ interface QrCardModalProps {
   existingCards: QrCard[];
   defaultCenterName?: string;
   onSaveCards: (cards: Partial<QrCard>[], shouldPrintImmediately?: boolean) => Promise<void>;
+  customDesign?: CardCustomDesign;
 }
 
 type Mode = 'single_student' | 'single_unassigned' | 'batch_unassigned_students' | 'batch_blank';
@@ -26,7 +27,8 @@ export function QrCardModal({
   students,
   existingCards,
   defaultCenterName = 'أكاديمية مسار التعليمية',
-  onSaveCards
+  onSaveCards,
+  customDesign
 }: QrCardModalProps) {
   const { update: updateStudent } = useApiMutation<Student>('students');
   const [mode, setMode] = useState<Mode>('single_student');
@@ -766,6 +768,7 @@ export function QrCardModal({
                 showCardNumber={true}
                 size={cardSize}
                 backgroundImage={backgroundImage}
+                customDesign={customDesign}
               />
             </div>
 

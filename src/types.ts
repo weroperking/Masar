@@ -198,6 +198,78 @@ export interface MessageTemplate extends BaseRecord {
   type: 'payment_reminder' | 'absence_alert' | 'general';
 }
 
+export interface CardOverlayElement {
+  visible: boolean;
+  x: number; // percentage (0-100)
+  y: number; // percentage (0-100)
+  fontSize: number;
+  color: string;
+  align?: 'right' | 'left' | 'center';
+  showBackground?: boolean;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
+  backgroundPadding?: number;
+  backgroundRadius?: number;
+}
+
+export interface CardCustomDesign {
+  themeColor?: 'blue' | 'emerald' | 'indigo' | 'amber' | 'rose' | 'slate' | 'custom';
+  customColor?: string;
+  textColor?: string;
+  centerName?: string;
+  subtitleLabel?: string;
+  showPhone?: boolean;
+  showGrade?: boolean;
+  showSchool?: boolean;
+  showCenterName?: boolean;
+  showCardNumber?: boolean;
+  showLogo?: boolean;
+  logoPosition?: 'right' | 'left' | 'center';
+  logoImage?: string;
+  backgroundImage?: string;
+  cardFormat?: 'barcode' | 'qrcode';
+  borderRadius?: number;
+  borderWidth?: number;
+  borderColor?: string;
+  fontFamily?: string;
+  gradientBg?: boolean;
+  gradientFrom?: string;
+  gradientTo?: string;
+  gradientAngle?: number;
+  headerBgColor?: string;
+  headerTextColor?: string;
+
+  // New advanced interactive editor properties
+  frontImage?: string;
+  frontOpacity?: number;
+  frontFit?: 'cover' | 'contain' | 'stretch';
+  frontScale?: number;
+  frontOffsetX?: number;
+  frontOffsetY?: number;
+
+  backImage?: string;
+  backOpacity?: number;
+  backFit?: 'cover' | 'contain' | 'stretch';
+  backScale?: number;
+  backOffsetX?: number;
+  backOffsetY?: number;
+
+  codeFormat?: 'barcode' | 'qrcode';
+  codeX?: number; // % 
+  codeY?: number; // %
+  codeScale?: number; // % (e.g. 50 - 160)
+  codeWidth?: number; // px or %
+  codeHeight?: number; // px or %
+  showCodeDigits?: boolean;
+  codeColor?: string;
+
+  studentNameElement?: CardOverlayElement;
+  centerNameElement?: CardOverlayElement;
+  phoneElement?: CardOverlayElement;
+  gradeElement?: CardOverlayElement;
+  schoolElement?: CardOverlayElement;
+}
+
 export interface Settings extends BaseRecord {
   numericMaxGrade?: number;
   assignmentGradingMethod?: string;
@@ -210,6 +282,7 @@ export interface Settings extends BaseRecord {
   currency?: string;
   autoConfirmPaymentOnAttendance: boolean;
   theme?: 'light' | 'dark' | 'system';
+  cardDesign?: CardCustomDesign;
 }
 
 export interface QrCard extends BaseRecord {
@@ -219,7 +292,7 @@ export interface QrCard extends BaseRecord {
   studentId?: string;
   qrCodeData?: string;
   status?: 'active' | 'revoked' | string;
-  themeColor?: 'blue' | 'emerald' | 'indigo' | 'amber' | 'rose' | 'slate';
+  themeColor?: 'blue' | 'emerald' | 'indigo' | 'amber' | 'rose' | 'slate' | 'custom';
   centerName?: string;
   backgroundImage?: string;
   notes?: string;
