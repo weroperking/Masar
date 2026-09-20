@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Camera, X, RefreshCw, AlertCircle, Check, Image, RotateCw, ChevronsUpDown } from 'lucide-react';
 import { playSuccessBeep, playWarningBeep } from '../../utils/audio';
 
@@ -71,9 +71,9 @@ export function CameraScanner({ onScan, onClose }: CameraScannerProps) {
       await html5QrcodeRef.current.start(
         cameraId,
         {
-          fps: 20,
+          fps: 25,
           qrbox: (width, height) => {
-            const size = Math.min(width, height) * 0.65;
+            const size = Math.min(width, height) * 0.75;
             return { width: size, height: size };
           },
           aspectRatio: 1.0
@@ -143,9 +143,9 @@ export function CameraScanner({ onScan, onClose }: CameraScannerProps) {
           await html5QrcodeRef.current.start(
             { facingMode: "environment" },
             {
-              fps: 20,
+              fps: 25,
               qrbox: (width, height) => {
-                const size = Math.min(width, height) * 0.65;
+                const size = Math.min(width, height) * 0.75;
                 return { width: size, height: size };
               },
               aspectRatio: 1.0
@@ -252,7 +252,18 @@ export function CameraScanner({ onScan, onClose }: CameraScannerProps) {
 
   useEffect(() => {
     // Instantiate the engine once
-    const html5Qrcode = new Html5Qrcode(containerId);
+    const html5Qrcode = new Html5Qrcode(containerId, {
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.EAN_13
+      ],
+      verbose: false,
+      experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true
+      }
+    });
     html5QrcodeRef.current = html5Qrcode;
 
     if (!useFileFallback) {
@@ -296,7 +307,18 @@ export function CameraScanner({ onScan, onClose }: CameraScannerProps) {
     setFileScanError(null);
 
     try {
-      const tempScanner = new Html5Qrcode(containerId);
+      const tempScanner = new Html5Qrcode(containerId, {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13
+        ],
+        verbose: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        }
+      });
       const decodedText = await tempScanner.scanFile(file, false);
       handleDecoded(decodedText);
       try {
