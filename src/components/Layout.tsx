@@ -21,7 +21,7 @@ import { useToast } from '../context/ToastContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { MasarLogo } from './MasarLogo';
-import { getSyncState, triggerManualSync } from '../services/syncService';
+import { getSyncState, triggerManualSync, processSyncQueue } from '../services/syncService';
 import { formatTime12 } from '../utils/time';
 
 // Base navigation groups (we will filter them inside the component)
@@ -220,6 +220,17 @@ export function Layout() {
     return () => window.removeEventListener('masar_sync_status_change', handleSyncChange);
   }, []);
 
+  // Retrigger sync on tab wake / visibility change
+  useEffect(() => {
+    const onRetry = () => {
+      if (typeof processSyncQueue === 'function') {
+        processSyncQueue(getToken).catch(() => {});
+      }
+    };
+    window.addEventListener('masar_sync_retry', onRetry);
+    return () => window.removeEventListener('masar_sync_retry', onRetry);
+  }, [getToken]);
+
   const handleManualSyncClick = async () => {
     if (!navigator.onLine) {
       toast.warning('الجهاز غير متصل بالإنترنت حالياً.');
@@ -231,6 +242,8 @@ export function Layout() {
       toast.success('تمت المزامنة بنجاح!');
     } catch (e: any) {
       toast.error('فشلت المزامنة: ' + (e.message || 'خطأ غير معروف'));
+    } finally {
+      setSyncState(getSyncState());
     }
   };
 

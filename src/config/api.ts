@@ -32,10 +32,14 @@ export async function fetchWithAuth(url: string, token: string | null, options: 
 
   // First attempt the local/current application backend (where /api/sync endpoints are implemented on server.ts)
   try {
+    const localCtrl = new AbortController();
+    const localTimeout = setTimeout(() => localCtrl.abort(), 6000);
     const localRes = await fetch(url, {
       ...options,
       headers,
+      signal: options.signal || localCtrl.signal,
     });
+    clearTimeout(localTimeout);
     if (localRes.ok) {
       console.log('[SYNC RESPONSE local]', localRes.status, localRes.headers.get('content-type'));
       return await localRes.json();
@@ -45,10 +49,14 @@ export async function fetchWithAuth(url: string, token: string | null, options: 
   }
 
   const targetUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  const upstreamCtrl = new AbortController();
+  const upstreamTimeout = setTimeout(() => upstreamCtrl.abort(), 10000);
   const response = await fetch(targetUrl, {
     ...options,
     headers,
+    signal: options.signal || upstreamCtrl.signal,
   });
+  clearTimeout(upstreamTimeout);
 
   console.log('[SYNC RESPONSE upstream]', response.status, response.headers.get('content-type'));
 

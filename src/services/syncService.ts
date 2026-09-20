@@ -36,6 +36,35 @@ let consecutiveFailures = 0;
 let breakerOpen = false;
 let retryTimeout: any = null;
 let syncPillStatus: SyncPillStatus = 'synced';
+let lastActivityAt = Date.now();
+let syncStartedAt = 0;
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      const idleMs = Date.now() - lastActivityAt;
+      const syncDuration = syncStartedAt ? Date.now() - syncStartedAt : 0;
+      // If we were mid-sync when the tab froze (idle > 30s or sync hung > 20s), the finally block
+      // may never have run. Force-reset so the next tap starts clean.
+      if (isSyncing && (idleMs > 30_000 || syncDuration > 20_000)) {
+        console.warn('[syncService] forcing isSyncing reset after tab resume', { idleMs, syncDuration });
+        isSyncing = false;
+        syncStartedAt = 0;
+        updateSyncStatus('pending');
+      }
+      // Retrigger sync shortly after resume (only if nothing is currently running)
+      if (!isSyncing && navigator.onLine) {
+        setTimeout(() => {
+          // caller-provided getToken is captured on the original call site;
+          // handled via masar_sync_retry event
+          window.dispatchEvent(new CustomEvent('masar_sync_retry'));
+        }, 1500);
+      }
+    } else {
+      lastActivityAt = Date.now();
+    }
+  });
+}
 
 export async function performHandshake(getToken: () => Promise<string | null>): Promise<void> {
   try {
@@ -94,9 +123,13 @@ export function resetCircuitBreaker() {
 }
 
 function updateSyncStatus(status: SyncPillStatus) {
-  trace('updateSyncStatus called', { status });
+  trace('updateSyncStatus called', { status, isSyncing });
   syncPillStatus = status;
-  window.dispatchEvent(new CustomEvent('masar_sync_status_change', { detail: { status } }));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('masar_sync_status_change', { 
+      detail: { status, isSyncing, ...getSyncState() } 
+    }));
+  }
 }
 
 export function getSyncPillStatus(): SyncPillStatus {
@@ -118,12 +151,28 @@ export async function processSyncQueue(getToken: () => Promise<string | null>) {
 
   if (typeof navigator !== 'undefined' && navigator.locks) {
     trace('locks: acquiring');
-    await navigator.locks.request('masar_sync_leader', { ifAvailable: true }, async (lock) => {
+    let timeoutId: any;
+    const lockPromise = navigator.locks.request('masar_sync_leader', { ifAvailable: true }, async (lock) => {
       trace('locks: acquired', { hasLock: !!lock });
       if (lock) {
         await executeSyncLoop(getToken);
       }
     });
+
+    const timeout = new Promise<void>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('lock acquisition timeout')), 15_000);
+    });
+
+    try {
+      await Promise.race([lockPromise, timeout]);
+    } catch (err) {
+      console.warn('[syncService] lock acquisition timed out, forcing isSyncing reset');
+      isSyncing = false;
+      syncStartedAt = 0;
+      updateSyncStatus('pending');
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
   } else {
     await executeSyncLoop(getToken);
   }
@@ -131,9 +180,13 @@ export async function processSyncQueue(getToken: () => Promise<string | null>) {
 
 async function executeSyncLoop(getToken: () => Promise<string | null>) {
   trace('executeSyncLoop entry');
+  lastActivityAt = Date.now();
+  syncStartedAt = Date.now();
   isSyncing = true;
   updateSyncStatus('syncing');
   trace('status -> syncing');
+
+  let terminalStatus: SyncPillStatus = 'synced';
 
   try {
     let token: string | null = null;
@@ -241,7 +294,7 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
 
     const remaining = await db.syncQueue.count();
     trace('terminal status reached', { remaining });
-    updateSyncStatus(remaining > 0 ? 'pending' : 'synced');
+    terminalStatus = remaining > 0 ? 'pending' : 'synced';
   } catch (err: any) {
     trace('executeSyncLoop catch', { message: err?.message, consecutiveFailures });
     consecutiveFailures++;
@@ -250,7 +303,7 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
 
     if (consecutiveFailures >= BREAKER_THRESHOLD) {
       breakerOpen = true;
-      updateSyncStatus('paused');
+      terminalStatus = 'paused';
       console.warn('[syncService] Circuit breaker tripped. Sync paused.');
 
       if (typeof window !== 'undefined') {
@@ -264,7 +317,7 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
 
     const delay = Math.min(CAP_MS, BASE_MS * (2 ** consecutiveFailures)) * (1 + Math.random() * 0.3);
     console.log(`[syncService] Scheduling retry in ${Math.round(delay)}ms...`);
-    updateSyncStatus('pending');
+    terminalStatus = 'pending';
 
     if (retryTimeout) clearTimeout(retryTimeout);
     retryTimeout = setTimeout(() => {
@@ -273,6 +326,8 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
   } finally {
     trace('executeSyncLoop finally', { isSyncing });
     isSyncing = false;
+    syncStartedAt = 0;
+    updateSyncStatus(terminalStatus);
   }
 }
 
@@ -366,6 +421,8 @@ export function getSyncState() {
 
 export async function triggerManualSync(getToken: () => Promise<string | null>) {
   resetCircuitBreaker();
+  isSyncing = false;
+  syncStartedAt = 0;
   await processSyncQueue(getToken);
   if (breakerOpen && syncError) {
     throw new Error(syncError);
