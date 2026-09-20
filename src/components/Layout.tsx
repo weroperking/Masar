@@ -391,36 +391,52 @@ export function Layout() {
         </aside>
       )}
 
-      {/* Mobile Slide-over Drawer */}
-      {showNav && isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
-          {/* Backdrop */}
-          <div
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200"
-          />
-
-          {/* Drawer Content */}
-          <aside className="relative mr-auto w-72 max-w-[80vw] h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col z-10 shadow-2xl transition-transform duration-200">
-            <div className="py-4 px-6 border-b border-slate-200 dark:border-slate-700 flex flex-col items-center relative shrink-0">
-              <button
+      {/* Mobile Bottom Sheet Menu */}
+      {showNav && (
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <div className="fixed inset-0 z-50 md:hidden flex items-end justify-center">
+              {/* Backdrop with Fade In/Out */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25, ease: 'easeInOut' }}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="absolute left-4 top-4 p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                aria-label="إغلاق القائمة"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <Link to="/" className="flex flex-col items-center gap-1 mt-2 group">
-                <MasarLogo size="sm" className="transition-transform duration-300 group-hover:scale-105" />
-                <span className="text-[10px] font-bold text-slate-900 dark:text-slate-100 tracking-tight animate-slogan-glow text-center select-none">
-                  مسار — حصصك من غير دوشة
-                </span>
-              </Link>
-            </div>
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
+              />
 
-            {renderNavContent(() => setIsMobileMenuOpen(false))}
-          </aside>
-        </div>
+              {/* Bottom Sheet Content with Morph, Slide Up, and Fade In/Out */}
+              <motion.aside
+                initial={{ y: '100%', scale: 0.95, opacity: 0 }}
+                animate={{ y: 0, scale: 1, opacity: 1 }}
+                exit={{ y: '100%', scale: 0.95, opacity: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                className="relative w-full max-h-[85vh] h-[75vh] bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 rounded-t-3xl flex flex-col z-10 shadow-2xl overflow-hidden"
+              >
+                {/* Drag Handle / Header */}
+                <div className="py-3 px-6 border-b border-slate-100 dark:border-slate-800 flex flex-col items-center relative shrink-0">
+                  <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mb-2" />
+                  <button
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="absolute left-4 top-4 p-1.5 rounded-full text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    aria-label="إغلاق القائمة"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                  <Link to="/" className="flex flex-col items-center gap-1 group">
+                    <MasarLogo size="sm" className="transition-transform duration-300 group-hover:scale-105" />
+                    <span className="text-[10px] font-bold text-slate-900 dark:text-slate-100 tracking-tight animate-slogan-glow text-center select-none">
+                      مسار — حصصك من غير دوشة
+                    </span>
+                  </Link>
+                </div>
+
+                {renderNavContent(() => setIsMobileMenuOpen(false))}
+              </motion.aside>
+            </div>
+          )}
+        </AnimatePresence>
       )}
 
       {/* Main Content */}
