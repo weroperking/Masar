@@ -117,30 +117,6 @@ export function Settings() {
 
   return (
     <div className="space-y-6 w-full max-w-5xl mx-auto pb-12">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="p-1.5 bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 rounded-lg">
-              <Sliders className="w-5 h-5" />
-            </span>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">إعدادات النظام</h1>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            تخصيص قواعد الأتمتة، تقييم الواجبات، الحصص التجريبية، والمظهر العام للمنصة
-          </p>
-        </div>
-
-        <button 
-          onClick={handleSave} 
-          type="button"
-          className="inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-blue-500/20 active:scale-[0.98] gap-2 shrink-0 cursor-pointer"
-        >
-          <Save className="w-4 h-4" />
-          <span>حفظ التغييرات</span>
-        </button>
-      </div>
-
       <div className="space-y-6">
         
         {/* Profile Section */}

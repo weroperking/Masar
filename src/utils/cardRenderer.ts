@@ -195,15 +195,16 @@ async function drawCodeOverlayOnBack(
     const qrCanvas = document.createElement('canvas');
     await QRCode.toCanvas(qrCanvas, code, {
       margin: 1,
-      width: 220,
+      width: 200,
       color: {
         dark: '#000000',
         light: '#ffffff'
       }
     });
 
-    const stickerWidth = 260;
-    const stickerHeight = showDigits ? 285 : 240;
+    const stickerSize = 260;
+    const stickerWidth = stickerSize;
+    const stickerHeight = stickerSize;
     const stickerX = -stickerWidth / 2;
     const stickerY = -stickerHeight / 2;
 
@@ -225,17 +226,18 @@ async function drawCodeOverlayOnBack(
     ctx.stroke();
 
     // Draw QR Code centered inside sticker
-    const qrX = -110;
-    const qrY = stickerY + 16;
-    ctx.drawImage(qrCanvas, qrX, qrY, 220, 220);
+    const qrSize = showDigits ? 185 : 210;
+    const qrX = -qrSize / 2;
+    const qrY = showDigits ? stickerY + 14 : stickerY + (stickerHeight - qrSize) / 2;
+    ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
 
     // Draw Digits text
     if (showDigits) {
       ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 22px Cairo, "Courier New", monospace';
+      ctx.font = 'bold 20px Cairo, "Courier New", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`* ${code} *`, 0, stickerY + stickerHeight - 22);
+      ctx.fillText(`* ${code} *`, 0, stickerY + stickerHeight - 20);
     }
   } else {
     // Render Barcode Code 128

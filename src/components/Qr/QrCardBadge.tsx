@@ -302,8 +302,8 @@ export function QrCardBadge({
     const codeX = design.codeX ?? 50;
     const codeY = design.codeY ?? (face === 'back' ? 55 : 80);
     const codeScale = (design.codeScale ?? 100) / 100;
-    const codeWidthVal = design.codeWidth ?? (isQrCode ? 85 : 135);
-    const codeHeightVal = design.codeHeight ?? (isQrCode ? 85 : 42);
+    const codeWidthVal = design.codeWidth ?? (isQrCode ? 92 : 135);
+    const codeHeightVal = design.codeHeight ?? (isQrCode ? 92 : 42);
     const showDigits = design.showCodeDigits ?? true;
 
     return (
@@ -317,24 +317,44 @@ export function QrCardBadge({
           zIndex: 30,
         }}
       >
-        <div 
-          className="bg-white px-3 py-2 rounded-lg border border-slate-300 shadow-sm flex flex-col items-center justify-center overflow-hidden"
-          style={{
-            minWidth: isQrCode ? `${codeWidthVal}px` : `${codeWidthVal + 10}px`,
-          }}
-        >
-          {isQrCode ? (
-            qrCodeUrl ? (
+        {isQrCode ? (
+          <div 
+            className="bg-white p-2 rounded-xl border border-slate-300 shadow-sm flex flex-col items-center justify-between aspect-square overflow-hidden box-border"
+            style={{
+              width: `${codeWidthVal}px`,
+              height: `${codeWidthVal}px`,
+            }}
+          >
+            {qrCodeUrl ? (
               <img 
                 src={qrCodeUrl} 
                 alt="QR Code" 
-                style={{ width: `${codeWidthVal - 10}px`, height: `${codeHeightVal - 10}px`, objectFit: 'contain' }}
+                style={{ 
+                  width: showDigits ? `${codeWidthVal - 26}px` : `${codeWidthVal - 14}px`, 
+                  height: showDigits ? `${codeWidthVal - 26}px` : `${codeWidthVal - 14}px`, 
+                  objectFit: 'contain' 
+                }}
                 referrerPolicy="no-referrer"
+                className="shrink-0"
               />
             ) : (
               <div className="w-12 h-12 bg-slate-100 rounded animate-pulse" />
-            )
-          ) : (
+            )}
+            {showDigits && (
+              <span 
+                className="font-mono text-[10px] sm:text-[11px] font-bold tracking-wider text-slate-900 text-center select-all shrink-0 pb-0.5 leading-none"
+              >
+                * {cleanCode} *
+              </span>
+            )}
+          </div>
+        ) : (
+          <div 
+            className="bg-white px-3 py-2 rounded-lg border border-slate-300 shadow-sm flex flex-col items-center justify-center overflow-hidden"
+            style={{
+              minWidth: `${codeWidthVal + 10}px`,
+            }}
+          >
             <div className="flex flex-col items-center justify-center">
               <Barcode 
                 value={cleanCode} 
@@ -347,15 +367,15 @@ export function QrCardBadge({
                 lineColor="#000000"
               />
             </div>
-          )}
-          {showDigits && (
-            <span 
-              className="font-mono text-[10px] sm:text-[11px] font-bold tracking-widest text-slate-900 mt-1 text-center select-all"
-            >
-              * {cleanCode} *
-            </span>
-          )}
-        </div>
+            {showDigits && (
+              <span 
+                className="font-mono text-[10px] sm:text-[11px] font-bold tracking-widest text-slate-900 mt-1 text-center select-all"
+              >
+                * {cleanCode} *
+              </span>
+            )}
+          </div>
+        )}
       </div>
     );
   };

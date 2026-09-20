@@ -171,6 +171,7 @@ export function Dashboard() {
         </div>
       </div>
 
+
       {dateRange === 'custom' && (
         <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
           <div className="flex flex-col gap-1">
