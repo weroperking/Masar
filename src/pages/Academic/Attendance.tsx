@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Zap,
   Camera,
+  Image,
 } from "lucide-react";
 import {
   ScannedStudentBottomSheet,
@@ -47,6 +48,7 @@ import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { getWhatsAppUrl } from "../../utils/phone";
 import { autoScheduleService } from "../../services/autoScheduleService";
+import { motion, AnimatePresence } from "motion/react";
 
 export function Attendance() {
   const toast = useToast();
@@ -656,14 +658,16 @@ export function Attendance() {
         </div>
       </div>
 
-      {markingSession && (
-        <AttendanceModal
-          session={markingSession}
-          onClose={() => setMarkingSession(null)}
-          groupName={groupMap.get(markingSession.groupId)?.name || ""}
-          initialCameraOpen={startWithCamera}
-        />
-      )}
+      <AnimatePresence>
+        {markingSession && (
+          <AttendanceModal
+            session={markingSession}
+            onClose={() => setMarkingSession(null)}
+            groupName={groupMap.get(markingSession.groupId)?.name || ""}
+            initialCameraOpen={startWithCamera}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1301,13 +1305,26 @@ function AttendanceModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-auto"
       dir="rtl"
-      onClick={onClose}
     >
-      <div 
-        className="w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-auto max-h-[85vh] sm:max-h-[90vh] animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-150"
-        onClick={(e) => e.stopPropagation()}
+      {/* Backdrop overlay */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs cursor-pointer"
+      />
+
+      {/* Sheet Content Drawer */}
+      <motion.div
+        initial={{ y: "100%", opacity: 0.8 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: "100%", opacity: 0 }}
+        transition={{ type: "spring", damping: 28, stiffness: 300 }}
+        className="relative w-full max-w-4xl lg:max-w-5xl bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-750 overflow-hidden flex flex-col h-auto max-h-[85vh] sm:max-h-[90vh] z-10"
       >
         {/* Grab Handle for mobile */}
         <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
@@ -1353,12 +1370,68 @@ function AttendanceModal({
         </div>
 
         {/* Clean, Prominent Scanner Input Bar */}
-        <div className="p-4 sm:p-5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="p-3 sm:p-5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
+          {/* Mobile Layout: A super compact row to prevent vertical stacking and preserve keyboard space */}
+          <div className="flex sm:hidden items-center gap-2">
+            <div className="relative flex-1">
+              <QrCode className="w-5 h-5 text-blue-600 dark:text-blue-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                ref={qrInputRef}
+                type="text"
+                placeholder="أدخل كود الطالب (مثال: 0009)..."
+                className="w-full pl-10 pr-9 py-2.5 border-2 border-blue-300 dark:border-blue-700/80 rounded-xl text-base text-slate-900 dark:text-slate-100 bg-blue-50/20 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-600 focus:outline-none text-left font-mono font-bold tracking-wider transition-all placeholder:text-slate-400 placeholder:text-xs placeholder:font-sans placeholder:tracking-normal shadow-2xs"
+                dir="ltr"
+                value={qrInput}
+                onChange={(e) => setQrInput(e.target.value)}
+                onKeyDown={handleQrScan}
+              />
+              {qrInput && (
+                <button
+                  type="button"
+                  onClick={() => processStudentCode(qrInput)}
+                  className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-colors cursor-pointer"
+                  title="تسجيل الحضور"
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Live Camera Stream Toggle Button - Compact Icon style */}
+            <button
+              type="button"
+              onClick={() => setShowLiveScanner(!showLiveScanner)}
+              className={`p-3 rounded-xl border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                showLiveScanner
+                  ? "bg-amber-600 border-amber-500 text-white"
+                  : "bg-blue-600 border-blue-500 text-white"
+              }`}
+              title="تشغيل الكاميرا المباشرة"
+            >
+              <Camera className={`w-5 h-5 ${showLiveScanner ? "animate-pulse" : ""}`} />
+            </button>
+
+            {/* Direct Device Native Camera Action Button - Compact Icon style */}
+            <button
+              type="button"
+              onClick={() => directCameraInputRef.current?.click()}
+              disabled={isProcessingDirectCamera}
+              className="p-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50"
+              title="تصوير الكارت بالكاميرا الحقيقية"
+            >
+              {isProcessingDirectCamera ? (
+                <div className="w-5 h-5 border-2 border-slate-700 dark:border-slate-300 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Image className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+
+          {/* Desktop Layout: Side-by-side rich controls */}
+          <div className="hidden sm:flex flex-row items-center gap-3">
             <div className="relative flex-1">
               <QrCode className="w-5 h-5 text-blue-600 dark:text-blue-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
-                ref={qrInputRef}
                 type="text"
                 placeholder="أدخل كود الطالب أو امسح الباركود (مثال: 0009)..."
                 className="w-full pl-4 pr-11 py-3 border-2 border-blue-300 dark:border-blue-700/80 rounded-xl text-base text-slate-900 dark:text-slate-100 bg-blue-50/20 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-none text-left font-mono font-bold tracking-wider transition-all placeholder:text-slate-400 placeholder:text-xs placeholder:font-sans placeholder:tracking-normal shadow-2xs"
@@ -1415,7 +1488,6 @@ function AttendanceModal({
               )}
             </button>
 
-
             <button
               type="button"
               onClick={() => processStudentCode(qrInput)}
@@ -1459,13 +1531,13 @@ function AttendanceModal({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => markAll("present")}
-                className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-semibold transition-colors"
+                className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
               >
                 تحضير الكل
               </button>
               <button
                 onClick={() => markAll("absent")}
-                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition-colors"
+                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
               >
                 تغييب الكل
               </button>
@@ -1475,7 +1547,7 @@ function AttendanceModal({
 
 
         {/* Content Body: DOES NOT list all students by default, shows live attended feed */}
-        <div className="p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-950/20 space-y-4">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-50/40 dark:bg-slate-950/20 space-y-4">
           {showLiveScanner && (
             <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
               <div className="w-full h-full md:max-w-xl md:h-[82vh] md:max-h-[720px] bg-black border border-white/10 rounded-none md:rounded-2xl shadow-2xl overflow-hidden relative flex flex-col animate-in zoom-in-95 duration-150">
@@ -1489,25 +1561,35 @@ function AttendanceModal({
 
           {viewTab === "attended" ? (
             attendedStudents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-                <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
+              <div 
+                onClick={() => setShowLiveScanner(true)}
+                className="flex flex-col items-center justify-center py-12 px-6 text-center max-w-md mx-auto bg-white dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-blue-500 hover:bg-blue-50/20 dark:hover:bg-blue-950/10 cursor-pointer transition-all active:scale-[0.98] shadow-2xs group"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <QrCode className="w-8 h-8 opacity-70" />
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                   في انتظار مسح أكواد الطلاب
                 </h3>
                 <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                  مرر كارت أو باركود الطالب أمام القارئ أو اكتب كود الطالب
-                  (مثال: <strong>0009</strong>) ثم اضغط Enter ليتم إدراجه فوراً
-                  في كشف الحاضرين.
+                  مرر كارت أو باركود الطالب أمام القارئ أو اكتب كود الطالب (مثال: <strong>0009</strong>) ثم اضغط Enter ليتم إدراجه فوراً في كشف الحاضرين.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => qrInputRef.current?.focus()}
-                  className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold transition-colors"
-                >
-                  التركيز على خانة المسح الآن
-                </button>
+                <div className="mt-5 flex flex-col sm:flex-row gap-2.5 w-full justify-center">
+                  <span className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer">
+                    <Camera className="w-4 h-4 animate-pulse" />
+                    اضغط للبدء بالمسح بالكاميرا المباشرة
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent opening scanner
+                      qrInputRef.current?.focus();
+                    }}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors border border-slate-200 dark:border-slate-700"
+                  >
+                    الكتابة اليدوية للكود
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -1674,7 +1756,7 @@ function AttendanceModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 shrink-0">
           <div className="text-xs">
             {isSaved ? (
               <span className="text-emerald-600 dark:text-emerald-400 font-bold">
@@ -1709,7 +1791,7 @@ function AttendanceModal({
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* 1. Mobile Bottom Sheet: Slides up from bottom upon scan with general info & payment status */}
       <div className="block sm:hidden">

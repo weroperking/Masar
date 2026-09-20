@@ -116,27 +116,6 @@ export function SimplifiedCardDesigner({
               ارفع التصميم المخصص لوجه وظهر الكارت، وحدد موضع الباركود أو كود QR بدقة للطباعة الفورية.
             </p>
           </div>
-
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsExportModalOpen(true)}
-              className="flex-1 sm:flex-initial min-h-[44px] px-4 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
-            >
-              <Download className="w-4 h-4 text-blue-400 dark:text-blue-600" />
-              <span>طلب الطباعة والتصدير</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onSaveDesign}
-              disabled={isSavingDesign}
-              className="flex-1 sm:flex-initial min-h-[44px] px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-2xs cursor-pointer disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              <span>{isSavingDesign ? 'جاري الحفظ...' : 'حفظ التصميم'}</span>
-            </button>
-          </div>
         </div>
       </div>
 

@@ -635,7 +635,6 @@ export function QrCards() {
         >
           <Sliders className="w-4 h-4" />
           <span>محرر ومصمم الكروت الذكية</span>
-          <span className="bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 text-[9px] px-1.5 py-0.5 rounded-full font-bold">مكتمل</span>
         </button>
       </div>
 
