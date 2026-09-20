@@ -296,7 +296,7 @@ export function Upgrade() {
         {/* Headline Header Section (X.com Style) */}
         <div className="text-center max-w-3xl mx-auto space-y-3">
           <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-snug">
-            اختر الخطة المناسبة <span className="text-blue-600">لتطوير سنترك التعليمي</span>
+            اختر الخطة المناسبة <span className="text-slate-900 dark:text-slate-100">لتطوير سنترك التعليمي</span>
           </h1>
           <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
             استمتع بكافة إمكانيات منصة مسار لإدارة الطلاب، الحضور والغياب الكترونياً، التحصيل المالي المتقدم والتقارير.
@@ -346,14 +346,14 @@ export function Upgrade() {
                 className={cn(
                   "rounded-2xl border transition-all duration-200 p-6 sm:p-7 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6 cursor-pointer relative bg-white dark:bg-slate-900 shadow-xs group",
                   isSelected
-                    ? "border-blue-600 ring-2 ring-blue-600 shadow-lg shadow-blue-500/10 scale-[1.01]"
+                    ? "border-slate-900 dark:border-slate-100 ring-2 ring-slate-900 dark:ring-slate-100 shadow-lg shadow-slate-900/10 dark:shadow-slate-100/10 scale-[1.01]"
                     : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md",
                   isCurrentPlan && "bg-slate-50/80 dark:bg-slate-800/50"
                 )}
               >
                 {/* Badge Header - Placed inside the top right corner */}
                 {plan.badge && !isCurrentPlan && (
-                  <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-bold px-3.5 py-1 rounded-bl-xl rounded-tr-[15px] shadow-xs uppercase tracking-wider">
+                  <div className="absolute top-0 right-0 bg-slate-900 dark:bg-slate-100 dark:text-slate-900 text-white text-[10px] font-bold px-3.5 py-1 rounded-bl-xl rounded-tr-[15px] shadow-xs uppercase tracking-wider">
                     {plan.badge}
                   </div>
                 )}
@@ -370,7 +370,7 @@ export function Upgrade() {
                     <div className={cn(
                       "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
                       isSelected
-                        ? "border-blue-600 bg-blue-600 text-white shadow-xs"
+                        ? "border-slate-900 dark:border-slate-100 bg-slate-900 dark:bg-slate-100 dark:text-slate-900 text-white shadow-xs"
                         : "border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 group-hover:border-slate-400"
                     )}>
                       {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -384,7 +384,7 @@ export function Upgrade() {
                   <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
                     {plan.features.map((feature, idx) => (
                       <div key={idx} className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-                        <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <Check className="w-3.5 h-3.5 text-slate-900 dark:text-slate-100 shrink-0" />
                         <span>{feature}</span>
                       </div>
                     ))}
@@ -424,7 +424,7 @@ export function Upgrade() {
                       </button>
                     ) : isSelected ? (
                       <button
-                        className="w-full py-2.5 px-5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-blue-600 text-white shadow-xs"
+                        className="w-full py-2.5 px-5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-slate-900 dark:bg-slate-100 dark:text-slate-900 text-white shadow-xs"
                       >
                         <Check className="w-4 h-4 stroke-[3]" />
                         الباقة المختارة
@@ -448,7 +448,7 @@ export function Upgrade() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full filter blur-3xl pointer-events-none" />
           
           <div className="flex items-start sm:items-center gap-4 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0">
               <Building2 className="w-6 h-6" />
             </div>
             <div>
@@ -465,7 +465,7 @@ export function Upgrade() {
                 setSelectedPlanId('pro');
                 setShowConfirmModal('pro');
               }}
-              className="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs sm:text-sm transition-colors shadow-xs"
+              className="w-full md:w-auto px-6 py-3 bg-slate-900 hover:bg-black dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 text-white rounded-xl font-bold text-xs sm:text-sm transition-colors shadow-xs"
             >
               استكشف باقة Pro للمؤسسات
             </button>
@@ -507,7 +507,7 @@ export function Upgrade() {
                       <div className="col-span-2 sm:col-span-2 text-center text-slate-600">
                         {typeof feature.starter === 'boolean' ? (
                           feature.starter ? (
-                            <Check className="w-4 h-4 text-blue-600 mx-auto stroke-[2.5]" />
+                            <Check className="w-4 h-4 text-slate-900 dark:text-slate-100 mx-auto stroke-[2.5]" />
                           ) : (
                             <X className="w-4 h-4 text-slate-300 mx-auto" />
                           )
@@ -520,12 +520,12 @@ export function Upgrade() {
                       <div className="col-span-2 sm:col-span-2 text-center text-slate-900 font-semibold">
                         {typeof feature.growth === 'boolean' ? (
                           feature.growth ? (
-                            <Check className="w-4 h-4 text-blue-600 mx-auto stroke-[2.5]" />
+                            <Check className="w-4 h-4 text-slate-900 dark:text-slate-100 mx-auto stroke-[2.5]" />
                           ) : (
                             <X className="w-4 h-4 text-slate-300 mx-auto" />
                           )
                         ) : (
-                          <span className="text-xs font-bold text-blue-700">{feature.growth}</span>
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{feature.growth}</span>
                         )}
                       </div>
 
@@ -533,12 +533,12 @@ export function Upgrade() {
                       <div className="col-span-2 sm:col-span-2 text-center text-slate-900 font-semibold">
                         {typeof feature.pro === 'boolean' ? (
                           feature.pro ? (
-                            <Check className="w-4 h-4 text-blue-600 mx-auto stroke-[2.5]" />
+                            <Check className="w-4 h-4 text-slate-900 dark:text-slate-100 mx-auto stroke-[2.5]" />
                           ) : (
                             <X className="w-4 h-4 text-slate-300 mx-auto" />
                           )
                         ) : (
-                          <span className="text-xs font-bold text-emerald-700">{feature.pro}</span>
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{feature.pro}</span>
                         )}
                       </div>
                     </div>
@@ -552,7 +552,7 @@ export function Upgrade() {
         {/* Support Section at Bottom */}
         <div className="mt-12 bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xs">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shrink-0 border border-blue-100">
+            <div className="w-12 h-12 bg-slate-100 text-slate-900 rounded-2xl flex items-center justify-center shrink-0 border border-slate-200">
               <MessageCircle className="w-6 h-6" />
             </div>
             <div>
@@ -593,7 +593,7 @@ export function Upgrade() {
           <div className="flex items-center gap-3 text-right w-full sm:w-auto justify-between sm:justify-start">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-extrabold text-blue-600 uppercase tracking-wide">
+                <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 uppercase tracking-wide">
                   الباقة المختارة:
                 </span>
                 <span className="text-base font-bold text-slate-900">
@@ -631,7 +631,7 @@ export function Upgrade() {
               <button
                 onClick={() => setShowConfirmModal(selectedPlanObj.id)}
                 disabled={hasAnyPending || proposalStatus.status === 'loading'}
-                className="w-full sm:w-auto px-8 py-3 rounded-full font-extrabold text-sm sm:text-base text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full sm:w-auto px-8 py-3 rounded-full font-extrabold text-sm sm:text-base text-white bg-slate-900 hover:bg-black dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <ArrowUpCircle className="w-5 h-5" />
                 {hasAnyPending ? 'يوجد طلب قيد المراجعة' : `طلب الترقية لـ ${selectedPlanObj.name}`}
@@ -660,7 +660,7 @@ export function Upgrade() {
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0">
+                <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 shrink-0">
                   <ArrowUpCircle className="w-5 h-5" />
                 </div>
                 <div>
@@ -687,11 +687,11 @@ export function Upgrade() {
             {/* Body */}
             <div className="p-5 sm:p-6 space-y-4">
               <p className="text-sm sm:text-base text-slate-800 dark:text-slate-200 font-medium leading-relaxed">
-                هل أنت متأكد من رغبتك في طلب الترقية إلى باقة <span className="font-extrabold text-blue-600 dark:text-blue-400">{PLANS.find(p => p.id === showConfirmModal)?.name}</span>؟
+                هل أنت متأكد من رغبتك في طلب الترقية إلى باقة <span className="font-extrabold text-slate-900 dark:text-slate-100">{PLANS.find(p => p.id === showConfirmModal)?.name}</span>؟
               </p>
 
-              <div className="p-4 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 rounded-xl text-xs sm:text-sm text-blue-900 dark:text-blue-200 leading-relaxed flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="p-4 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 leading-relaxed flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-slate-900 dark:text-slate-100 shrink-0 mt-0.5" />
                 <div>
                   سيتم إرسال طلبك لفريق المبيعات الخاص بنا وسيتواصلون معك في خلال 24 ساعة لتأكيد الترقية وإتمام عملية الدفع.
                 </div>
@@ -721,7 +721,7 @@ export function Upgrade() {
               <button
                 onClick={() => handleProposeUpgrade(showConfirmModal)}
                 disabled={isSubmitting === showConfirmModal}
-                className="px-6 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-xs"
+                className="px-6 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold text-white bg-slate-900 hover:bg-black dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 transition-colors flex items-center gap-2 shadow-xs"
               >
                 {isSubmitting === showConfirmModal && <Loader2 className="w-4 h-4 animate-spin" />}
                 تأكيد الطلب
