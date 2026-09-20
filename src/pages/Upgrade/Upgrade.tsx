@@ -6,6 +6,7 @@ import {
   Loader2, Building2, ShieldCheck, Sparkles, HelpCircle, 
   ChevronRight, ExternalLink, Info, CheckCircle2
 } from 'lucide-react';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { cn } from '../../lib/utils';
 import { useToast } from '../../context/ToastContext';
@@ -330,8 +331,8 @@ export function Upgrade() {
           </div>
         </div>
 
-        {/* Plan Cards Grid (X.com Selectable Cards Methodology) */}
-        <div className="mt-8 sm:mt-12 grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
+        {/* Plan Cards Grid (Horizontal Row Layout) */}
+        <div className="mt-8 sm:mt-12 grid grid-cols-1 gap-5 max-w-4xl mx-auto">
           {PLANS.map((plan) => {
             const isSelected = selectedPlanId === plan.id;
             const isCurrentPlan = currentPlan === plan.id;
@@ -343,76 +344,98 @@ export function Upgrade() {
                 key={plan.id}
                 onClick={() => setSelectedPlanId(plan.id)}
                 className={cn(
-                  "rounded-2xl border transition-all duration-200 p-6 sm:p-7 flex flex-col justify-between cursor-pointer relative overflow-hidden bg-white shadow-xs",
+                  "rounded-2xl border transition-all duration-200 p-6 sm:p-7 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6 cursor-pointer relative bg-white dark:bg-slate-900 shadow-xs group",
                   isSelected
                     ? "border-blue-600 ring-2 ring-blue-600 shadow-lg shadow-blue-500/10 scale-[1.01]"
-                    : "border-slate-200 hover:border-slate-300 hover:shadow-md",
-                  isCurrentPlan && "bg-slate-50/80"
+                    : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md",
+                  isCurrentPlan && "bg-slate-50/80 dark:bg-slate-800/50"
                 )}
               >
-                {/* Badge Header */}
+                {/* Badge Header - Placed inside the top right corner */}
                 {plan.badge && !isCurrentPlan && (
-                  <div className="absolute top-0 left-0 bg-blue-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-br-xl uppercase tracking-wider">
+                  <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-bold px-3.5 py-1 rounded-bl-xl rounded-tr-[15px] shadow-xs uppercase tracking-wider">
                     {plan.badge}
                   </div>
                 )}
                 {isCurrentPlan && (
-                  <div className="absolute top-0 left-0 bg-emerald-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-br-xl uppercase tracking-wider">
+                  <div className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-bold px-3.5 py-1 rounded-bl-xl rounded-tr-[15px] shadow-xs uppercase tracking-wider">
                     مُفعل حالياً
                   </div>
                 )}
 
-                <div>
-                  {/* Title & Selection indicator */}
-                  <div className="flex items-center justify-between mb-2 pt-1">
-                    <h3 className="text-xl font-bold text-slate-900">{plan.name}</h3>
+                {/* Left side: Info & Features */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{plan.name}</h3>
                     <div className={cn(
-                      "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
+                      "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
                       isSelected
-                        ? "border-blue-600 bg-blue-600 text-white"
-                        : "border-slate-300 bg-slate-50"
+                        ? "border-blue-600 bg-blue-600 text-white shadow-xs"
+                        : "border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 group-hover:border-slate-400"
                     )}>
                       {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                     </div>
                   </div>
 
-                  <p className="text-xs sm:text-sm text-slate-500 min-h-[36px] leading-snug">
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
                     {plan.description}
                   </p>
 
-                  {/* Pricing Display */}
-                  <div className="mt-5 pb-5 border-b border-slate-100">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                  <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+                    {plan.features.map((feature, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
+                        <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right side: Pricing & Action Button */}
+                <div className="w-full md:w-auto md:min-w-[220px] flex flex-col sm:flex-row md:flex-col items-center sm:items-between md:items-end justify-between gap-4 pt-4 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800 shrink-0">
+                  <div className="text-left md:text-right w-full sm:w-auto">
+                    <div className="flex items-baseline gap-1 justify-start md:justify-end">
+                      <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
                         {priceDisplay}
                       </span>
                       {plan.id !== 'pro' && (
-                        <span className="text-xs font-medium text-slate-500">
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                           / شهرياً
                         </span>
                       )}
                     </div>
+                    {billingCycle === 'annual' && plan.id !== 'pro' && (
+                      <div className="mt-1">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 inline-block">
+                          خصم السنوي
+                        </span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Key Features List */}
-                  <ul className="mt-6 space-y-3 text-xs sm:text-sm text-slate-700">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5">
-                        <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="mt-8 pt-4">
-                  <div className={cn(
-                    "text-center text-xs font-bold py-2 rounded-xl transition-colors",
-                    isSelected
-                      ? "bg-blue-50 text-blue-700"
-                      : "bg-slate-100 text-slate-600"
-                  )}>
-                    {isSelected ? 'محددة حالياً' : 'انقر للاختيار'}
+                  <div className="w-full sm:w-auto md:w-full">
+                    {isCurrentPlan ? (
+                      <button
+                        disabled
+                        className="w-full py-2.5 px-5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 cursor-not-allowed"
+                      >
+                        <Check className="w-4 h-4" />
+                        باقتك الحالية
+                      </button>
+                    ) : isSelected ? (
+                      <button
+                        className="w-full py-2.5 px-5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-blue-600 text-white shadow-xs"
+                      >
+                        <Check className="w-4 h-4 stroke-[3]" />
+                        الباقة المختارة
+                      </button>
+                    ) : (
+                      <button
+                        className="w-full py-2.5 px-5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+                      >
+                        اختيار هذه الباقة
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -421,16 +444,16 @@ export function Upgrade() {
         </div>
 
         {/* Are you a business / Enterprise Banner (X.com Style Callout) */}
-        <div className="mt-8 sm:mt-10 bg-slate-900 text-white rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-md relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full filter blur-3xl pointer-events-none" />
+        <div className="mt-8 sm:mt-10 bg-slate-100/90 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xs relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full filter blur-3xl pointer-events-none" />
           
           <div className="flex items-start sm:items-center gap-4 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800 flex items-center justify-center shrink-0">
               <Building2 className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">هل أنت مؤسسة تعليمية أو مجمع أكاديمي كبير؟</h3>
-              <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">هل أنت مؤسسة تعليمية أو مجمع أكاديمي كبير؟</h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-2xl leading-relaxed">
                 تحتاج خطة مخصصة لعدة فروع، ربط أنظمة مخصصة عبر API، أو استيعاب آلاف الطلاب مع مدير حساب متابع؟
               </p>
             </div>
@@ -442,7 +465,7 @@ export function Upgrade() {
                 setSelectedPlanId('pro');
                 setShowConfirmModal('pro');
               }}
-              className="w-full md:w-auto px-6 py-3 bg-white hover:bg-slate-100 text-slate-900 rounded-xl font-bold text-xs sm:text-sm transition-colors shadow-sm"
+              className="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs sm:text-sm transition-colors shadow-xs"
             >
               استكشف باقة Pro للمؤسسات
             </button>
