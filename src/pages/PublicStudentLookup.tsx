@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   AlertCircle, Building2, UserCheck, 
-  CheckCircle2, MapPin, Globe, ExternalLink
+  CheckCircle2, MapPin
 } from 'lucide-react';
 import { PublicLookupData } from '../types';
 import { db } from '../db/db';
@@ -381,35 +381,11 @@ export function PublicStudentLookup() {
         {/* 6. Subscription Section (Clean & Minimalist) */}
         <SubscriptionSection subscription={subscription} />
 
-        {/* 7. Verification & Footer with Platform Social & Website */}
-        <footer className="pt-2 pb-6 text-center space-y-2.5">
-          {/* Platform Links (Landing & Facebook) */}
-          <div className="flex items-center justify-center gap-2 pt-1">
-            <a
-              href="https://masar.top"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold transition-all shadow-xs"
-            >
-              <Globe className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>موقع مسار</span>
-              <span className="text-[10px] text-slate-400 font-mono" dir="ltr">masar.top</span>
-            </a>
-
-            <a
-              href="https://u2l.ai/Masar"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/40 hover:bg-blue-100/80 dark:hover:bg-blue-950/70 border border-blue-200/70 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 text-[11px] font-semibold transition-all shadow-xs"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>صفحة فيسبوك</span>
-            </a>
-          </div>
-
+        {/* 7. Verification & Footer */}
+        <footer className="pt-2 pb-6 text-center space-y-1">
           <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1">
             <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
-            <span>بيانات رسمية ومحدثة عبر منصة مسار التعليمية</span>
+            <span>بيانات محدثة إلكترونياً عبر منصة مسار التعليمية</span>
           </p>
         </footer>
 

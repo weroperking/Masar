@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, User, Users, ChevronLeft } from 'lucide-react';
 import { ContactBottomSheet, ContactTarget } from './ContactBottomSheet';
 
 interface LostCardNoticeProps {
@@ -45,11 +45,10 @@ export function LostCardNotice({
             </p>
 
             {hasAnyContact ? (
-              <div className="grid grid-cols-2 gap-2 mt-2.5 w-full">
+              <div className="space-y-1.5 mt-2.5">
                 {cleanStudentPhone && (
                   <button
                     type="button"
-                    title="اضغط للتواصل مع الطالب"
                     onClick={() =>
                       setActiveContact({
                         type: 'student',
@@ -58,16 +57,32 @@ export function LostCardNotice({
                         phone: studentPhone || cleanStudentPhone,
                       })
                     }
-                    className="w-full py-2.5 px-3 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-amber-200/80 dark:border-amber-900/50 text-slate-800 dark:text-slate-100 font-bold text-xs sm:text-sm text-center transition-all cursor-pointer shadow-xs active:scale-[0.98] flex items-center justify-center focus:outline-hidden focus:ring-2 focus:ring-amber-500/30"
+                    className="w-full p-2.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/80 border border-amber-200/70 dark:border-amber-900/40 flex items-center justify-between gap-2 text-right transition-all cursor-pointer shadow-xs active:scale-[0.99]"
                   >
-                    الطالب
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                        <User className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100 block truncate">
+                          الطالب {studentName ? `(${studentName.split(' ')[0]})` : ''}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono block" dir="ltr">
+                          {studentPhone}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-semibold shrink-0">
+                      <span>عرض خيارات التواصل</span>
+                      <ChevronLeft className="w-3 h-3" />
+                    </div>
                   </button>
                 )}
 
                 {cleanParentPhone && (
                   <button
                     type="button"
-                    title="اضغط للتواصل مع ولي الأمر"
                     onClick={() =>
                       setActiveContact({
                         type: 'parent',
@@ -76,9 +91,26 @@ export function LostCardNotice({
                         phone: parentPhone || cleanParentPhone,
                       })
                     }
-                    className="w-full py-2.5 px-3 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-amber-200/80 dark:border-amber-900/50 text-slate-800 dark:text-slate-100 font-bold text-xs sm:text-sm text-center transition-all cursor-pointer shadow-xs active:scale-[0.98] flex items-center justify-center focus:outline-hidden focus:ring-2 focus:ring-amber-500/30"
+                    className="w-full p-2.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/80 border border-amber-200/70 dark:border-amber-900/40 flex items-center justify-between gap-2 text-right transition-all cursor-pointer shadow-xs active:scale-[0.99]"
                   >
-                    ولي الأمر
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-md bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <Users className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100 block truncate">
+                          ولي الأمر {parentName ? `(${parentName})` : ''}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono block" dir="ltr">
+                          {parentPhone}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-semibold shrink-0">
+                      <span>عرض خيارات التواصل</span>
+                      <ChevronLeft className="w-3 h-3" />
+                    </div>
                   </button>
                 )}
               </div>
