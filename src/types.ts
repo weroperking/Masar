@@ -18,6 +18,7 @@ export interface Student extends BaseRecord {
   leadSource?: string;
   notes?: string;
   isActive: boolean;
+  branch?: string;
 }
 
 export interface Course extends BaseRecord {
@@ -31,6 +32,7 @@ export interface Course extends BaseRecord {
 
 export interface Group extends BaseRecord {
   room?: string;
+  branch?: string;
   courseId: string;
   name: string;
   type: 'in_person' | 'online';
@@ -278,6 +280,7 @@ export interface Settings extends BaseRecord {
   autoStartEndSessions?: boolean;
   academyName?: string;
   teacherName?: string;
+  branch?: string;
   whatsappNumber?: string;
   currency?: string;
   autoConfirmPaymentOnAttendance: boolean;
@@ -310,12 +313,29 @@ export interface PublicLookupData {
     studentCode?: string;
     gradeLevel?: string;
     school?: string;
+    phone?: string;
+    parentPhone?: string;
+    parentName?: string;
+    branch?: string;
   };
+  centerName?: string;
+  academyName?: string;
+  teacherName?: string;
+  branch?: string;
   attendance: {
     attended: number;
     missed: number;
     total: number;
     rate?: number;
+    sessions?: Array<{
+      id: string;
+      date: string;
+      status: 'present' | 'absent' | 'compensation';
+      courseName?: string;
+      groupName?: string;
+      room?: string;
+      branch?: string;
+    }>;
   };
   exams: Array<{
     id: string;
@@ -323,8 +343,10 @@ export interface PublicLookupData {
     grade: number | string;
     maxGrade?: number;
     date?: string;
+    type?: string;
+    percentage?: number;
   }>;
-  subscription: {
+  subscription?: {
     status: 'paid' | 'partial' | 'overdue' | 'no_record';
     month?: number;
     year?: number;

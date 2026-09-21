@@ -437,6 +437,7 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
     parentName: existingStudent?.parentName || '', 
     parentPhone: existingStudent?.parentPhone || '', 
     school: existingStudent?.school || '', 
+    branch: existingStudent?.branch || 'الفرع الرئيسي',
     gradeLevel: existingStudent?.gradeLevel || 'الصف الأول الثانوي',
     leadSource: existingStudent?.leadSource || 'فيسبوك', 
     isActive: existingStudent ? existingStudent.isActive : true
@@ -798,6 +799,19 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
               />
             </div>
             <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">الفرع / المقر</label>
+              <input 
+                type="text" 
+                placeholder="الفرع الرئيسي أو اسم الفرع"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                value={formData.branch} 
+                onChange={e => setFormData({...formData, branch: e.target.value})} 
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">قناة التعرف علينا</label>
               <select 
                 className="w-full px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
@@ -810,6 +824,17 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
                 <option value="إعلان شارع">إعلان شارع</option>
                 <option value="أخرى">أخرى</option>
               </select>
+            </div>
+            <div className="flex items-center pt-5">
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.isActive}
+                  onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>حالة الطالب: نشط ومقيد بالسنتر</span>
+              </label>
             </div>
           </div>
 

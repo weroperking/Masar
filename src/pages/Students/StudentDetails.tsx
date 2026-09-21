@@ -13,7 +13,7 @@ import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { getWhatsAppUrl } from '../../utils/phone';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
-import { Enrollment, MonthlySubscription, Student } from '../../types';
+import { Enrollment, MonthlySubscription, Student, Settings } from '../../types';
 import { StudentFormModal } from './Students';
 import { calculateEnrollmentFee, syncStudentMonthlySubscriptions, recordLedgerRevenue } from '../../utils/pricing';
 import { buildStudentLookupUrl, normalizeStudentCode } from '../../utils/studentCode';
@@ -101,6 +101,10 @@ export function StudentDetails() {
   const { data: allGrades = [] } = useApiQuery<any>('assessmentGrades', 60 * 1000);
   const studentGrades = allGrades.filter(g => g.studentId === id);
 
+  // System Settings (Teacher name, academy name, branch)
+  const { data: allSettings = [] } = useApiQuery<Settings>('settings', 60 * 1000);
+  const currentSettings = allSettings[0];
+
   // Background server sync for the canonical student lookup profile
   const handleSyncLookup = async (showToast = true) => {
     if (!student || !id) return;
@@ -115,15 +119,51 @@ export function StudentDetails() {
 
       const currentSub = monthlySubscriptions?.find((s: any) => s.month === currentMonth && s.year === currentYear) || null;
 
+      // Active group and branch
+      const activeEnrollment = enrollments.find(e => e.status === 'active');
+      const activeGroup = groups.find((g: any) => g.id === activeEnrollment?.groupId);
+      const studentBranch = student.branch || activeGroup?.branch || currentSettings?.branch || 'الفرع الرئيسي';
+      const teacherName = currentSettings?.teacherName || localStorage.getItem('masar_teacher_name') || '';
+      const academyName = currentSettings?.academyName || localStorage.getItem('masar_academy_name') || '';
+
+      // Detailed lessons list
+      const sessionsList = attendanceRecords
+        .slice()
+        .sort((a: any, b: any) => (b.markedAt || 0) - (a.markedAt || 0))
+        .slice(0, 20)
+        .map((rec: any) => {
+          const sess = attendanceSessions?.find((s: any) => s.id === rec.sessionId);
+          const grp = groups?.find((g: any) => g.id === (rec.groupId || sess?.groupId));
+          const crs = courses?.find((c: any) => c.id === (sess?.courseId || grp?.courseId));
+          const dateStr = sess?.startedAt
+            ? new Date(sess.startedAt).toISOString().split('T')[0]
+            : rec.markedAt
+            ? new Date(rec.markedAt).toISOString().split('T')[0]
+            : '';
+          return {
+            id: rec.id,
+            date: dateStr,
+            status: rec.status,
+            courseName: crs?.name || '',
+            groupName: grp?.name || '',
+            room: sess?.room || grp?.room || '',
+            branch: grp?.branch || studentBranch
+          };
+        });
+
       const examsSnapshot = studentGrades.map((grade: any) => {
         const assessment = allAssessments?.find((a: any) => a.id === grade.assessmentId);
         const numericGrade = typeof grade.grade === 'number' ? grade.grade : parseFloat(grade.grade as string) || 0;
+        const maxGrade = assessment?.maxGrade || 100;
+        const percentage = maxGrade > 0 ? Math.round((numericGrade / maxGrade) * 100) : 0;
         return {
           id: grade.id,
           name: assessment?.name || 'اختبار',
           grade: numericGrade,
-          maxGrade: assessment?.maxGrade || 100,
-          date: assessment?.date || ''
+          maxGrade: maxGrade,
+          date: assessment?.date || (grade.gradedAt ? new Date(grade.gradedAt).toISOString().split('T')[0] : ''),
+          type: assessment?.type || 'exam',
+          percentage
         };
       });
 
@@ -133,13 +173,22 @@ export function StudentDetails() {
           name: student.name,
           studentCode: student.studentCode || cleanStudentCodeVal,
           gradeLevel: student.gradeLevel,
-          school: student.school
+          school: student.school,
+          phone: student.phone,
+          parentPhone: student.parentPhone,
+          parentName: student.parentName,
+          branch: studentBranch
         },
+        teacherName,
+        academyName,
+        centerName: academyName,
+        branch: studentBranch,
         attendance: {
           attended,
           missed,
           total,
-          rate
+          rate,
+          sessions: sessionsList
         },
         exams: examsSnapshot,
         subscription: {

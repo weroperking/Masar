@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
-  CheckCircle2, AlertCircle, Clock, GraduationCap, 
-  Wallet, BookOpen, AlertTriangle, ShieldCheck
+  AlertCircle, Building2, UserCheck, 
+  CheckCircle2, MapPin, Globe, ExternalLink
 } from 'lucide-react';
 import { PublicLookupData } from '../types';
 import { db } from '../db/db';
+import { MasarLogo } from '../components/MasarLogo';
+import { LostCardNotice } from '../components/Lookup/LostCardNotice';
+import { LessonsSection, LessonSessionItem } from '../components/Lookup/LessonsSection';
+import { ExamsSection, ExamItem } from '../components/Lookup/ExamsSection';
+import { SubscriptionSection } from '../components/Lookup/SubscriptionSection';
+import { LookupDetailSheet } from '../components/Lookup/LookupDetailSheet';
 
 async function resolveStudentFromDexie(token: string): Promise<PublicLookupData | null> {
   try {
@@ -16,26 +22,74 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
 
     if (!localStudent) return null;
 
+    // Load Center Settings
+    const settingsList = await db.settings.toArray();
+    const currentSettings = settingsList[0];
+    const teacherName = currentSettings?.teacherName || localStorage.getItem('masar_teacher_name') || undefined;
+    const academyName = currentSettings?.academyName || localStorage.getItem('masar_academy_name') || undefined;
+
+    // Resolve Enrollments and Branch
+    const enrollments = await db.enrollments.where('studentId').equals(localStudent.id).toArray();
+    const activeEnrollment = enrollments.find(e => e.status === 'active');
+    const group = activeEnrollment ? await db.groups.get(activeEnrollment.groupId) : null;
+    const studentBranch = localStudent.branch || group?.branch || currentSettings?.branch || 'الفرع الرئيسي';
+
+    // Attendance & Lessons
     const studentRecords = await db.attendanceRecords.where('studentId').equals(localStudent.id).toArray();
     const attended = studentRecords.filter(r => r.status === 'present' || r.status === 'compensation').length;
     const missed = studentRecords.filter(r => r.status === 'absent').length;
     const total = attended + missed;
     const rate = total > 0 ? Math.round((attended / total) * 100) : 100;
 
+    // Build session list
+    const sessionsList: LessonSessionItem[] = [];
+    const sortedRecords = studentRecords
+      .slice()
+      .sort((a, b) => (b.markedAt || 0) - (a.markedAt || 0))
+      .slice(0, 15);
+
+    for (const rec of sortedRecords) {
+      const sess = rec.sessionId ? await db.attendanceSessions.get(rec.sessionId) : null;
+      const grp = await db.groups.get(rec.groupId || sess?.groupId || '');
+      const crs = await db.courses.get(sess?.courseId || grp?.courseId || '');
+      const dateStr = sess?.startedAt
+        ? new Date(sess.startedAt).toISOString().split('T')[0]
+        : rec.markedAt
+        ? new Date(rec.markedAt).toISOString().split('T')[0]
+        : '';
+
+      sessionsList.push({
+        id: rec.id,
+        date: dateStr,
+        status: rec.status,
+        courseName: crs?.name,
+        groupName: grp?.name,
+        room: sess?.room || grp?.room,
+        branch: grp?.branch || studentBranch
+      });
+    }
+
+    // Exams
     const grades = await db.assessmentGrades.where('studentId').equals(localStudent.id).toArray();
-    const examList: any[] = [];
+    const examList: ExamItem[] = [];
     for (const g of grades) {
       const assessment = await db.assessments.get(g.assessmentId);
       const numericGrade = typeof g.grade === 'number' ? g.grade : parseFloat(g.grade as string) || 0;
+      const maxGrade = assessment?.maxGrade || 100;
+      const pct = maxGrade > 0 ? Math.round((numericGrade / maxGrade) * 100) : 0;
+
       examList.push({
         id: g.id,
         name: assessment?.name || 'اختبار',
         grade: numericGrade,
-        maxGrade: assessment?.maxGrade || 100,
-        date: g.gradedAt ? new Date(g.gradedAt).toISOString().split('T')[0] : undefined
+        maxGrade,
+        date: assessment?.date || (g.gradedAt ? new Date(g.gradedAt).toISOString().split('T')[0] : undefined),
+        type: assessment?.type || 'exam',
+        percentage: pct
       });
     }
 
+    // Subscription
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
     const sub = await db.monthlySubscriptions
@@ -50,9 +104,23 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
         name: localStudent.name,
         studentCode: localStudent.studentCode,
         gradeLevel: localStudent.gradeLevel,
-        school: localStudent.school
+        school: localStudent.school,
+        phone: localStudent.phone,
+        parentPhone: localStudent.parentPhone,
+        parentName: localStudent.parentName,
+        branch: studentBranch
       },
-      attendance: { attended, missed, total, rate },
+      teacherName,
+      academyName,
+      centerName: academyName,
+      branch: studentBranch,
+      attendance: {
+        attended,
+        missed,
+        total,
+        rate,
+        sessions: sessionsList
+      },
       exams: examList,
       subscription: {
         status: (sub?.status === 'paid' ? 'paid' : sub?.status === 'partial' ? 'partial' : 'no_record') as any,
@@ -63,6 +131,7 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
       }
     };
   } catch (err) {
+    console.error('Failed to resolve student from Dexie:', err);
     return null;
   }
 }
@@ -72,6 +141,11 @@ export function PublicStudentLookup() {
   const [data, setData] = useState<PublicLookupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  // BottomSheet states for mobile & desktop interactive details
+  const [sheetType, setSheetType] = useState<'session' | 'exam' | null>(null);
+  const [selectedSession, setSelectedSession] = useState<LessonSessionItem | null>(null);
+  const [selectedExam, setSelectedExam] = useState<ExamItem | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -86,11 +160,10 @@ export function PublicStudentLookup() {
       setLoading(true);
       setError(false);
 
+      // 1. Try URL decoding if base64 encoded
       try {
         let base64 = token;
-        // Restore standard base64 characters
         base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
-        // Pad with '=' if necessary
         while (base64.length % 4) {
           base64 += '=';
         }
@@ -103,11 +176,11 @@ export function PublicStudentLookup() {
           return;
         }
       } catch (e) {
-        // Not a valid client-side base64 JSON payload, proceed with API fetch
+        // Not a client-side base64 payload, proceed with server lookup
       }
 
+      // 2. Fetch live data from backend endpoint
       try {
-        // Direct fetch to backend API, completely bypassing Dexie / IndexedDB
         let res = await fetch(`/api/public/lookup/${token}`);
         if (!res.ok) {
           res = await fetch(`/public/lookup/${token}`);
@@ -122,7 +195,7 @@ export function PublicStudentLookup() {
           return;
         }
 
-        // Secondary fallback: Check local Dexie if opened in center or offline
+        // 3. Fallback to local Dexie IndexedDB
         const localData = await resolveStudentFromDexie(token);
         if (localData && isMounted) {
           setData(localData);
@@ -135,7 +208,6 @@ export function PublicStudentLookup() {
           setLoading(false);
         }
       } catch (err) {
-        // Fallback on network failure
         const localData = await resolveStudentFromDexie(token);
         if (localData && isMounted) {
           setData(localData);
@@ -162,277 +234,202 @@ export function PublicStudentLookup() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4" dir="rtl">
         <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center space-y-4">
-          <div className="w-12 h-12 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            جاري تحميل بيانات الطالب...
+          <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+            جاري تحميل بطاقة ومتابعة الطالب...
           </p>
         </div>
       </div>
     );
   }
 
-  // Error / Invalid Token State (Plain, secure, no technical internals)
+  // Error State
   if (error || !data) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4" dir="rtl">
         <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center space-y-4">
-          <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-7 h-7" />
+          <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-            هذا الرابط غير صالح أو قد انتهت صلاحيته
+          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            هذا الرابط غير صالح أو انتهت صلاحيته
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
-            يرجى التأكد من مسح أحدث كود QR تم إصداره للطالب من إدارة المركز.
+            يُرجى التأكد من مسح أحدث كود QR متواجد على بطاقة الطالب الصادرة من إدارة المركز.
           </p>
         </div>
       </div>
     );
   }
 
-  const { student, attendance, exams, subscription } = data;
-  const totalSessions = (attendance?.attended || 0) + (attendance?.missed || 0);
-  const attendanceRate = totalSessions > 0 ? Math.round(((attendance?.attended || 0) / totalSessions) * 100) : 100;
-
-  // Subscription status badge mapping
-  const subscriptionConfig = {
-    paid: {
-      label: 'خالص ومسدد بالكامل',
-      bg: 'bg-emerald-50 dark:bg-emerald-950/40',
-      text: 'text-emerald-700 dark:text-emerald-300',
-      border: 'border-emerald-200 dark:border-emerald-800/60',
-      icon: CheckCircle2
-    },
-    partial: {
-      label: 'مدفوع جزئياً',
-      bg: 'bg-amber-50 dark:bg-amber-950/40',
-      text: 'text-amber-700 dark:text-amber-300',
-      border: 'border-amber-200 dark:border-amber-800/60',
-      icon: AlertTriangle
-    },
-    overdue: {
-      label: 'متأخر وغير مسدد',
-      bg: 'bg-rose-50 dark:bg-rose-950/40',
-      text: 'text-rose-700 dark:text-rose-300',
-      border: 'border-rose-200 dark:border-rose-800/60',
-      icon: AlertCircle
-    },
-    no_record: {
-      label: 'لا يوجد اشتراك مسجل',
-      bg: 'bg-slate-100 dark:bg-slate-800',
-      text: 'text-slate-600 dark:text-slate-400',
-      border: 'border-slate-200 dark:border-slate-700',
-      icon: Clock
-    }
-  };
-
-  const currentSubStatus = subscription?.status || 'no_record';
-  const subConfig = subscriptionConfig[currentSubStatus] || subscriptionConfig.no_record;
-  const SubIcon = subConfig.icon;
+  const { student, attendance, exams, subscription, teacherName, academyName, branch } = data;
+  const resolvedBranch = student?.branch || branch || 'الفرع الرئيسي';
+  const resolvedTeacher = teacherName || undefined;
+  const resolvedAcademy = academyName || data.centerName || undefined;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-8 px-4 flex flex-col items-center justify-start" dir="rtl">
-      <div className="w-full max-w-md space-y-4">
-        
-        {/* Brand Header */}
-        <div className="flex items-center justify-between px-2">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-4 sm:py-8 px-3 sm:px-4 flex flex-col items-center justify-start text-right selection:bg-blue-500/20" dir="rtl">
+      <div className="w-full max-w-md space-y-3 sm:space-y-4">
+
+        {/* 1. Top Brand & System Bar (Compact & Minimalist) */}
+        <header className="flex items-center justify-between px-1 py-1">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-sm">
-              م
+            <MasarLogo size="sm" showText={false} className="shrink-0 scale-90" />
+            <div className="leading-tight">
+              <span className="font-bold text-[11px] sm:text-xs text-slate-800 dark:text-slate-200 block">
+                منصة مسار التعليمية
+              </span>
+              <span className="text-[9px] text-slate-400 dark:text-slate-500 block">
+                متابعة الطالب الأكاديمية
+              </span>
             </div>
-            <span className="font-bold text-sm tracking-wide text-slate-800 dark:text-slate-200">
-              منصة مسار التعليمية
+          </div>
+
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-md">
+            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+            <span>بيانات رسمية</span>
+          </span>
+        </header>
+
+        {/* 2. Top Notice Banner: Lost Card Notice */}
+        <LostCardNotice
+          studentName={student?.name}
+          studentPhone={student?.phone}
+          parentPhone={student?.parentPhone}
+          parentName={student?.parentName}
+        />
+
+        {/* 3. Student & Academic Header Card (Super Minimalist & Responsive) */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 p-3.5 sm:p-4 space-y-2.5 shadow-xs">
+          
+          {/* Top Academic Strip: Teacher, Academy, and Branch */}
+          <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2.5 border-b border-slate-100 dark:border-slate-800 text-[11px]">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {resolvedTeacher && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200/50 dark:border-blue-900/40 text-[11px]">
+                  <UserCheck className="w-3 h-3 text-blue-500" />
+                  <span>{resolvedTeacher}</span>
+                </span>
+              )}
+
+              {resolvedAcademy && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px]">
+                  <Building2 className="w-3 h-3 text-slate-400" />
+                  <span>{resolvedAcademy}</span>
+                </span>
+              )}
+            </div>
+
+            {/* Branch Badge */}
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100/80 dark:bg-slate-800/80 px-2 py-0.5 rounded-md">
+              <MapPin className="w-2.5 h-2.5 text-blue-500" />
+              <span>{resolvedBranch}</span>
             </span>
           </div>
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>بيان متابعة الطالب المباشر</span>
-          </span>
-        </div>
 
-        {/* Main Receipt Card */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-          
-          {/* Header Strip with Student Name */}
-          <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h1 className="text-xl font-black text-slate-900 dark:text-slate-100 leading-tight">
-                  {student?.name || 'الطالب'}
-                </h1>
-                <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {student?.gradeLevel && (
-                    <span>{student.gradeLevel}</span>
-                  )}
-                  {student?.school && (
-                    <>
-                      <span>•</span>
-                      <span>{student.school}</span>
-                    </>
-                  )}
-                </div>
-              </div>
+          {/* Student Identity Information */}
+          <div className="flex items-start justify-between gap-2.5 pt-0.5">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 leading-snug truncate">
+                {student?.name || 'طالب مسار'}
+              </h1>
 
-              {student?.studentCode && (
-                <div className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center shrink-0">
-                  <span className="block text-[9px] text-slate-400 font-medium">كود الطالب</span>
-                  <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200">
-                    #{student.studentCode}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="p-5 space-y-6">
-            
-            {/* 1. Subscription Status (Current Month) */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Wallet className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  حالة اشتراك الشهر الحالي
-                </span>
-                {subscription?.month && subscription?.year && (
-                  <span className="text-[11px] font-mono text-slate-400">
-                    {subscription.month} / {subscription.year}
+              <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                {student?.gradeLevel && (
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {student.gradeLevel}
                   </span>
                 )}
-              </div>
-
-              <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 ${subConfig.bg} ${subConfig.border}`}>
-                <div className="flex items-center gap-2.5">
-                  <SubIcon className={`w-5 h-5 shrink-0 ${subConfig.text}`} />
-                  <div>
-                    <span className={`text-xs font-bold block ${subConfig.text}`}>
-                      {subConfig.label}
-                    </span>
-                    {subscription?.amountPaid !== undefined && subscription?.amountTotal !== undefined && subscription.amountTotal > 0 && (
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block font-mono">
-                        المسدد: {(subscription.amountPaid / 100).toLocaleString('ar-EG')} ج.م من أصل {(subscription.amountTotal / 100).toLocaleString('ar-EG')} ج.م
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Attendance Stats */}
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  سجل الحضور والغياب
-                </span>
-                <span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono">
-                  نسبة الالتزام: {attendanceRate}%
-                </span>
-              </div>
-
-              {/* Ratio Bar */}
-              <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex mb-3">
-                <div 
-                  className="bg-emerald-500 transition-all duration-500 rounded-r-full"
-                  style={{ width: `${totalSessions > 0 ? ((attendance?.attended || 0) / totalSessions) * 100 : 100}%` }}
-                />
-                <div 
-                  className="bg-rose-500 transition-all duration-500 rounded-l-full"
-                  style={{ width: `${totalSessions > 0 ? ((attendance?.missed || 0) / totalSessions) * 100 : 0}%` }}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="p-2.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40">
-                  <span className="block text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                    أيام الحضور
-                  </span>
-                  <span className="text-base font-black font-mono text-emerald-800 dark:text-emerald-200">
-                    {attendance?.attended || 0}
-                  </span>
-                </div>
-                
-                <div className="p-2.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900/40">
-                  <span className="block text-[11px] font-medium text-rose-700 dark:text-rose-400">
-                    أيام الغياب
-                  </span>
-                  <span className="text-base font-black font-mono text-rose-800 dark:text-rose-200">
-                    {attendance?.missed || 0}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Exams and Grades */}
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <GraduationCap className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  درجات الامتحانات والتقييمات
-                </span>
-                {exams && exams.length > 0 && (
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    ({exams.length} اختبار)
-                  </span>
+                {student?.school && (
+                  <>
+                    <span className="text-slate-300 dark:text-slate-700">•</span>
+                    <span className="truncate">{student.school}</span>
+                  </>
                 )}
               </div>
-
-              {(!exams || exams.length === 0) ? (
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 text-center">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    لا توجد نتائج اختبارات مرصودة حتى الآن.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {exams.map((exam, idx) => {
-                    const numGrade = Number(exam.grade);
-                    const maxGrade = exam.maxGrade || 100;
-                    const isPassed = !isNaN(numGrade) && (numGrade / maxGrade >= 0.5);
-
-                    return (
-                      <div 
-                        key={exam.id || idx}
-                        className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3"
-                      >
-                        <div className="min-w-0">
-                          <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
-                            {exam.name}
-                          </h4>
-                          {exam.date && (
-                            <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
-                              {exam.date}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-mono font-black ${
-                            isPassed 
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' 
-                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                          }`}>
-                            {exam.grade} {exam.maxGrade ? `/ ${exam.maxGrade}` : ''}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
 
+            {student?.studentCode && (
+              <div className="px-2.5 py-1 bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/80 rounded-lg text-center shrink-0">
+                <span className="block text-[8px] text-slate-400 font-medium">كود الطالب</span>
+                <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                  #{student.studentCode}
+                </span>
+              </div>
+            )}
           </div>
-
-          {/* Verification Footer */}
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 text-center">
-            <p className="text-[11px] text-slate-400">
-              تقرير إلكتروني مباشر ومحدث صادر عن إدارة المركز عبر منصة مسار
-            </p>
-          </div>
-
         </div>
+
+        {/* 4. Lessons & Attendance Component */}
+        <LessonsSection
+          attendance={attendance}
+          onSelectSession={(sess) => {
+            setSelectedSession(sess);
+            setSheetType('session');
+          }}
+        />
+
+        {/* 5. Exams & Assessments Component */}
+        <ExamsSection
+          exams={exams}
+          onSelectExam={(ex) => {
+            setSelectedExam(ex);
+            setSheetType('exam');
+          }}
+        />
+
+        {/* 6. Subscription Section (Clean & Minimalist) */}
+        <SubscriptionSection subscription={subscription} />
+
+        {/* 7. Verification & Footer with Platform Social & Website */}
+        <footer className="pt-2 pb-6 text-center space-y-2.5">
+          {/* Platform Links (Landing & Facebook) */}
+          <div className="flex items-center justify-center gap-2 pt-1">
+            <a
+              href="https://masar.top"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold transition-all shadow-xs"
+            >
+              <Globe className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>موقع مسار</span>
+              <span className="text-[10px] text-slate-400 font-mono" dir="ltr">masar.top</span>
+            </a>
+
+            <a
+              href="https://u2l.ai/Masar"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/40 hover:bg-blue-100/80 dark:hover:bg-blue-950/70 border border-blue-200/70 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 text-[11px] font-semibold transition-all shadow-xs"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>صفحة فيسبوك</span>
+            </a>
+          </div>
+
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1">
+            <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+            <span>بيانات رسمية ومحدثة عبر منصة مسار التعليمية</span>
+          </p>
+        </footer>
 
       </div>
+
+      {/* 8. Interactive Mobile-first BottomSheet */}
+      <LookupDetailSheet
+        isOpen={!!sheetType}
+        onClose={() => {
+          setSheetType(null);
+          setSelectedSession(null);
+          setSelectedExam(null);
+        }}
+        type={sheetType}
+        selectedSession={selectedSession}
+        selectedExam={selectedExam}
+        teacherName={resolvedTeacher}
+        academyName={resolvedAcademy}
+        branch={resolvedBranch}
+      />
     </div>
   );
 }

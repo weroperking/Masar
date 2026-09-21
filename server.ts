@@ -13,12 +13,29 @@ interface LookupData {
     studentCode?: string;
     gradeLevel?: string;
     school?: string;
+    phone?: string;
+    parentPhone?: string;
+    parentName?: string;
+    branch?: string;
   };
+  centerName?: string;
+  academyName?: string;
+  teacherName?: string;
+  branch?: string;
   attendance: {
     attended: number;
     missed: number;
     total: number;
     rate?: number;
+    sessions?: Array<{
+      id: string;
+      date: string;
+      status: 'present' | 'absent' | 'compensation';
+      courseName?: string;
+      groupName?: string;
+      room?: string;
+      branch?: string;
+    }>;
   };
   exams: Array<{
     id: string;
@@ -26,6 +43,8 @@ interface LookupData {
     grade: number | string;
     maxGrade?: number;
     date?: string;
+    type?: string;
+    percentage?: number;
   }>;
   subscription: {
     status: 'paid' | 'partial' | 'overdue' | 'no_record';
@@ -394,8 +413,16 @@ async function startServer() {
         name: studentInfo.name,
         studentCode: studentInfo.studentCode,
         gradeLevel: studentInfo.gradeLevel,
-        school: studentInfo.school
+        school: studentInfo.school,
+        phone: studentInfo.phone || body.phone || '',
+        parentPhone: studentInfo.parentPhone || body.parentPhone || '',
+        parentName: studentInfo.parentName || body.parentName || '',
+        branch: studentInfo.branch || body.branch || ''
       },
+      teacherName: body.teacherName || undefined,
+      academyName: body.academyName || undefined,
+      centerName: body.centerName || body.academyName || undefined,
+      branch: body.branch || studentInfo.branch || undefined,
       attendance: attendanceInfo,
       exams: examsInfo,
       subscription: subscriptionInfo
@@ -440,6 +467,10 @@ async function startServer() {
       if (req.body.attendance) existing.attendance = { ...existing.attendance, ...req.body.attendance };
       if (req.body.exams) existing.exams = req.body.exams;
       if (req.body.subscription) existing.subscription = { ...existing.subscription, ...req.body.subscription };
+      if (req.body.teacherName) existing.teacherName = req.body.teacherName;
+      if (req.body.academyName) existing.academyName = req.body.academyName;
+      if (req.body.centerName) existing.centerName = req.body.centerName;
+      if (req.body.branch) existing.branch = req.body.branch;
       lookupTokensMap.set(token, existing);
     }
 
