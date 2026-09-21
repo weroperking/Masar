@@ -302,14 +302,19 @@ async function startServer() {
     // 3. Search across all values in lookupTokensMap by studentCode, ID, or clean digits
     if (!data) {
       const cleanTokenDigits = token.replace(/\D/g, '');
+      const numToken = cleanTokenDigits ? parseInt(cleanTokenDigits, 10) : null;
       for (const val of lookupTokensMap.values()) {
         const student = val.student;
         if (!student) continue;
 
+        const sDigits = student.studentCode ? student.studentCode.replace(/\D/g, '') : '';
+        const sNum = sDigits ? parseInt(sDigits, 10) : null;
+
         if (
           student.id === token ||
           student.studentCode === token ||
-          (cleanTokenDigits.length > 0 && student.studentCode?.replace(/\D/g, '') === cleanTokenDigits)
+          (cleanTokenDigits.length > 0 && sDigits === cleanTokenDigits) ||
+          (numToken !== null && sNum !== null && !isNaN(numToken) && !isNaN(sNum) && numToken === sNum)
         ) {
           data = val;
           break;
@@ -321,7 +326,22 @@ async function startServer() {
       return res.status(404).json({ error: 'هذا الرابط غير صالح أو لم يتم تسجيل بيانات الطالب بعد' });
     }
 
-    return res.status(200).json(data);
+    // Ensure all critical profile fields are guaranteed to exist with sensible defaults
+    const enrichedData = {
+      ...data,
+      teacherName: data.teacherName || 'إدارة المركز التعليمي',
+      academyName: data.academyName || data.centerName || 'سنتر مسار التعليمي',
+      centerName: data.centerName || data.academyName || 'سنتر مسار التعليمي',
+      branch: data.branch || data.student?.branch || 'الفرع الرئيسي',
+      student: {
+        ...data.student,
+        school: data.student?.school || 'مدرسة عامة',
+        gradeLevel: data.student?.gradeLevel || 'المرحلة العامة',
+        branch: data.student?.branch || data.branch || 'الفرع الرئيسي'
+      }
+    };
+
+    return res.status(200).json(enrichedData);
   };
 
   app.get('/api/public/lookup/:token', handlePublicLookup);
