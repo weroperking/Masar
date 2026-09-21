@@ -4,13 +4,14 @@ import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { BookingRequest, Student, Course, Group } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { syncStudentMonthlySubscriptions } from '../../utils/pricing';
 import { getNextStudentCode, findStudentWithCode, normalizeStudentCode } from '../../utils/studentCode';
 
 export function Booking() {
   const toast = useToast();
   const { confirm } = useConfirm();
+  const { organization } = useOrganization();
   const [copied, setCopied] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'accepted' | 'rejected' | 'all'>('pending');
@@ -26,13 +27,36 @@ export function Booking() {
   const courseMap = new Map(courses.map(c => [c.id, c.name]));
   const groupMap = new Map(allGroups.map(g => [g.id, g.name]));
   
-  // Public booking route
-  const bookingLink = `${window.location.origin}/book`;
+  // Read booking_code from organization data or metadata
+  const bookingCode = (organization as any)?.publicMetadata?.booking_code || 
+                      (organization as any)?.unsafeMetadata?.booking_code || 
+                      (organization as any)?.booking_code || 
+                      (organization as any)?.publicMetadata?.bookingCode ||
+                      (organization as any)?.slug || 
+                      organization?.id || 
+                      '';
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(bookingLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  // Public booking link formatted for sharing
+  const bookingLink = `app.masar.top/book?org=${bookingCode}`;
+
+  const handleCopy = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(bookingLink);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = bookingLink;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopied(true);
+      toast.success('تم نسخ رابط الحجز الأونلاين بنجاح');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
   };
 
   const handleAcceptClick = (booking: BookingRequest) => {

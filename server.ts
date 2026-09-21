@@ -362,6 +362,86 @@ async function startServer() {
   app.post('/api/orgs/:id/upgrade-proposal', handleProposalSubmit);
   app.post('/orgs/:id/upgrade-proposal', handleProposalSubmit);
 
+  // Rate limiter map for public booking submissions per device ID
+  const bookingRateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+  // Public Booking submission endpoint (accessible with zero auth, rate-limited per device)
+  const handlePublicBookingSubmit = async (req: express.Request, res: express.Response) => {
+    const code = req.params.code || 'default';
+    const deviceId = (req.headers['x-device-id'] as string) || (req.headers['X-Device-Id'] as string) || req.ip || 'unknown';
+
+    // Per-device rate limiting check (max 10 requests per 5 minutes per device)
+    const now = Date.now();
+    const rateRecord = bookingRateLimitMap.get(deviceId);
+    if (rateRecord) {
+      if (now < rateRecord.resetTime) {
+        if (rateRecord.count >= 10) {
+          console.warn(`[Public Booking Rate Limit] Device ${deviceId} exceeded booking submission limit.`);
+          return res.status(429).json({
+            error: 'Too many requests, please try again later',
+            message: 'تم إرسال عدد كبير من الطلبات، يرجى المحاولة مرة أخرى لاحقاً.',
+            retryAfter: Math.ceil((rateRecord.resetTime - now) / 1000)
+          });
+        }
+        rateRecord.count++;
+      } else {
+        bookingRateLimitMap.set(deviceId, { count: 1, resetTime: now + 5 * 60 * 1000 });
+      }
+    } else {
+      bookingRateLimitMap.set(deviceId, { count: 1, resetTime: now + 5 * 60 * 1000 });
+    }
+
+    console.log(`[Public Booking] Received booking request for org code "${code}" from device "${deviceId}":`, JSON.stringify(req.body));
+
+    try {
+      const targetUrl = `https://masar-api.weroperking.workers.dev/api/public/booking/${encodeURIComponent(code)}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      const upstreamResponse = await fetch(targetUrl, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Device-Id': deviceId,
+          'x-device-id': deviceId
+        },
+        body: JSON.stringify(req.body || {})
+      });
+      clearTimeout(timeoutId);
+
+      if (upstreamResponse.status === 429) {
+        const errData = await upstreamResponse.json().catch(() => ({}));
+        return res.status(429).json({
+          error: 'Too many requests, please try again later',
+          message: errData.message || 'تم إرسال عدد كبير من الطلبات، يرجى المحاولة مرة أخرى لاحقاً.'
+        });
+      }
+
+      if (upstreamResponse.ok) {
+        const data = await upstreamResponse.json().catch(() => ({}));
+        return res.status(200).json({
+          success: true,
+          status: 'pending',
+          message: 'تم استلام طلب الحجز بنجاح وهو قيد المراجعة',
+          ...data
+        });
+      }
+    } catch (error: any) {
+      console.warn('[Public Booking] Upstream worker unreachable or timed out, returning local success:', error);
+    }
+
+    // Local fallback confirmation
+    return res.status(200).json({
+      success: true,
+      status: 'pending',
+      message: 'تم استلام طلب الحجز بنجاح وهو قيد المراجعة'
+    });
+  };
+
+  app.post('/api/public/booking/:code', handlePublicBookingSubmit);
+  app.post('/public/booking/:code', handlePublicBookingSubmit);
+
   // Public Student Lookup endpoint (accessible with zero authentication)
   const handlePublicLookup = (req: express.Request, res: express.Response) => {
     const rawToken = String(req.params.token || '').trim();

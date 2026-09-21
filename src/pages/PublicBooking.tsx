@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApiQuery, useApiMutation } from '../config/queryHooks';
 import { BookingRequest, Course, Group, Settings as SettingsType } from '../types';
 import { CourseBottomSheet } from '../components/Booking/CourseBottomSheet';
@@ -15,10 +16,40 @@ import {
   User,
   Edit3,
   RotateCcw,
+  AlertCircle,
+  Loader2,
+  X,
 } from 'lucide-react';
 
+function getOrCreateDeviceId(): string {
+  const STORAGE_KEY = 'masar_booking_device_id';
+  try {
+    let deviceId = localStorage.getItem(STORAGE_KEY);
+    if (!deviceId) {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        deviceId = crypto.randomUUID();
+      } else {
+        deviceId = 'dev_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      }
+      localStorage.setItem(STORAGE_KEY, deviceId);
+    }
+    return deviceId;
+  } catch (e) {
+    return 'fallback_device_' + Date.now();
+  }
+}
+
 export function PublicBooking() {
+  const [searchParams] = useSearchParams();
+  const orgCode = searchParams.get('org') || 
+                  searchParams.get('code') || 
+                  new URLSearchParams(window.location.search).get('org') || 
+                  new URLSearchParams(window.location.search).get('code') || 
+                  '';
+
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Form State (Student Name and Phone only)
   const [formData, setFormData] = useState({
@@ -100,28 +131,87 @@ export function PublicBooking() {
       return;
     }
 
-    createBooking.mutate(
-      {
+    setErrorMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const deviceId = getOrCreateDeviceId();
+      const code = orgCode || 'default';
+      const endpoint = `/api/public/booking/${encodeURIComponent(code)}`;
+
+      const payload = {
         name: formData.name.trim(),
         phone: formData.phone.trim(),
         courseId: selectedCourse.id,
+        courseName: selectedCourse.name,
+        subject: selectedCourse.subject || selectedCourse.name,
+        teacher: academyName,
         groupId: selectedGroup?.id || undefined,
+        groupName: selectedGroup?.name || undefined,
+        slot: selectedGroup
+          ? `${selectedGroup.name}${selectedGroup.startTime ? ` (${selectedGroup.startTime} - ${selectedGroup.endTime || ''})` : ''}`
+          : undefined,
         gradeLevel: selectedGrade || undefined,
+        grade: selectedGrade || undefined,
         declaredAmount: 0,
         requestDate: new Date().toISOString().split('T')[0],
         status: 'pending',
-      },
-      {
-        onSuccess: () => {
-          setSubmitted(true);
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Device-Id': deviceId,
+          'x-device-id': deviceId,
         },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.status === 429) {
+        const errJson = await response.json().catch(() => ({}));
+        const msg = errJson.message || 'تم إرسال عدد كبير من الطلبات، يرجى المحاولة مرة أخرى لاحقاً.';
+        setErrorMessage(msg);
+        setIsSubmitting(false);
+        return;
       }
-    );
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        const msg = errJson.message || errJson.error || 'حدث خطأ أثناء إرسال طلب الحجز، يرجى المحاولة لاحقاً.';
+        setErrorMessage(msg);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Record to local mutations cache silently as backup
+      try {
+        createBooking.mutate({
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          courseId: selectedCourse.id,
+          groupId: selectedGroup?.id || undefined,
+          gradeLevel: selectedGrade || undefined,
+          declaredAmount: 0,
+          requestDate: new Date().toISOString().split('T')[0],
+          status: 'pending',
+        } as any);
+      } catch (_) {}
+
+      // Confirmation state (booking received / pending approval)
+      setSubmitted(true);
+    } catch (error: any) {
+      console.error('Booking submission error:', error);
+      setErrorMessage('تعذر الاتصال بالخادم، يرجى التحقق من اتصال الإنترنت والمحاولة لاحقاً.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {
     setFormData({ name: '', phone: '' });
     setSelectedGroupId('');
+    setErrorMessage(null);
     setSubmitted(false);
   };
 
@@ -257,6 +347,23 @@ export function PublicBooking() {
               </div>
             </button>
 
+            {/* Error message alert (e.g. 429 rate limit or network error) */}
+            {errorMessage && (
+              <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center justify-between gap-2 animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                  <span>{errorMessage}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setErrorMessage(null)}
+                  className="p-1 text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {/* Bottom Action Area: Status & Pill "Book Now" + Cancel/Reset Button */}
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               {/* Left Side: Real-time Seat Reservation Status */}
@@ -289,16 +396,25 @@ export function PublicBooking() {
                 {/* Primary "Book Now" Button in Masar Blue */}
                 <button
                   type="button"
-                  disabled={!selectedCourse}
+                  disabled={!selectedCourse || isSubmitting}
                   onClick={handleSubmitBooking}
                   className={`flex-1 sm:flex-initial px-8 sm:px-10 py-3.5 rounded-full font-bold text-sm sm:text-base transition-all shadow-lg flex items-center justify-center gap-2 ${
-                    !selectedCourse
+                    !selectedCourse || isSubmitting
                       ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed shadow-none'
                       : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/25 active:scale-95 cursor-pointer'
                   }`}
                 >
-                  <Check className="w-4 h-4 stroke-[2.5]" />
-                  <span>احجز الآن</span>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>جاري إرسال الطلب...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 stroke-[2.5]" />
+                      <span>احجز الآن</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
