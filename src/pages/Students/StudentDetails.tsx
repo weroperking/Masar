@@ -36,9 +36,14 @@ export function StudentDetails() {
     setLoadingToken(true);
     try {
       const sessionToken = await getToken();
-      const res = await fetch(`/api/students/${id}`, {
+      let res = await fetch(`/api/students/${id}`, {
         headers: sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {}
       });
+      if (!res.ok) {
+        res = await fetch(`/students/${id}`, {
+          headers: sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {}
+        });
+      }
       if (res.ok) {
         const data = await res.json();
         setPublicToken(data.public_lookup_token || null);
@@ -60,6 +65,11 @@ export function StudentDetails() {
   };
 
   const handleGenerateToken = async () => {
+    if (!student) {
+      toast.error('لم يتم تحميل بيانات الطالب بالكامل بعد. يرجى المحاولة بعد قليل.');
+      return;
+    }
+
     try {
       setLoadingToken(true);
       const sessionToken = await getToken();
@@ -106,7 +116,7 @@ export function StudentDetails() {
         }
       };
 
-      const res = await fetch(`/api/students/${id}/lookup-token`, {
+      let res = await fetch(`/api/students/${id}/lookup-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,12 +125,23 @@ export function StudentDetails() {
         body: JSON.stringify(payload)
       });
 
+      if (!res.ok) {
+        res = await fetch(`/students/${id}/lookup-token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': sessionToken ? `Bearer ${sessionToken}` : ''
+          },
+          body: JSON.stringify(payload)
+        });
+      }
+
       if (res.ok) {
         const data = await res.json();
         setPublicToken(data.token);
         toast.success('تم توليد وتحديث رابط المتابعة المباشر بنجاح!');
       } else {
-        toast.error('حدث خطأ أثناء توليد رابط المتابعة');
+        toast.error('حدث خطأ أثناء توليد رابط المتابعة. يرجى مراجعة الخادم.');
       }
     } catch (err) {
       console.error(err);
