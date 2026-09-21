@@ -26,6 +26,26 @@ export function PublicStudentLookup() {
       setError(false);
 
       try {
+        let base64 = token;
+        // Restore standard base64 characters
+        base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+        // Pad with '=' if necessary
+        while (base64.length % 4) {
+          base64 += '=';
+        }
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(base64))));
+        if (decoded && decoded.student) {
+          if (isMounted) {
+            setData(decoded);
+            setLoading(false);
+          }
+          return;
+        }
+      } catch (e) {
+        // Not a valid client-side base64 JSON payload, proceed with API fetch
+      }
+
+      try {
         // Direct fetch to backend API, completely bypassing Dexie / IndexedDB
         let res = await fetch(`/api/public/lookup/${token}`);
         if (!res.ok) {
