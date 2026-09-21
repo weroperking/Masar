@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { 
   AlertCircle, Building2, UserCheck, 
   CheckCircle2, MapPin, GraduationCap, 
-  School, Phone, User, ShieldCheck
+  School, Phone, User, ShieldCheck, RefreshCw, Search
 } from 'lucide-react';
-import { PublicLookupData } from '../types';
+import { PublicLookupData, Student, QrCard } from '../types';
 import { db } from '../db/db';
 import { MasarLogo } from '../components/MasarLogo';
 import { LostCardNotice } from '../components/Lookup/LostCardNotice';
@@ -13,55 +13,92 @@ import { LessonsSection, LessonSessionItem } from '../components/Lookup/LessonsS
 import { ExamsSection, ExamItem } from '../components/Lookup/ExamsSection';
 import { SubscriptionSection } from '../components/Lookup/SubscriptionSection';
 import { LookupDetailSheet } from '../components/Lookup/LookupDetailSheet';
+import { decryptRecord, Envelope } from '../services/cryptoService';
+import { isNotDeleted } from '../config/queryHooks';
+import { normalizeStudentCode } from '../utils/studentCode';
+
+async function getDecryptedStudents(): Promise<Student[]> {
+  try {
+    const raw = await db.students.toArray();
+    const list: Student[] = [];
+    for (const item of raw) {
+      if (item.envelope) {
+        try {
+          const plain = await decryptRecord<Student>(item.envelope as Envelope);
+          if (isNotDeleted(plain) && isNotDeleted(item)) {
+            list.push({ ...plain, id: item.id });
+          }
+        } catch {}
+      } else {
+        if (isNotDeleted(item)) {
+          list.push(item as Student);
+        }
+      }
+    }
+    return list;
+  } catch {
+    return [];
+  }
+}
 
 async function resolveStudentFromDexie(token: string): Promise<PublicLookupData | null> {
   try {
-    const cleanToken = token.replace(/\D/g, '');
+    const rawToken = String(token || '').trim();
+    const cleanToken = rawToken.replace(/\D/g, '');
     const numToken = cleanToken ? parseInt(cleanToken, 10) : null;
+    const strippedToken = rawToken.replace(/^[#№s_STst-]+\s*/i, '').trim();
 
-    // 1. Try finding student by ID, exact studentCode, padded code, or numeric value
-    let localStudent = await db.students.get(token);
-    if (!localStudent) {
-      localStudent = await db.students.where('studentCode').equals(token).first();
-    }
-    if (!localStudent && cleanToken) {
-      localStudent = await db.students.filter(s => {
-        if (!s.studentCode) return false;
-        const sClean = s.studentCode.replace(/\D/g, '');
-        if (sClean === cleanToken) return true;
-        if (numToken !== null && !isNaN(numToken)) {
-          const sNum = parseInt(sClean, 10);
-          if (!isNaN(sNum) && sNum === numToken) return true;
-        }
-        return false;
-      }).first();
-    }
+    const students = await getDecryptedStudents();
+    if (!students || students.length === 0) return null;
 
-    if (!localStudent) {
-      // General search across all students
-      const allStudents = await db.students.toArray();
-      localStudent = allStudents.find(s => 
-        s.id === token || 
-        s.studentCode === token || 
-        (cleanToken && s.studentCode && s.studentCode.includes(cleanToken))
+    // 1. Match by ID, studentCode, cleanDigits, or stripped
+    let localStudent = students.find(s => {
+      if (!s) return false;
+      const sRaw = String(s.studentCode || '').trim();
+      const sDigits = sRaw.replace(/\D/g, '');
+      const sNum = sDigits ? parseInt(sDigits, 10) : null;
+      const sCleanCode = sRaw.replace(/^[#№\s]+/, '').trim();
+
+      return (
+        s.id === rawToken ||
+        sRaw === rawToken ||
+        sCleanCode === rawToken ||
+        sCleanCode === strippedToken ||
+        (cleanToken.length > 0 && sDigits === cleanToken) ||
+        (cleanToken.length > 0 && sDigits.padStart(4, '0') === cleanToken.padStart(4, '0')) ||
+        (numToken !== null && sNum !== null && !isNaN(numToken) && !isNaN(sNum) && numToken === sNum) ||
+        (s.phone && cleanToken.length >= 8 && s.phone.replace(/\D/g, '').endsWith(cleanToken))
       );
+    });
+
+    // 2. If still not found, check qrCards table to see if token matches a card's cardNumber
+    if (!localStudent) {
+      const cards = await db.qrCards.toArray().catch(() => []);
+      const matchedCard = cards.find((c: QrCard) => 
+        c.cardNumber === rawToken || 
+        c.qrCodeData === rawToken || 
+        (cleanToken && c.cardNumber && c.cardNumber.replace(/\D/g, '') === cleanToken)
+      );
+      if (matchedCard && matchedCard.studentId) {
+        localStudent = students.find(s => s.id === matchedCard.studentId);
+      }
     }
 
     if (!localStudent) return null;
 
     // Load Center Settings
-    const settingsList = await db.settings.toArray();
+    const settingsList = await db.settings.toArray().catch(() => []);
     const currentSettings = settingsList[0];
     let teacherName = currentSettings?.teacherName || localStorage.getItem('masar_teacher_name') || undefined;
     let academyName = currentSettings?.academyName || localStorage.getItem('masar_academy_name') || undefined;
 
     // Check users table if teacherName is still empty
     if (!teacherName) {
-      const teachers = await db.users.where('role').equals('teacher').toArray();
+      const teachers = await db.users.where('role').equals('teacher').toArray().catch(() => []);
       if (teachers.length > 0 && teachers[0]?.name) {
         teacherName = teachers[0].name;
       } else {
-        const admins = await db.users.where('role').equals('admin').toArray();
+        const admins = await db.users.where('role').equals('admin').toArray().catch(() => []);
         if (admins.length > 0 && admins[0]?.name) {
           teacherName = admins[0].name;
         }
@@ -69,19 +106,19 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
     }
 
     // Resolve Enrollments, Groups, and Branch
-    const enrollments = await db.enrollments.where('studentId').equals(localStudent.id).toArray();
-    const activeEnrollment = enrollments.find(e => e.status === 'active') || enrollments[0];
-    const group = activeEnrollment ? await db.groups.get(activeEnrollment.groupId) : null;
-    const course = activeEnrollment ? await db.courses.get(activeEnrollment.courseId) : null;
+    const enrollments = await db.enrollments.where('studentId').equals(localStudent.id).toArray().catch(() => []);
+    const activeEnrollment = enrollments.find((e: any) => e.status === 'active') || enrollments[0];
+    const group = activeEnrollment ? await db.groups.get(activeEnrollment.groupId).catch(() => null) : null;
+    const course = activeEnrollment ? await db.courses.get(activeEnrollment.courseId).catch(() => null) : null;
 
     const studentBranch = localStudent.branch || group?.branch || currentSettings?.branch || 'الفرع الرئيسي';
-    const resolvedTeacher = teacherName || (course ? `مدرس كورس ${course.name}` : undefined);
+    const resolvedTeacher = teacherName || (course ? `مدرس ${course.name}` : 'إدارة المركز التعليمي');
     const resolvedAcademy = academyName || 'سنتر مسار التعليمي';
 
     // Attendance & Lessons
-    const studentRecords = await db.attendanceRecords.where('studentId').equals(localStudent.id).toArray();
-    const attended = studentRecords.filter(r => r.status === 'present' || r.status === 'compensation').length;
-    const missed = studentRecords.filter(r => r.status === 'absent').length;
+    const studentRecords = await db.attendanceRecords.where('studentId').equals(localStudent.id).toArray().catch(() => []);
+    const attended = studentRecords.filter((r: any) => r.status === 'present' || r.status === 'compensation').length;
+    const missed = studentRecords.filter((r: any) => r.status === 'absent').length;
     const total = attended + missed;
     const rate = total > 0 ? Math.round((attended / total) * 100) : 100;
 
@@ -89,13 +126,13 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
     const sessionsList: LessonSessionItem[] = [];
     const sortedRecords = studentRecords
       .slice()
-      .sort((a, b) => (b.markedAt || 0) - (a.markedAt || 0))
+      .sort((a: any, b: any) => (b.markedAt || 0) - (a.markedAt || 0))
       .slice(0, 15);
 
     for (const rec of sortedRecords) {
-      const sess = rec.sessionId ? await db.attendanceSessions.get(rec.sessionId) : null;
-      const grp = await db.groups.get(rec.groupId || sess?.groupId || '');
-      const crs = await db.courses.get(sess?.courseId || grp?.courseId || '');
+      const sess = rec.sessionId ? await db.attendanceSessions.get(rec.sessionId).catch(() => null) : null;
+      const grp = await db.groups.get(rec.groupId || sess?.groupId || '').catch(() => null);
+      const crs = await db.courses.get(sess?.courseId || grp?.courseId || '').catch(() => null);
       const dateStr = sess?.startedAt
         ? new Date(sess.startedAt).toISOString().split('T')[0]
         : rec.markedAt
@@ -114,10 +151,10 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
     }
 
     // Exams
-    const grades = await db.assessmentGrades.where('studentId').equals(localStudent.id).toArray();
+    const grades = await db.assessmentGrades.where('studentId').equals(localStudent.id).toArray().catch(() => []);
     const examList: ExamItem[] = [];
     for (const g of grades) {
-      const assessment = await db.assessments.get(g.assessmentId);
+      const assessment = await db.assessments.get(g.assessmentId).catch(() => null);
       const numericGrade = typeof g.grade === 'number' ? g.grade : parseFloat(g.grade as string) || 0;
       const maxGrade = assessment?.maxGrade || 100;
       const pct = maxGrade > 0 ? Math.round((numericGrade / maxGrade) * 100) : 0;
@@ -136,22 +173,22 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
     // Subscription
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
-    const sub = await db.monthlySubscriptions
+    const subs = await db.monthlySubscriptions
       .where('studentId')
       .equals(localStudent.id)
-      .filter(s => s.month === currentMonth && s.year === currentYear)
-      .first();
+      .toArray().catch(() => []);
+    const sub = subs.find((s: any) => s.month === currentMonth && s.year === currentYear);
 
-    return {
+    const fullResult: PublicLookupData = {
       student: {
         id: localStudent.id,
         name: localStudent.name,
-        studentCode: localStudent.studentCode,
-        gradeLevel: localStudent.gradeLevel,
-        school: localStudent.school,
-        phone: localStudent.phone,
-        parentPhone: localStudent.parentPhone,
-        parentName: localStudent.parentName,
+        studentCode: localStudent.studentCode || normalizeStudentCode(localStudent.studentCode),
+        gradeLevel: localStudent.gradeLevel || 'المرحلة العامة',
+        school: localStudent.school || 'مدرسة عامة',
+        phone: localStudent.phone || '',
+        parentPhone: localStudent.parentPhone || '',
+        parentName: localStudent.parentName || '',
         branch: studentBranch
       },
       teacherName: resolvedTeacher,
@@ -174,6 +211,15 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
         amountPaid: sub?.amountPaid || 0
       }
     };
+
+    // Auto-sync this resolved record to the server in background
+    fetch('/api/public/sync-lookups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([fullResult])
+    }).catch(() => {});
+
+    return fullResult;
   } catch (err) {
     console.error('Failed to resolve student from Dexie:', err);
     return null;
@@ -185,98 +231,97 @@ export function PublicStudentLookup() {
   const [data, setData] = useState<PublicLookupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // BottomSheet states for mobile & desktop interactive details
   const [sheetType, setSheetType] = useState<'session' | 'exam' | null>(null);
   const [selectedSession, setSelectedSession] = useState<LessonSessionItem | null>(null);
   const [selectedExam, setSelectedExam] = useState<ExamItem | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchLookupData = useCallback(async (tokenToFetch?: string) => {
+    const currentToken = tokenToFetch || token;
+    if (!currentToken) {
+      setError(true);
+      setLoading(false);
+      return;
+    }
 
-    async function fetchLookupData() {
-      if (!token) {
-        setError(true);
+    setLoading(true);
+    setError(false);
+
+    // 1. Try URL decoding if base64 encoded
+    try {
+      let base64 = currentToken;
+      base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+      while (base64.length % 4) {
+        base64 += '=';
+      }
+      const decoded = JSON.parse(decodeURIComponent(escape(atob(base64))));
+      if (decoded && decoded.student) {
+        setData(decoded);
         setLoading(false);
         return;
       }
+    } catch (e) {
+      // Not a client-side base64 payload, proceed with server lookup
+    }
 
-      setLoading(true);
-      setError(false);
+    // 2. Fetch live data from backend endpoint (trying variations)
+    const cleanDigits = currentToken.replace(/\D/g, '');
+    const tokensToTry = [
+      currentToken,
+      encodeURIComponent(currentToken),
+      cleanDigits,
+      cleanDigits ? cleanDigits.padStart(4, '0') : '',
+      cleanDigits ? String(parseInt(cleanDigits, 10)) : ''
+    ].filter(Boolean);
 
-      // 1. Try URL decoding if base64 encoded
+    for (const t of tokensToTry) {
       try {
-        let base64 = token;
-        base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
-        while (base64.length % 4) {
-          base64 += '=';
-        }
-        const decoded = JSON.parse(decodeURIComponent(escape(atob(base64))));
-        if (decoded && decoded.student) {
-          if (isMounted) {
-            setData(decoded);
-            setLoading(false);
-          }
-          return;
-        }
-      } catch (e) {
-        // Not a client-side base64 payload, proceed with server lookup
-      }
-
-      // 2. Fetch live data from backend endpoint
-      try {
-        let res = await fetch(`/api/public/lookup/${token}`);
+        let res = await fetch(`/api/public/lookup/${t}`);
         if (!res.ok) {
-          res = await fetch(`/public/lookup/${token}`);
+          res = await fetch(`/public/lookup/${t}`);
         }
 
         if (res.ok) {
           const result = await res.json();
-          if (isMounted) {
+          if (result && result.student) {
             setData(result);
             setLoading(false);
+            return;
           }
-          return;
         }
-
-        // 3. Fallback to local Dexie IndexedDB
-        const localData = await resolveStudentFromDexie(token);
-        if (localData && isMounted) {
-          setData(localData);
-          setLoading(false);
-          return;
-        }
-
-        if (isMounted) {
-          setError(true);
-          setLoading(false);
-        }
-      } catch (err) {
-        const localData = await resolveStudentFromDexie(token);
-        if (localData && isMounted) {
-          setData(localData);
-          setLoading(false);
-          return;
-        }
-
-        if (isMounted) {
-          setError(true);
-          setLoading(false);
-        }
-      }
+      } catch {}
     }
 
-    fetchLookupData();
+    // 3. Fallback to local Dexie IndexedDB
+    try {
+      const localData = await resolveStudentFromDexie(currentToken);
+      if (localData) {
+        setData(localData);
+        setLoading(false);
+        return;
+      }
+    } catch {}
 
-    return () => {
-      isMounted = false;
-    };
+    setError(true);
+    setLoading(false);
   }, [token]);
+
+  useEffect(() => {
+    fetchLookupData();
+  }, [fetchLookupData]);
+
+  const handleManualSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    fetchLookupData(searchQuery.trim());
+  };
 
   // Loading State
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4" dir="rtl">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 font-cairo" dir="rtl">
         <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center space-y-4">
           <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
@@ -290,17 +335,46 @@ export function PublicStudentLookup() {
   // Error State
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4" dir="rtl">
-        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center space-y-4">
-          <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-6 h-6" />
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 font-cairo" dir="rtl">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 sm:p-8 text-center space-y-5">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-900/40">
+            <AlertCircle className="w-7 h-7" />
           </div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-            هذا الرابط غير صالح أو انتهت صلاحيته
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
-            يُرجى التأكد من مسح أحدث كود QR متواجد على بطاقة الطالب الصادرة من إدارة المركز.
-          </p>
+          
+          <div className="space-y-1.5">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
+              لم يتم العثور على بيانات الطالب
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
+              تأكد من صحة الرابط أو كود الطالب، أو قم بإدخال كود الطالب يدوياً للبحث.
+            </p>
+          </div>
+
+          <form onSubmit={handleManualSearch} className="flex gap-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="أدخل كود الطالب (مثال: 0001 أو 1001)..."
+              className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>بحث</span>
+            </button>
+          </form>
+
+          <button
+            type="button"
+            onClick={() => fetchLookupData()}
+            className="inline-flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 py-1 transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>إعادة المحاولة</span>
+          </button>
         </div>
       </div>
     );

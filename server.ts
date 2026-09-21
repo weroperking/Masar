@@ -67,9 +67,90 @@ const lookupTokensMap = new Map<string, LookupData>();
 const studentToTokenMap = new Map<string, string>();
 const upgradeProposalsMap = new Map<string, UpgradeProposalRecord>();
 
+const LOOKUP_DATA_DIR = path.join(process.cwd(), 'data');
+const LOOKUP_DATA_FILE = path.join(LOOKUP_DATA_DIR, 'lookup_records.json');
+
+function indexLookupRecord(record: LookupData, customToken?: string) {
+  if (!record || !record.student) return;
+  const s = record.student;
+  
+  if (customToken) {
+    lookupTokensMap.set(customToken, record);
+    if (s.id) {
+      studentToTokenMap.set(s.id, customToken);
+    }
+  }
+
+  if (s.id) {
+    lookupTokensMap.set(s.id, record);
+  }
+
+  if (s.studentCode) {
+    const rawCode = String(s.studentCode).trim();
+    lookupTokensMap.set(rawCode, record);
+    
+    // Strip # or other symbols
+    const cleanCode = rawCode.replace(/^[#№\s]+/, '');
+    if (cleanCode) {
+      lookupTokensMap.set(cleanCode, record);
+    }
+
+    const cleanDigits = rawCode.replace(/\D/g, '');
+    if (cleanDigits) {
+      lookupTokensMap.set(cleanDigits, record);
+      lookupTokensMap.set(cleanDigits.padStart(4, '0'), record);
+      const parsedNum = parseInt(cleanDigits, 10);
+      if (!isNaN(parsedNum)) {
+        lookupTokensMap.set(String(parsedNum), record);
+      }
+    }
+  }
+}
+
+function loadPersistedLookupData() {
+  try {
+    if (fs.existsSync(LOOKUP_DATA_FILE)) {
+      const content = fs.readFileSync(LOOKUP_DATA_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item && item.student) {
+            indexLookupRecord(item);
+          }
+        }
+        console.log(`[Persistence] Loaded ${parsed.length} lookup records from ${LOOKUP_DATA_FILE}`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Persistence] Could not load lookup records:', err);
+  }
+}
+
+function savePersistedLookupData() {
+  try {
+    if (!fs.existsSync(LOOKUP_DATA_DIR)) {
+      fs.mkdirSync(LOOKUP_DATA_DIR, { recursive: true });
+    }
+    const uniqueRecords: LookupData[] = [];
+    const seenStudentIds = new Set<string>();
+    for (const record of lookupTokensMap.values()) {
+      if (record && record.student && record.student.id && !seenStudentIds.has(record.student.id)) {
+        seenStudentIds.add(record.student.id);
+        uniqueRecords.push(record);
+      }
+    }
+    fs.writeFileSync(LOOKUP_DATA_FILE, JSON.stringify(uniqueRecords, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[Persistence] Could not save lookup records:', err);
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Load any previously persisted student lookup records
+  loadPersistedLookupData();
 
   // Middleware to parse JSON body
   app.use(express.json({ limit: '10mb' }));
@@ -283,38 +364,59 @@ async function startServer() {
 
   // Public Student Lookup endpoint (accessible with zero authentication)
   const handlePublicLookup = (req: express.Request, res: express.Response) => {
-    const { token } = req.params;
-    if (!token) {
+    const rawToken = String(req.params.token || '').trim();
+    if (!rawToken) {
       return res.status(404).json({ error: 'Invalid token' });
     }
 
-    // 1. Direct match in lookupTokensMap (by UUID token, studentId, or studentCode)
-    let data = lookupTokensMap.get(token);
+    // Try loading persisted data if map is empty
+    if (lookupTokensMap.size === 0) {
+      loadPersistedLookupData();
+    }
+
+    const decodedToken = decodeURIComponent(rawToken).trim();
+    const cleanTokenDigits = decodedToken.replace(/\D/g, '');
+    const numToken = cleanTokenDigits ? parseInt(cleanTokenDigits, 10) : null;
+    const strippedPrefix = decodedToken.replace(/^[#№s_STst-]+\s*/i, '').trim();
+
+    // 1. Direct match in lookupTokensMap (by token, decoded, stripped, or digits)
+    let data = lookupTokensMap.get(rawToken) ||
+               lookupTokensMap.get(decodedToken) ||
+               (strippedPrefix ? lookupTokensMap.get(strippedPrefix) : undefined) ||
+               (cleanTokenDigits ? lookupTokensMap.get(cleanTokenDigits) : undefined) ||
+               (cleanTokenDigits ? lookupTokensMap.get(cleanTokenDigits.padStart(4, '0')) : undefined) ||
+               (numToken !== null ? lookupTokensMap.get(String(numToken)) : undefined);
 
     // 2. Check if token matches studentId in studentToTokenMap
     if (!data) {
-      const mappedToken = studentToTokenMap.get(token);
+      const mappedToken = studentToTokenMap.get(rawToken) || 
+                          studentToTokenMap.get(decodedToken) ||
+                          (strippedPrefix ? studentToTokenMap.get(strippedPrefix) : undefined);
       if (mappedToken) {
         data = lookupTokensMap.get(mappedToken);
       }
     }
 
-    // 3. Search across all values in lookupTokensMap by studentCode, ID, or clean digits
+    // 3. Search across all values in lookupTokensMap by studentCode, ID, clean digits, or phone
     if (!data) {
-      const cleanTokenDigits = token.replace(/\D/g, '');
-      const numToken = cleanTokenDigits ? parseInt(cleanTokenDigits, 10) : null;
       for (const val of lookupTokensMap.values()) {
         const student = val.student;
         if (!student) continue;
 
         const sDigits = student.studentCode ? student.studentCode.replace(/\D/g, '') : '';
         const sNum = sDigits ? parseInt(sDigits, 10) : null;
+        const sCleanCode = student.studentCode ? student.studentCode.replace(/^[#№\s]+/, '').trim() : '';
 
         if (
-          student.id === token ||
-          student.studentCode === token ||
+          student.id === rawToken ||
+          student.id === decodedToken ||
+          student.studentCode === rawToken ||
+          student.studentCode === decodedToken ||
+          (sCleanCode && (sCleanCode === rawToken || sCleanCode === decodedToken || sCleanCode === strippedPrefix)) ||
           (cleanTokenDigits.length > 0 && sDigits === cleanTokenDigits) ||
-          (numToken !== null && sNum !== null && !isNaN(numToken) && !isNaN(sNum) && numToken === sNum)
+          (numToken !== null && sNum !== null && !isNaN(numToken) && !isNaN(sNum) && numToken === sNum) ||
+          (student.phone && cleanTokenDigits.length >= 8 && student.phone.replace(/\D/g, '').endsWith(cleanTokenDigits)) ||
+          (student.parentPhone && cleanTokenDigits.length >= 8 && student.parentPhone.replace(/\D/g, '').endsWith(cleanTokenDigits))
         ) {
           data = val;
           break;
@@ -353,19 +455,14 @@ async function startServer() {
     let count = 0;
     for (const item of items) {
       if (item && item.student && item.student.id) {
-        const studentId = item.student.id;
-        const studentCode = item.student.studentCode || '';
-        lookupTokensMap.set(studentId, item);
-        if (studentCode) {
-          lookupTokensMap.set(studentCode, item);
-          const cleanDigits = studentCode.replace(/\D/g, '');
-          if (cleanDigits) {
-            lookupTokensMap.set(cleanDigits, item);
-          }
-        }
+        indexLookupRecord(item);
         count++;
       }
     }
+    if (count > 0) {
+      savePersistedLookupData();
+    }
+    console.log(`[API] Synced and persisted ${count} lookup snapshots to server.`);
     res.status(200).json({ success: true, count });
   };
 
@@ -448,19 +545,10 @@ async function startServer() {
       subscription: subscriptionInfo
     };
 
-    // Store new mapping under UUID token, student ID, and studentCode
-    lookupTokensMap.set(newToken, record);
-    lookupTokensMap.set(id, record);
-    if (studentInfo.studentCode) {
-      lookupTokensMap.set(studentInfo.studentCode, record);
-      const cleanDigits = studentInfo.studentCode.replace(/\D/g, '');
-      if (cleanDigits) {
-        lookupTokensMap.set(cleanDigits, record);
-      }
-    }
-    studentToTokenMap.set(id, newToken);
+    indexLookupRecord(record, newToken);
+    savePersistedLookupData();
 
-    console.log(`[API] Generated new public lookup token for student ${id} (${studentInfo.name}): ${newToken}`);
+    console.log(`[API] Generated and persisted new public lookup token for student ${id} (${studentInfo.name}): ${newToken}`);
 
     res.status(200).json({
       success: true,
@@ -491,7 +579,8 @@ async function startServer() {
       if (req.body.academyName) existing.academyName = req.body.academyName;
       if (req.body.centerName) existing.centerName = req.body.centerName;
       if (req.body.branch) existing.branch = req.body.branch;
-      lookupTokensMap.set(token, existing);
+      indexLookupRecord(existing, token);
+      savePersistedLookupData();
     }
 
     res.status(200).json({ success: true, token });

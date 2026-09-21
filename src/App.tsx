@@ -48,6 +48,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './config/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { performHandshake } from './services/syncService';
+import { syncAllStudentsToLookupServer } from './services/lookupSyncService';
 import { TourProvider } from './context/TourContext';
 import { TourOverlay } from './components/Tour/TourOverlay';
 
@@ -138,13 +139,16 @@ function AuthGate() {
     }
   }, [clerk.loaded, clerk.session, clerk.client?.sessions]);
 
-  // Perform local-first encryption handshake once authenticated
+  // Perform local-first encryption handshake and public lookup sync once authenticated
   const { getToken } = useAuth();
   useEffect(() => {
-    if (hasSession && organization) {
-      performHandshake(getToken).catch((err) => {
-        console.warn('Crypto handshake deferred or running offline:', err);
-      });
+    if (hasSession) {
+      if (organization) {
+        performHandshake(getToken).catch((err) => {
+          console.warn('Crypto handshake deferred or running offline:', err);
+        });
+      }
+      syncAllStudentsToLookupServer().catch(() => {});
     }
   }, [hasSession, organization?.id, getToken]);
 
