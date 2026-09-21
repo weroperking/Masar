@@ -49,6 +49,7 @@ import { queryClient } from './config/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { performHandshake } from './services/syncService';
 import { syncAllStudentsToLookupServer } from './services/lookupSyncService';
+import { syncBookingCatalogToServer } from './services/bookingSyncService';
 import { TourProvider } from './context/TourContext';
 import { TourOverlay } from './components/Tour/TourOverlay';
 
@@ -139,7 +140,7 @@ function AuthGate() {
     }
   }, [clerk.loaded, clerk.session, clerk.client?.sessions]);
 
-  // Perform local-first encryption handshake and public lookup sync once authenticated
+  // Perform local-first encryption handshake, public lookup sync, and booking catalog sync once authenticated
   const { getToken } = useAuth();
   useEffect(() => {
     if (hasSession) {
@@ -149,8 +150,9 @@ function AuthGate() {
         });
       }
       syncAllStudentsToLookupServer().catch(() => {});
+      syncBookingCatalogToServer(organization).catch(() => {});
     }
-  }, [hasSession, organization?.id, getToken]);
+  }, [hasSession, organization?.id, (organization as any)?.publicMetadata?.booking_code, organization?.slug, getToken]);
 
   useEffect(() => {
     // Fallback in case onComplete doesn't fire for some reason

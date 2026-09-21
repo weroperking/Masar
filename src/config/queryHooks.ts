@@ -3,6 +3,8 @@ import { db } from '../db/db';
 import { useAuth } from '@clerk/clerk-react';
 import { processSyncQueue } from '../services/syncService';
 import { decryptRecord, encryptRecord, Envelope } from '../services/cryptoService';
+import { syncAllStudentsToLookupServer } from '../services/lookupSyncService';
+import { syncBookingCatalogToServer } from '../services/bookingSyncService';
 import { useState, useEffect } from 'react';
 
 /**
@@ -97,6 +99,15 @@ export function useApiQuery<T extends { id?: string; deleted_at?: number | null;
   };
 }
 
+function triggerPublicSync(resource: string) {
+  if (resource === 'courses' || resource === 'groups' || resource === 'settings') {
+    syncBookingCatalogToServer().catch(() => {});
+  }
+  if (['students', 'attendanceRecords', 'attendanceSessions', 'assessments', 'assessmentGrades', 'monthlySubscriptions', 'enrollments', 'courses', 'groups', 'settings'].includes(resource)) {
+    syncAllStudentsToLookupServer().catch(() => {});
+  }
+}
+
 export function useApiMutation<T extends { id?: string }>(resource: string) {
   const { getToken } = useAuth();
   const [isPending, setIsPending] = useState(false);
@@ -153,6 +164,7 @@ export function useApiMutation<T extends { id?: string }>(resource: string) {
 
         // Trigger background sync non-blockingly
         processSyncQueue(getToken).catch(console.warn);
+        triggerPublicSync(resource);
 
         return record as T;
       } finally {
@@ -222,6 +234,7 @@ export function useApiMutation<T extends { id?: string }>(resource: string) {
 
         // Trigger background sync non-blockingly
         processSyncQueue(getToken).catch(console.warn);
+        triggerPublicSync(resource);
 
         return updated as T;
       } finally {
@@ -291,6 +304,7 @@ export function useApiMutation<T extends { id?: string }>(resource: string) {
 
         // Trigger background sync non-blockingly
         processSyncQueue(getToken).catch(console.warn);
+        triggerPublicSync(resource);
       } finally {
         setIsPending(false);
       }

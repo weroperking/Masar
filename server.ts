@@ -63,12 +63,89 @@ interface UpgradeProposalRecord {
   createdAt: string;
 }
 
+interface BookingCatalogRecord {
+  bookingCode: string;
+  orgId?: string;
+  orgSlug?: string;
+  orgName?: string;
+  academyName?: string;
+  teacherName?: string;
+  courses: Array<{
+    id: string;
+    name: string;
+    subject?: string;
+    gradeLevel?: string;
+    price?: number;
+    paymentType?: string;
+    isActive?: boolean;
+  }>;
+  groups: Array<{
+    id: string;
+    courseId: string;
+    name: string;
+    type?: string;
+    daysOfWeek?: string[];
+    startTime?: string;
+    endTime?: string;
+    maxStudents?: number;
+    room?: string;
+  }>;
+  syncedAt?: number;
+}
+
 const lookupTokensMap = new Map<string, LookupData>();
 const studentToTokenMap = new Map<string, string>();
 const upgradeProposalsMap = new Map<string, UpgradeProposalRecord>();
+const bookingCatalogsMap = new Map<string, BookingCatalogRecord>();
 
 const LOOKUP_DATA_DIR = path.join(process.cwd(), 'data');
 const LOOKUP_DATA_FILE = path.join(LOOKUP_DATA_DIR, 'lookup_records.json');
+const BOOKING_DATA_FILE = path.join(LOOKUP_DATA_DIR, 'booking_catalogs.json');
+
+function indexBookingCatalog(record: BookingCatalogRecord) {
+  if (!record) return;
+  if (record.bookingCode) bookingCatalogsMap.set(record.bookingCode, record);
+  if (record.orgId) bookingCatalogsMap.set(record.orgId, record);
+  if (record.orgSlug) bookingCatalogsMap.set(record.orgSlug, record);
+  bookingCatalogsMap.set('default', record);
+}
+
+function loadPersistedBookingData() {
+  try {
+    if (fs.existsSync(BOOKING_DATA_FILE)) {
+      const content = fs.readFileSync(BOOKING_DATA_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item) indexBookingCatalog(item);
+        }
+        console.log(`[Persistence] Loaded ${parsed.length} booking catalogs from ${BOOKING_DATA_FILE}`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Persistence] Could not load booking catalogs:', err);
+  }
+}
+
+function savePersistedBookingData() {
+  try {
+    if (!fs.existsSync(LOOKUP_DATA_DIR)) {
+      fs.mkdirSync(LOOKUP_DATA_DIR, { recursive: true });
+    }
+    const uniqueCatalogs: BookingCatalogRecord[] = [];
+    const seenCodes = new Set<string>();
+    for (const cat of bookingCatalogsMap.values()) {
+      const key = cat.bookingCode || cat.orgId || 'default';
+      if (!seenCodes.has(key)) {
+        seenCodes.add(key);
+        uniqueCatalogs.push(cat);
+      }
+    }
+    fs.writeFileSync(BOOKING_DATA_FILE, JSON.stringify(uniqueCatalogs, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[Persistence] Could not save booking catalogs:', err);
+  }
+}
 
 function indexLookupRecord(record: LookupData, customToken?: string) {
   if (!record || !record.student) return;
@@ -361,6 +438,122 @@ async function startServer() {
 
   app.post('/api/orgs/:id/upgrade-proposal', handleProposalSubmit);
   app.post('/orgs/:id/upgrade-proposal', handleProposalSubmit);
+
+  // Public Booking fetch & submit endpoints (accessible with zero auth)
+  const handlePublicBookingGet = async (req: express.Request, res: express.Response) => {
+    const rawCode = String(req.params.code || req.query.org || req.query.code || req.query.booking_code || 'default').trim();
+    
+    if (bookingCatalogsMap.size === 0) {
+      loadPersistedBookingData();
+    }
+
+    // 1. Check local in-memory & persisted catalog map for exact key
+    let localCatalog = bookingCatalogsMap.get(rawCode) ||
+                       bookingCatalogsMap.get(decodeURIComponent(rawCode));
+
+    if (localCatalog && Array.isArray(localCatalog.courses) && localCatalog.courses.length > 0) {
+      return res.status(200).json({
+        success: true,
+        academyName: localCatalog.academyName || localCatalog.orgName || 'أكاديمية مسار التعليمية',
+        orgName: localCatalog.orgName || localCatalog.academyName,
+        teacherName: localCatalog.teacherName || '',
+        bookingCode: localCatalog.bookingCode || rawCode,
+        courses: localCatalog.courses,
+        groups: localCatalog.groups || []
+      });
+    }
+
+    // 2. Try upstream worker if not available locally with courses
+    if (rawCode && rawCode !== 'default') {
+      try {
+        const upstreamUrls = [
+          `https://masar-api.weroperking.workers.dev/api/public/booking/${encodeURIComponent(rawCode)}`,
+          `https://masar-api.weroperking.workers.dev/public/booking/${encodeURIComponent(rawCode)}`,
+          `https://masar-api.weroperking.workers.dev/api/public/booking?code=${encodeURIComponent(rawCode)}`,
+          `https://masar-api.weroperking.workers.dev/api/public/booking?org=${encodeURIComponent(rawCode)}`
+        ];
+
+        for (const targetUrl of upstreamUrls) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3500);
+            const upstreamResponse = await fetch(targetUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (upstreamResponse.ok) {
+              const data = await upstreamResponse.json().catch(() => ({}));
+              const extractedCourses = data?.courses || data?.data?.courses || data?.result?.courses || (Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : null));
+              if (Array.isArray(extractedCourses) && extractedCourses.length > 0) {
+                const extractedGroups = data?.groups || data?.data?.groups || data?.result?.groups || [];
+                const catalogRecord: BookingCatalogRecord = {
+                  bookingCode: rawCode,
+                  orgName: data.orgName || data.academyName || data.data?.orgName || data.data?.academyName,
+                  academyName: data.academyName || data.orgName || data.data?.academyName || data.data?.orgName || 'أكاديمية مسار التعليمية',
+                  teacherName: data.teacherName || data.data?.teacherName || '',
+                  courses: extractedCourses,
+                  groups: extractedGroups,
+                  syncedAt: Date.now()
+                };
+                indexBookingCatalog(catalogRecord);
+                savePersistedBookingData();
+                return res.status(200).json(data);
+              }
+            }
+          } catch {
+            // continue to next URL
+          }
+        }
+      } catch (err) {
+        console.warn('[Public Booking GET] Upstream worker fetch failed:', err);
+      }
+    }
+
+    // 3. Check fallback / default catalog if no exact match found
+    const fallbackCatalog = bookingCatalogsMap.get('default') || (bookingCatalogsMap.size > 0 ? bookingCatalogsMap.values().next().value : null);
+    if (fallbackCatalog && Array.isArray(fallbackCatalog.courses) && fallbackCatalog.courses.length > 0) {
+      return res.status(200).json({
+        success: true,
+        academyName: fallbackCatalog.academyName || fallbackCatalog.orgName || 'أكاديمية مسار التعليمية',
+        orgName: fallbackCatalog.orgName || fallbackCatalog.academyName,
+        teacherName: fallbackCatalog.teacherName || '',
+        bookingCode: fallbackCatalog.bookingCode || rawCode,
+        courses: fallbackCatalog.courses,
+        groups: fallbackCatalog.groups || []
+      });
+    }
+
+    // 4. Return clean empty catalog response
+    return res.status(200).json({
+      success: true,
+      academyName: localCatalog?.academyName || fallbackCatalog?.academyName || 'أكاديمية مسار التعليمية',
+      courses: [],
+      groups: []
+    });
+  };
+
+  app.get('/api/public/booking/:code', handlePublicBookingGet);
+  app.get('/public/booking/:code', handlePublicBookingGet);
+  app.get('/api/public/booking', handlePublicBookingGet);
+  app.get('/public/booking', handlePublicBookingGet);
+
+  // Sync public booking catalog from authenticated client
+  const handleSyncBookingCatalog = (req: express.Request, res: express.Response) => {
+    try {
+      const payload: BookingCatalogRecord = req.body || {};
+      if (payload && (Array.isArray(payload.courses) || payload.academyName)) {
+        indexBookingCatalog(payload);
+        savePersistedBookingData();
+        console.log(`[API] Synced and persisted booking catalog for "${payload.bookingCode || 'default'}" with ${(payload.courses || []).length} courses and ${(payload.groups || []).length} groups.`);
+        return res.status(200).json({ success: true, count: (payload.courses || []).length });
+      }
+      return res.status(400).json({ error: 'Invalid catalog payload' });
+    } catch (e: any) {
+      console.error('[API] Failed to sync booking catalog:', e);
+      return res.status(500).json({ error: 'Failed to sync booking catalog' });
+    }
+  };
+
+  app.post('/api/public/sync-booking-catalog', handleSyncBookingCatalog);
+  app.post('/public/sync-booking-catalog', handleSyncBookingCatalog);
 
   // Rate limiter map for public booking submissions per device ID
   const bookingRateLimitMap = new Map<string, { count: number; resetTime: number }>();

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApiQuery, useApiMutation } from '../config/queryHooks';
 import { BookingRequest, Course, Group, Settings as SettingsType } from '../types';
@@ -43,13 +43,24 @@ export function PublicBooking() {
   const [searchParams] = useSearchParams();
   const orgCode = searchParams.get('org') || 
                   searchParams.get('code') || 
+                  searchParams.get('booking_code') || 
+                  searchParams.get('orgCode') || 
+                  searchParams.get('slug') || 
                   new URLSearchParams(window.location.search).get('org') || 
                   new URLSearchParams(window.location.search).get('code') || 
+                  new URLSearchParams(window.location.search).get('booking_code') || 
                   '';
 
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Public remote data state (loaded from server for unauthenticated guest / student visitors)
+  const [publicCourses, setPublicCourses] = useState<Course[]>([]);
+  const [publicGroups, setPublicGroups] = useState<Group[]>([]);
+  const [publicAcademyName, setPublicAcademyName] = useState<string>('');
+  const [isPublicLoading, setIsPublicLoading] = useState<boolean>(true);
+  const [publicFetchAttempted, setPublicFetchAttempted] = useState<boolean>(false);
 
   // Form State (Student Name and Phone only)
   const [formData, setFormData] = useState({
@@ -67,31 +78,166 @@ export function PublicBooking() {
   const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
   const [isStudentDetailsSheetOpen, setIsStudentDetailsSheetOpen] = useState(false);
 
-  // Queries
-  const { data: allCourses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  // Local queries (used as fallback when admin/teacher visits from same workspace)
+  const { data: allCourses = [], isLoading: isLocalCoursesLoading } = useApiQuery<Course>('courses', 60 * 1000);
   const { data: allGroups = [] } = useApiQuery<Group>('groups', 60 * 1000);
   const { data: allEnrollments = [] } = useApiQuery<any>('enrollments', 60 * 1000);
   const { data: settingsList = [] } = useApiQuery<SettingsType>('settings', 60 * 1000);
   const { create: createBooking } = useApiMutation<BookingRequest>('bookingRequests');
 
-  // Academy name from settings or saved storage
+  // Fetch public catalog from backend for the given org code or default
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function fetchPublicBookingCatalog() {
+      setIsPublicLoading(true);
+      try {
+        const queryCode = orgCode || 'default';
+        const endpoints = [
+          `/api/public/booking/${encodeURIComponent(queryCode)}`,
+          `/api/public/booking?code=${encodeURIComponent(queryCode)}`,
+          `/api/public/booking?org=${encodeURIComponent(queryCode)}`,
+          '/api/public/booking',
+          `https://masar-api.weroperking.workers.dev/api/public/booking/${encodeURIComponent(queryCode)}`
+        ];
+
+        let catalogData: any = null;
+
+        for (const ep of endpoints) {
+          try {
+            const res = await fetch(ep, {
+              headers: { 'Accept': 'application/json' }
+            });
+            if (res.ok) {
+              const parsed = await res.json();
+              const hasCourses = Boolean(
+                parsed?.courses || 
+                parsed?.data?.courses || 
+                parsed?.result?.courses || 
+                parsed?.catalog?.courses ||
+                (Array.isArray(parsed) && parsed.length > 0)
+              );
+              if (parsed && (hasCourses || parsed.academyName || parsed.orgName)) {
+                catalogData = parsed;
+                break;
+              }
+            }
+          } catch (err) {
+            console.warn(`[Public Booking] Failed fetching from ${ep}:`, err);
+          }
+        }
+
+        if (!isCancelled && catalogData) {
+          const rawCourses = catalogData.courses || 
+                             catalogData.data?.courses || 
+                             catalogData.result?.courses || 
+                             catalogData.catalog?.courses || 
+                             (Array.isArray(catalogData) && catalogData[0]?.courses ? catalogData[0].courses : null) ||
+                             (Array.isArray(catalogData) ? catalogData : []);
+
+          const rawGroups = catalogData.groups || 
+                            catalogData.data?.groups || 
+                            catalogData.result?.groups || 
+                            catalogData.catalog?.groups || 
+                            (Array.isArray(catalogData) && catalogData[0]?.groups ? catalogData[0].groups : null) || 
+                            [];
+
+          const rawOrgName = catalogData.academyName || 
+                             catalogData.orgName || 
+                             catalogData.name || 
+                             catalogData.data?.academyName || 
+                             catalogData.data?.orgName || 
+                             catalogData.result?.academyName || 
+                             catalogData.organization?.name || 
+                             '';
+
+          if (Array.isArray(rawCourses) && rawCourses.length > 0) {
+            setPublicCourses(rawCourses.map((c: any) => ({
+              id: String(c.id || c._id || c.courseId || Math.random()),
+              name: c.name || c.title || c.courseName || 'كورس تعليمي',
+              subject: c.subject || c.name || c.title || '',
+              price: Number(c.price || c.cost || c.amount) || 0,
+              paymentType: c.paymentType || c.payment_type || 'monthly',
+              isActive: c.isActive !== false && c.is_active !== false && (c as any).active !== false,
+              created_at: Number(c.created_at) || Date.now(),
+              updated_at: Number(c.updated_at) || Date.now(),
+              sync_status: 'synced',
+              gradeLevel: c.gradeLevel || c.grade_level || c.grade || '',
+            } as unknown as Course)));
+          }
+
+          if (Array.isArray(rawGroups) && rawGroups.length > 0) {
+            setPublicGroups(rawGroups.map((g: any) => ({
+              id: String(g.id || g._id || g.groupId || Math.random()),
+              courseId: String(g.courseId || g.course_id || g.course || ''),
+              name: g.name || g.groupName || g.title || 'المجموعة الأولى',
+              type: g.type || 'in_person',
+              daysOfWeek: Array.isArray(g.daysOfWeek) ? g.daysOfWeek : (Array.isArray(g.days) ? g.days : (typeof g.days === 'string' ? g.days.split(',') : [])),
+              startTime: g.startTime || g.start_time || g.time || '',
+              endTime: g.endTime || g.end_time || '',
+              startDate: g.startDate || g.start_date || '',
+              endDate: g.endDate || g.end_date || '',
+              maxStudents: Number(g.maxStudents || g.maxCapacity || g.capacity || g.max_students) || 25,
+              availableSlots: g.availableSlots !== undefined ? g.availableSlots : (g.available_slots !== undefined ? g.available_slots : null),
+              room: g.room || '',
+              status: g.status || 'scheduled',
+              created_at: Number(g.created_at) || Date.now(),
+              updated_at: Number(g.updated_at) || Date.now(),
+              sync_status: 'synced',
+            } as unknown as Group)));
+          }
+
+          if (rawOrgName) {
+            setPublicAcademyName(rawOrgName);
+          }
+        }
+      } catch (e) {
+        console.warn('[Public Booking] Error loading public booking data:', e);
+      } finally {
+        if (!isCancelled) {
+          setIsPublicLoading(false);
+          setPublicFetchAttempted(true);
+        }
+      }
+    }
+
+    fetchPublicBookingCatalog();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [orgCode]);
+
+  // Academy name from public response, settings, or saved storage
   const academyName = useMemo(() => {
     return (
+      publicAcademyName ||
       settingsList[0]?.academyName ||
       localStorage.getItem('masar_academy_name') ||
       'أكاديمية مسار التعليمية'
     );
-  }, [settingsList]);
+  }, [publicAcademyName, settingsList]);
 
-  // Active courses - only actual courses added by the teacher
+  // Active courses - use public courses from backend if available, otherwise local Dexie courses
   const courses = useMemo(() => {
+    if (publicCourses.length > 0) {
+      return publicCourses.filter((c) => !c.deleted_at && c.isActive !== false);
+    }
     return allCourses.filter((c) => !c.deleted_at && c.isActive);
-  }, [allCourses]);
+  }, [publicCourses, allCourses]);
+
+  // Groups list - use public groups from backend if available, otherwise local Dexie groups
+  const groupsList = useMemo(() => {
+    if (publicGroups.length > 0) {
+      return publicGroups.filter((g) => !g.deleted_at);
+    }
+    return allGroups.filter((g) => !g.deleted_at);
+  }, [publicGroups, allGroups]);
 
   // Current selected course object
   const selectedCourse = useMemo(() => {
     if (selectedCourseId) {
-      const found = courses.find((c) => c.id === selectedCourseId);
+      const found = courses.find((c) => String(c.id) === String(selectedCourseId));
       if (found) return found;
     }
     return courses[0] || null;
@@ -108,17 +254,28 @@ export function PublicBooking() {
     return counts;
   }, [allEnrollments]);
 
-  // Course groups - only actual groups added by the teacher for this course
+  // Course groups - only actual groups for the currently selected course
   const courseGroups = useMemo(() => {
-    if (!selectedCourse?.id) return [];
-    return allGroups.filter((g) => !g.deleted_at && g.courseId === selectedCourse.id);
-  }, [allGroups, selectedCourse?.id]);
+    if (!selectedCourse?.id) return groupsList;
+    const matched = groupsList.filter((g) => String(g.courseId || '') === String(selectedCourse.id));
+    if (matched.length > 0) return matched;
+    // Fallback: if groups exist in list but none have matching courseId explicitly, return all groups
+    return groupsList;
+  }, [groupsList, selectedCourse?.id]);
 
   // Selected Group Object
   const selectedGroup = useMemo(() => {
     if (!selectedGroupId) return null;
     return courseGroups.find((g) => g.id === selectedGroupId) || null;
   }, [courseGroups, selectedGroupId]);
+
+  // Auto-sync grade level from selected course if empty
+  useEffect(() => {
+    const courseGrade = (selectedCourse as any)?.gradeLevel || (selectedCourse as any)?.grade;
+    if (courseGrade && !selectedGrade) {
+      setSelectedGrade(courseGrade);
+    }
+  }, [selectedCourse, selectedGrade]);
 
   const handleSubmitBooking = async () => {
     if (!selectedCourse) {
@@ -259,18 +416,29 @@ export function PublicBooking() {
               {/* Item 1: Course */}
               <button
                 type="button"
+                disabled={isPublicLoading}
                 onClick={() => setIsCourseSheetOpen(true)}
-                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer"
+                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-wait"
               >
                 <div className="flex items-center justify-end w-full">
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                  {isPublicLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                  )}
                 </div>
                 <div className="w-full">
                   <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium block">
                     الكورس المطلوب
                   </span>
                   <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
-                    {selectedCourse ? selectedCourse.name : 'لا توجد كورسات متاحة'}
+                    {isPublicLoading ? (
+                      <span className="text-slate-400">جاري التحميل...</span>
+                    ) : selectedCourse ? (
+                      selectedCourse.name
+                    ) : (
+                      'لا توجد كورسات متاحة'
+                    )}
                   </p>
                 </div>
               </button>
@@ -278,8 +446,9 @@ export function PublicBooking() {
               {/* Item 2: Grade Level */}
               <button
                 type="button"
+                disabled={isPublicLoading}
                 onClick={() => setIsGradeSheetOpen(true)}
-                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer"
+                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-wait"
               >
                 <div className="flex items-center justify-between w-full">
                   <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -300,8 +469,9 @@ export function PublicBooking() {
               {/* Item 3: Group & Schedule (Selection based on available seats) */}
               <button
                 type="button"
+                disabled={isPublicLoading}
                 onClick={() => setIsGroupSheetOpen(true)}
-                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer"
+                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-wait"
               >
                 <div className="flex items-center justify-between w-full">
                   <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -316,7 +486,15 @@ export function PublicBooking() {
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
-                    {selectedGroup ? selectedGroup.name : (courseGroups.length > 0 ? 'اختر المجموعة' : 'لا توجد مجموعات متاحة')}
+                    {isPublicLoading ? (
+                      <span className="text-slate-400">جاري التحميل...</span>
+                    ) : selectedGroup ? (
+                      selectedGroup.name
+                    ) : courseGroups.length > 0 ? (
+                      'اختر المجموعة'
+                    ) : (
+                      'لا توجد مجموعات متاحة'
+                    )}
                   </p>
                 </div>
               </button>

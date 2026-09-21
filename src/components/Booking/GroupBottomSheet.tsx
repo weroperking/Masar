@@ -53,9 +53,38 @@ export function GroupBottomSheet({
           groups.map((group) => {
           const isSelected = group.id === selectedGroupId;
           const enrolledCount = enrollmentCounts[group.id] || 0;
-          const capacity = group.maxStudents || 25;
-          const availableSeats = Math.max(0, capacity - enrolledCount);
-          const isFull = availableSeats <= 0;
+          
+          // Determine available slots and full status
+          // If availableSlots: null or capacity is null -> always bookable (unlimited capacity)
+          const rawAvailable = (group as any).availableSlots !== undefined 
+            ? (group as any).availableSlots 
+            : ((group as any).available_slots !== undefined ? (group as any).available_slots : undefined);
+
+          let isFull = false;
+          let availableSeatsDisplay: number | null = null;
+
+          if (rawAvailable === null) {
+            // Group has no capacity limit set — treat as always bookable, don't hide or crash on it
+            isFull = false;
+            availableSeatsDisplay = null;
+          } else if (typeof rawAvailable === 'number') {
+            isFull = rawAvailable <= 0;
+            availableSeatsDisplay = Math.max(0, rawAvailable);
+          } else if (typeof (group as any).maxStudents === 'number' && (group as any).maxStudents > 0) {
+            const capacity = (group as any).maxStudents;
+            const seats = Math.max(0, capacity - enrolledCount);
+            isFull = seats <= 0;
+            availableSeatsDisplay = seats;
+          } else if (typeof (group as any).capacity === 'number' && (group as any).capacity > 0) {
+            const capacity = (group as any).capacity;
+            const seats = Math.max(0, capacity - enrolledCount);
+            isFull = seats <= 0;
+            availableSeatsDisplay = seats;
+          } else {
+            // Default: unlimited capacity / no restriction
+            isFull = false;
+            availableSeatsDisplay = null;
+          }
 
           return (
             <button
@@ -98,9 +127,13 @@ export function GroupBottomSheet({
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300 border border-red-200 dark:border-red-900/60">
                         مكتملة العدد
                       </span>
+                    ) : availableSeatsDisplay !== null ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60">
+                        متاح {availableSeatsDisplay} مقعد
+                      </span>
                     ) : (
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60">
-                        متاح {availableSeats} مقعد
+                        متاح للتسجيل
                       </span>
                     )}
 
