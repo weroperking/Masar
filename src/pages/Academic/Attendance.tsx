@@ -42,6 +42,7 @@ import {
   formatTimeRange12,
   formatTimestamp12,
 } from "../../utils/time";
+import { extractStudentCodeFromScanned } from "../../utils/studentCode";
 import { useToast } from "../../context/ToastContext";
 import { useConfirm } from "../../context/ConfirmContext";
 import { format } from "date-fns";
@@ -827,9 +828,13 @@ function AttendanceModal({
 
   // Process code scanning or manual submit
   const processStudentCode = (rawCode: string) => {
-    const code = rawCode.trim();
+    const rawTrimmed = rawCode.trim();
     setQrInput("");
-    if (!code) return;
+    if (!rawTrimmed) return;
+
+    // Support dual-purpose QR codes encoding full URL (e.g. https://.../s/1001) as well as raw codes
+    const extracted = extractStudentCodeFromScanned(rawTrimmed);
+    const code = extracted || rawTrimmed;
 
     // Convert Arabic numerals to standard digits and strip leading '#' or symbols
     const normalizedCode = code

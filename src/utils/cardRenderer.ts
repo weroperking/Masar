@@ -1,6 +1,7 @@
 import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
 import { CardCustomDesign } from '../types';
+import { buildStudentLookupUrl } from './studentCode';
 
 export interface RenderCardOptions {
   design: CardCustomDesign;
@@ -75,7 +76,7 @@ export async function renderCardToCanvas(options: RenderCardOptions): Promise<HT
   ctx.imageSmoothingQuality = 'high';
 
   const cleanCode = String(cardNumber).replace(/\D/g, '') || '1001';
-  const isQrCode = (design.cardFormat || 'barcode') === 'qrcode';
+  const isQrCode = (design.cardFormat || 'qrcode') !== 'barcode';
 
   // Base fill
   ctx.fillStyle = '#ffffff';
@@ -191,11 +192,12 @@ async function drawCodeOverlayOnBack(
   ctx.scale(codeScale, codeScale);
 
   if (isQrCode) {
-    // Render QR Code onto temp canvas
+    // Render QR Code onto temp canvas with full student lookup URL
     const qrCanvas = document.createElement('canvas');
-    await QRCode.toCanvas(qrCanvas, code, {
+    const qrPayload = buildStudentLookupUrl(code);
+    await QRCode.toCanvas(qrCanvas, qrPayload, {
       margin: 1,
-      width: 200,
+      width: 220,
       color: {
         dark: '#000000',
         light: '#ffffff'

@@ -16,6 +16,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import { Enrollment, MonthlySubscription, Student } from '../../types';
 import { StudentFormModal } from './Students';
 import { calculateEnrollmentFee, syncStudentMonthlySubscriptions, recordLedgerRevenue } from '../../utils/pricing';
+import { buildStudentLookupUrl, normalizeStudentCode } from '../../utils/studentCode';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { useAuth } from '@clerk/clerk-react';
 import { triggerPennyDrop } from '../../components/PennyDropAnimation';
@@ -27,153 +28,34 @@ export function StudentDetails() {
   const { confirm } = useConfirm();
   const { getToken } = useAuth();
 
-  const [publicToken, setPublicToken] = useState<string | null>(null);
-  const [loadingToken, setLoadingToken] = useState(false);
+  const [loadingSync, setLoadingSync] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
-  const fetchPublicToken = async () => {
-    setLoadingToken(true);
-    // 1. Try local cache first
-    const cached = localStorage.getItem(`masar_lookup_token_${id}`);
-    if (cached) {
-      setPublicToken(cached);
-      setLoadingToken(false);
-      return;
-    }
+  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
+  const student = allStudents.find(s => s.id === id);
 
-    // 2. Fallback to API if present
-    try {
-      const sessionToken = await getToken();
-      let res = await fetch(`/api/students/${id}`, {
-        headers: sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {}
-      });
-      if (!res.ok) {
-        res = await fetch(`/students/${id}`, {
-          headers: sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {}
-        });
-      }
-      if (res.ok) {
-        const data = await res.json();
-        if (data.public_lookup_token) {
-          setPublicToken(data.public_lookup_token);
-          localStorage.setItem(`masar_lookup_token_${id}`, data.public_lookup_token);
-        }
-      }
-    } catch (err) {
-      console.warn('Error fetching student lookup token from server:', err);
-    } finally {
-      setLoadingToken(false);
-    }
-  };
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear = new Date().getFullYear();
 
-  const handleCopyLink = () => {
-    if (!publicToken) return;
-    const shareUrl = `${window.location.origin}/s/${publicToken}`;
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    toast.success('تم نسخ رابط المتابعة بنجاح!');
-    setTimeout(() => setCopied(false), 2000);
-  };
+  // The permanent short student code for URL and QR card matching
+  const cleanStudentCodeVal = useMemo(() => {
+    if (!student) return '';
+    return normalizeStudentCode(student.studentCode) || student.studentCode || student.id || '';
+  }, [student]);
 
-  const handleGenerateToken = async () => {
-    if (!student) {
-      toast.error('لم يتم تحميل بيانات الطالب بالكامل بعد. يرجى المحاولة بعد قليل.');
-      return;
-    }
+  // The exact canonical short URL matching the back of the student card (/s/:code)
+  const shortLookupUrl = useMemo(() => {
+    if (!cleanStudentCodeVal) return '';
+    return buildStudentLookupUrl(cleanStudentCodeVal);
+  }, [cleanStudentCodeVal]);
 
-    try {
-      setLoadingToken(true);
-      
-      const attended = attendanceRecords.filter(r => r.status === 'present').length;
-      const missed = attendanceRecords.filter(r => r.status === 'absent').length;
-      const total = attended + missed;
-      const rate = total > 0 ? Math.round((attended / total) * 100) : 100;
-      
-      const currentSub = monthlySubscriptions?.find(s => s.month === currentMonth && s.year === currentYear) || null;
-      
-      const examsSnapshot = studentGrades.map(grade => {
-        const assessment = allAssessments?.find(a => a.id === grade.assessmentId);
-        return {
-          id: grade.id,
-          name: assessment?.name || 'اختبار',
-          grade: grade.grade,
-          maxGrade: assessment?.maxGrade || 100,
-          date: assessment?.date || ''
-        };
-      });
-
-      const payload = {
-        student: {
-          id,
-          name: student.name,
-          studentCode: student.studentCode,
-          gradeLevel: student.gradeLevel,
-          school: student.school
-        },
-        attendance: {
-          attended,
-          missed,
-          total,
-          rate
-        },
-        exams: examsSnapshot,
-        subscription: {
-          status: currentSub?.status || 'no_record',
-          month: currentMonth,
-          year: currentYear,
-          amountTotal: currentSub?.amountTotal || 0,
-          amountPaid: currentSub?.amountPaid || 0
-        }
-      };
-
-      // Generate a client-side URL-safe Base64 token containing the entire payload snapshot.
-      // This ensures 100% serverless, zero-backend, high-performance compatibility on platforms like Cloudflare Pages.
-      const jsonStr = JSON.stringify(payload);
-      const base64Token = btoa(unescape(encodeURIComponent(jsonStr)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, ''); // URL-safe base64 encoding
-
-      setPublicToken(base64Token);
-      localStorage.setItem(`masar_lookup_token_${id}`, base64Token);
-
-      toast.success('تم توليد وتحديث رابط المتابعة المباشر بنجاح!');
-
-      // Try to sync with server in background for backwards-compatibility, but don't fail if the server is offline or unavailable
-      try {
-        const sessionToken = await getToken();
-        await fetch(`/api/students/${id}/lookup-token`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': sessionToken ? `Bearer ${sessionToken}` : ''
-          },
-          body: JSON.stringify(payload)
-        });
-      } catch (srvErr) {
-        console.warn('[Sync background] Server lookup storage was deferred:', srvErr);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error('حدث خطأ أثناء توليد رابط المتابعة');
-    } finally {
-      setLoadingToken(false);
-    }
-  };
-
+  // Generate the simple, low-density QR code identical to the card back
   useEffect(() => {
-    if (activeTab === 'lookup') {
-      fetchPublicToken();
-    }
-  }, [activeTab, id]);
-
-  useEffect(() => {
-    if (publicToken) {
-      const shareUrl = `${window.location.origin}/s/${publicToken}`;
+    if (shortLookupUrl) {
       QRCode.toDataURL(
-        shareUrl,
-        { margin: 2, width: 250, color: { dark: '#0f172a', light: '#ffffff' } },
+        shortLookupUrl,
+        { margin: 1, width: 220, color: { dark: '#000000', light: '#ffffff' } },
         (err, url) => {
           if (!err && url) {
             setQrCodeUrl(url);
@@ -183,11 +65,16 @@ export function StudentDetails() {
     } else {
       setQrCodeUrl('');
     }
-  }, [publicToken]);
+  }, [shortLookupUrl]);
 
-  const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
-  const student = allStudents.find(s => s.id === id);
-  
+  const handleCopyLink = () => {
+    if (!shortLookupUrl) return;
+    navigator.clipboard.writeText(shortLookupUrl);
+    setCopied(true);
+    toast.success('تم نسخ رابط المتابعة المختصر بنجاح!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   // Roster / Enrollments
   const { data: allEnrollments = [] } = useApiQuery<Enrollment>('enrollments', 2 * 60 * 1000);
   const enrollments = allEnrollments.filter(e => e.studentId === id);
@@ -213,6 +100,89 @@ export function StudentDetails() {
   const { data: allAssessments = [] } = useApiQuery<any>('assessments', 2 * 60 * 1000);
   const { data: allGrades = [] } = useApiQuery<any>('assessmentGrades', 60 * 1000);
   const studentGrades = allGrades.filter(g => g.studentId === id);
+
+  // Background server sync for the canonical student lookup profile
+  const handleSyncLookup = async (showToast = true) => {
+    if (!student || !id) return;
+
+    try {
+      setLoadingSync(true);
+
+      const attended = attendanceRecords.filter((r: any) => r.status === 'present' || r.status === 'compensation').length;
+      const missed = attendanceRecords.filter((r: any) => r.status === 'absent').length;
+      const total = attended + missed;
+      const rate = total > 0 ? Math.round((attended / total) * 100) : 100;
+
+      const currentSub = monthlySubscriptions?.find((s: any) => s.month === currentMonth && s.year === currentYear) || null;
+
+      const examsSnapshot = studentGrades.map((grade: any) => {
+        const assessment = allAssessments?.find((a: any) => a.id === grade.assessmentId);
+        const numericGrade = typeof grade.grade === 'number' ? grade.grade : parseFloat(grade.grade as string) || 0;
+        return {
+          id: grade.id,
+          name: assessment?.name || 'اختبار',
+          grade: numericGrade,
+          maxGrade: assessment?.maxGrade || 100,
+          date: assessment?.date || ''
+        };
+      });
+
+      const payload = {
+        student: {
+          id,
+          name: student.name,
+          studentCode: student.studentCode || cleanStudentCodeVal,
+          gradeLevel: student.gradeLevel,
+          school: student.school
+        },
+        attendance: {
+          attended,
+          missed,
+          total,
+          rate
+        },
+        exams: examsSnapshot,
+        subscription: {
+          status: currentSub?.status || 'no_record',
+          month: currentMonth,
+          year: currentYear,
+          amountTotal: currentSub?.amountTotal || 0,
+          amountPaid: currentSub?.amountPaid || 0
+        }
+      };
+
+      try {
+        const sessionToken = await getToken();
+        await fetch(`/api/students/${id}/lookup-token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': sessionToken ? `Bearer ${sessionToken}` : ''
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (srvErr) {
+        console.warn('[Sync lookup background] Server lookup storage was deferred:', srvErr);
+      }
+
+      if (showToast) {
+        toast.success('تمت مزامنة وتحديث بيانات متابعة الطالب بنجاح!');
+      }
+    } catch (err) {
+      console.error(err);
+      if (showToast) {
+        toast.error('حدث خطأ أثناء مزامنة البيانات');
+      }
+    } finally {
+      setLoadingSync(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'lookup' && student) {
+      handleSyncLookup(false);
+    }
+  }, [activeTab, id, student?.id]);
 
   const [isEditStudentModalOpen, setIsEditStudentModalOpen] = useState(false);
   const [isEditPricingModalOpen, setIsEditPricingModalOpen] = useState(false);
@@ -245,9 +215,6 @@ export function StudentDetails() {
       </div>
     );
   }
-
-  const currentMonth = new Date().getMonth() + 1;
-  const currentYear = new Date().getFullYear();
 
   return (
     <div className="space-y-6">
@@ -891,101 +858,79 @@ export function StudentDetails() {
               <div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">رابط المتابعة العام لولي الأمر والطالب</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  يتيح لك هذا الرابط مشاركة بيان تفصيلي مباشر (حضور، درجات امتحانات، حالة الاشتراكات) لولي الأمر دون الحاجة لتسجيل دخول.
+                  نفس الرابط المختصر ورمز الـ QR المطبوع على ظهر كارت الطالب — يتيح لولي الأمر مسح الكود أو فتح الرابط لمتابعة الحضور والدرجات والاشتراكات مباشرة.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={handleGenerateToken}
-                disabled={loadingToken}
+                onClick={() => handleSyncLookup(true)}
+                disabled={loadingSync}
                 className="px-4 py-2 text-xs font-bold text-white bg-slate-900 dark:bg-slate-800 rounded-lg hover:bg-slate-850 dark:hover:bg-slate-700 transition-colors cursor-pointer inline-flex items-center gap-1.5 shrink-0"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingToken ? 'animate-spin' : ''}`} />
-                <span>{publicToken ? 'تحديث وتزامن البيانات المباشرة' : 'توليد رابط المتابعة الآن'}</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingSync ? 'animate-spin' : ''}`} />
+                <span>تحديث وتزامن البيانات المباشرة</span>
               </button>
             </div>
 
-            {loadingToken && !publicToken ? (
-              <div className="py-12 text-center text-xs text-slate-400">
-                <div className="w-6 h-6 border-2 border-slate-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <span>جاري تحميل الرابط الحالي...</span>
-              </div>
-            ) : publicToken ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <div className="md:col-span-2 space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">رابط المشاركة المباشر:</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={`${window.location.origin}/s/${publicToken}`}
-                        dir="ltr"
-                        className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono font-bold text-slate-700 dark:text-slate-300 outline-none select-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleCopyLink}
-                        className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                          copied
-                            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400'
-                        }`}
-                        title="نسخ الرابط"
-                      >
-                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                      <a
-                        href={`${window.location.origin}/s/${publicToken}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-lg transition-colors animate-none"
-                        title="فتح الرابط في نافذة جديدة"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 rounded-xl space-y-2">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      <span>الرابط مفعل وجاهز للمشاركة</span>
-                    </h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      عند نقر ولي الأمر أو الطالب على هذا الرابط، سيتمكن من عرض مستوى حضور الطالب الحالي، فواتير الاشتراكات الشهرية المتبقية والمسددة، وسجل درجات الامتحانات والتقييمات الأخيرة بشكل فوري وتفاعلي، دون أي إعدادات أو الحاجة لإنشاء حساب.
-                    </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="md:col-span-2 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">رابط المشاركة المباشر (المطابق لكارت الطالب):</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={shortLookupUrl}
+                      dir="ltr"
+                      className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono font-bold text-slate-700 dark:text-slate-300 outline-none select-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyLink}
+                      className={`p-2 rounded-lg border transition-all cursor-pointer ${
+                        copied
+                          ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400'
+                      }`}
+                      title="نسخ الرابط"
+                    >
+                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                    <a
+                      href={shortLookupUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-lg transition-colors animate-none"
+                      title="فتح الرابط في نافذة جديدة"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
                   </div>
                 </div>
 
-                <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800 rounded-xl">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3 font-semibold">رمز الـ QR المباشر للمتابعة:</span>
-                  {qrCodeUrl ? (
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
-                      <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" />
-                    </div>
-                  ) : (
-                    <div className="w-40 h-40 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
-                  )}
-                  <span className="text-[10px] text-slate-400 mt-2 text-center font-medium">يمكنك مسح الكود من الهاتف لفتح الصفحة مباشرة</span>
+                <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 rounded-xl space-y-2">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <span>رمز ورابط موحد لكارت الطالب وصفحة المتابعة</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    هذا الكود هو نفس رمز الـ QR المطبوع على ظهر بطاقة الطالب التعريفية، بصيغة رابط مختصرة وخفيفة. عند مسحه بكاميرا أي هاتف، يتم فتح صفحة متابعة الطالب مباشرة ومزامنة الحضور والامتحانات وموقف الاشتراكات بشكل ديناميكي ومستمر.
+                  </p>
                 </div>
               </div>
-            ) : (
-              <div className="p-8 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-center space-y-3">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  لا يوجد رابط متابعة نشط تم توليده لهذا الطالب حتى الآن.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleGenerateToken}
-                  disabled={loadingToken}
-                  className="px-5 py-2 text-xs font-bold text-white bg-slate-900 dark:bg-slate-800 rounded-lg hover:bg-slate-850 dark:hover:bg-slate-700 transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingToken ? 'animate-spin' : ''}`} />
-                  <span>توليد رابط متابعة الطالب لأول مرة</span>
-                </button>
+
+              <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800 rounded-xl">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3 font-semibold">رمز الـ QR المباشر (المطابق للكارت):</span>
+                {qrCodeUrl ? (
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
+                    <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" />
+                  </div>
+                ) : (
+                  <div className="w-40 h-40 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
+                )}
+                <span className="text-[10px] text-slate-400 mt-2 text-center font-medium">نفس رمز الـ QR الموجود على ظهر كارت الطالب</span>
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>

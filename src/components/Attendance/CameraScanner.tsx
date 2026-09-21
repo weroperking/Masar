@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Camera, X, RefreshCw, AlertCircle, Check, Image, RotateCw, ChevronsUpDown } from 'lucide-react';
 import { playSuccessBeep, playWarningBeep } from '../../utils/audio';
+import { extractStudentCodeFromScanned } from '../../utils/studentCode';
 
 interface CameraScannerProps {
   onScan: (decodedText: string) => void;
@@ -33,27 +34,31 @@ export function CameraScanner({ onScan, onClose }: CameraScannerProps) {
 
   // Handle successful detection
   const handleDecoded = (decodedText: string) => {
-    const cleanText = decodedText.trim();
-    if (!cleanText) return;
+    const rawClean = decodedText.trim();
+    if (!rawClean) return;
+
+    // Automatically extract clean student code or ID from URL or raw code
+    const studentCode = extractStudentCodeFromScanned(rawClean) || rawClean;
+    if (!studentCode) return;
 
     const now = Date.now();
     // 2.5 second cooldown for the exact same student code to prevent duplicate logging
-    if (cleanText === lastScannedCodeRef.current && now - lastScannedTimeRef.current < 2500) {
+    if (studentCode === lastScannedCodeRef.current && now - lastScannedTimeRef.current < 2500) {
       return;
     }
 
-    lastScannedCodeRef.current = cleanText;
+    lastScannedCodeRef.current = studentCode;
     lastScannedTimeRef.current = now;
 
     playSuccessBeep();
 
-    setSuccessCode(cleanText);
+    setSuccessCode(studentCode);
     setTimeout(() => {
       setSuccessCode(null);
     }, 2000);
 
     // Call parent scan callback immediately
-    onScan(cleanText);
+    onScan(studentCode);
   };
 
   // Start scanning with a specific camera ID

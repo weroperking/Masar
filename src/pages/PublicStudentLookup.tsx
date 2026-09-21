@@ -5,6 +5,67 @@ import {
   Wallet, BookOpen, AlertTriangle, ShieldCheck
 } from 'lucide-react';
 import { PublicLookupData } from '../types';
+import { db } from '../db/db';
+
+async function resolveStudentFromDexie(token: string): Promise<PublicLookupData | null> {
+  try {
+    const cleanToken = token.replace(/\D/g, '');
+    const localStudent = (await db.students.get(token)) ||
+      (await db.students.where('studentCode').equals(token).first()) ||
+      (cleanToken ? await db.students.filter(s => !!s.studentCode && s.studentCode.replace(/\D/g, '') === cleanToken).first() : null);
+
+    if (!localStudent) return null;
+
+    const studentRecords = await db.attendanceRecords.where('studentId').equals(localStudent.id).toArray();
+    const attended = studentRecords.filter(r => r.status === 'present' || r.status === 'compensation').length;
+    const missed = studentRecords.filter(r => r.status === 'absent').length;
+    const total = attended + missed;
+    const rate = total > 0 ? Math.round((attended / total) * 100) : 100;
+
+    const grades = await db.assessmentGrades.where('studentId').equals(localStudent.id).toArray();
+    const examList: any[] = [];
+    for (const g of grades) {
+      const assessment = await db.assessments.get(g.assessmentId);
+      const numericGrade = typeof g.grade === 'number' ? g.grade : parseFloat(g.grade as string) || 0;
+      examList.push({
+        id: g.id,
+        name: assessment?.name || 'اختبار',
+        grade: numericGrade,
+        maxGrade: assessment?.maxGrade || 100,
+        date: g.gradedAt ? new Date(g.gradedAt).toISOString().split('T')[0] : undefined
+      });
+    }
+
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    const sub = await db.monthlySubscriptions
+      .where('studentId')
+      .equals(localStudent.id)
+      .filter(s => s.month === currentMonth && s.year === currentYear)
+      .first();
+
+    return {
+      student: {
+        id: localStudent.id,
+        name: localStudent.name,
+        studentCode: localStudent.studentCode,
+        gradeLevel: localStudent.gradeLevel,
+        school: localStudent.school
+      },
+      attendance: { attended, missed, total, rate },
+      exams: examList,
+      subscription: {
+        status: (sub?.status === 'paid' ? 'paid' : sub?.status === 'partial' ? 'partial' : 'no_record') as any,
+        month: currentMonth,
+        year: currentYear,
+        amountTotal: sub?.amountTotal || 0,
+        amountPaid: sub?.amountPaid || 0
+      }
+    };
+  } catch (err) {
+    return null;
+  }
+}
 
 export function PublicStudentLookup() {
   const { token } = useParams<{ token: string }>();
@@ -52,20 +113,36 @@ export function PublicStudentLookup() {
           res = await fetch(`/public/lookup/${token}`);
         }
 
-        if (!res.ok) {
+        if (res.ok) {
+          const result = await res.json();
           if (isMounted) {
-            setError(true);
+            setData(result);
             setLoading(false);
           }
           return;
         }
 
-        const result = await res.json();
+        // Secondary fallback: Check local Dexie if opened in center or offline
+        const localData = await resolveStudentFromDexie(token);
+        if (localData && isMounted) {
+          setData(localData);
+          setLoading(false);
+          return;
+        }
+
         if (isMounted) {
-          setData(result);
+          setError(true);
           setLoading(false);
         }
       } catch (err) {
+        // Fallback on network failure
+        const localData = await resolveStudentFromDexie(token);
+        if (localData && isMounted) {
+          setData(localData);
+          setLoading(false);
+          return;
+        }
+
         if (isMounted) {
           setError(true);
           setLoading(false);

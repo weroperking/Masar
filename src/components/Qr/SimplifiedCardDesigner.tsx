@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Save, Upload, CheckCircle, Barcode as BarcodeIcon, 
+  Save, Upload, CheckCircle, 
   QrCode, CreditCard, Palette, Trash2, HelpCircle,
   ZoomIn, ZoomOut, Maximize2, Download, Send, RefreshCw,
-  Sliders, Eye, Sparkles
+  Sliders, Eye, Sparkles, Smartphone, UserCheck
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { CardCustomDesign } from '../../types';
@@ -33,6 +33,13 @@ export function SimplifiedCardDesigner({
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isDownloadingDirect, setIsDownloadingDirect] = useState<boolean>(false);
 
+  // Guarantee card back is strictly a QR code (no barcode)
+  useEffect(() => {
+    if (design.cardFormat !== 'qrcode') {
+      setDesign(prev => ({ ...prev, cardFormat: 'qrcode' }));
+    }
+  }, [design.cardFormat, setDesign]);
+
   // File upload handlers
   const handleFrontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -45,6 +52,7 @@ export function SimplifiedCardDesigner({
       reader.onload = ev => {
         setDesign(prev => ({
           ...prev,
+          cardFormat: 'qrcode',
           frontImage: ev.target?.result as string,
           frontFit: 'cover',
           frontOpacity: 1,
@@ -68,6 +76,7 @@ export function SimplifiedCardDesigner({
       reader.onload = ev => {
         setDesign(prev => ({
           ...prev,
+          cardFormat: 'qrcode',
           backImage: ev.target?.result as string,
           backFit: 'cover',
           backOpacity: 1,
@@ -87,13 +96,13 @@ export function SimplifiedCardDesigner({
     try {
       setIsDownloadingDirect(true);
       await downloadCardImage({
-        design,
+        design: { ...design, cardFormat: 'qrcode' },
         face,
         cardNumber: '1001',
         width: 1050,
         height: 660
       });
-      toast.success(face === 'front' ? 'تم تنزيل تصميم الوجه الأمامي بدقة HD' : 'تم تنزيل تصميم الظهر مع الباركود بدقة HD');
+      toast.success(face === 'front' ? 'تم تنزيل تصميم الوجه الأمامي بدقة HD' : 'تم تنزيل تصميم الظهر مع رمز QR بدقة HD');
     } catch (err: any) {
       toast.error('فشل تنزيل الصورة: ' + (err?.message || ''));
     } finally {
@@ -236,66 +245,55 @@ export function SimplifiedCardDesigner({
                 3
               </div>
               <div>
-                <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">نوع الرمز وموضعه في ظهر الكارت</h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">سيظهر كود الطالب أسفل الرمز مباشرةً في ملصق أبيض نقي</p>
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">رمز QR الذكي وموضعه في ظهر الكارت</h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">رمز QR تفاعلي موحد يجمع بين تسجيل الحضور وبوابة الطالب الذكية</p>
               </div>
             </div>
 
-            {/* Code Selector Options */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {/* Option 1: Barcode */}
-              <button
-                type="button"
-                onClick={() => {
-                  setDesign(prev => ({ ...prev, cardFormat: 'barcode' }));
-                  setActivePreviewFace('back');
-                }}
-                className={`p-3.5 rounded-xl border text-right transition-all flex flex-col gap-2 cursor-pointer min-h-[90px] ${
-                  (design.cardFormat || 'barcode') === 'barcode'
-                    ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200 ring-2 ring-blue-500/20'
-                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold flex items-center gap-1.5">
-                    <BarcodeIcon className="w-4 h-4 text-blue-600" />
-                    <span>باركود (Barcode)</span>
-                  </span>
-                  {(design.cardFormat || 'barcode') === 'barcode' && (
-                    <CheckCircle className="w-4 h-4 text-blue-600" />
-                  )}
+            {/* Dual-Purpose QR Code Feature Card */}
+            <div className="rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                    <QrCode className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-blue-950 dark:text-blue-200">
+                      رمز كيو آر الموحد (Dual-Purpose QR Code)
+                    </h5>
+                    <span className="text-[10px] text-blue-700 dark:text-blue-300 font-medium">
+                      معتمد وثابت لجميع الكروت الصادرة في السنتر (بدون باركود تقليدي)
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  متوافق تماماً مع قارئات الليزر وشباك السنتر
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                  <CheckCircle className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                  <span>مفعل تلقائياً</span>
                 </span>
-              </button>
+              </div>
 
-              {/* Option 2: QR Code */}
-              <button
-                type="button"
-                onClick={() => {
-                  setDesign(prev => ({ ...prev, cardFormat: 'qrcode' }));
-                  setActivePreviewFace('back');
-                }}
-                className={`p-3.5 rounded-xl border text-right transition-all flex flex-col gap-2 cursor-pointer min-h-[90px] ${
-                  design.cardFormat === 'qrcode'
-                    ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200 ring-2 ring-blue-500/20'
-                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold flex items-center gap-1.5">
-                    <QrCode className="w-4 h-4 text-blue-600" />
-                    <span>رمز كيو آر (QR Code)</span>
-                  </span>
-                  {design.cardFormat === 'qrcode' && (
-                    <CheckCircle className="w-4 h-4 text-blue-600" />
-                  )}
+              {/* Two Core Functions */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="bg-white/90 dark:bg-slate-900/90 rounded-lg p-3 border border-blue-100 dark:border-blue-900/40 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-slate-100">
+                    <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <span>1. للمنصة والسنتر:</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                    يخزن المعرّف الفريد للطالب غير القابل للتكرار، لتسجيل الحضور والغياب فورياً عبر كاميرا المنصة أو ماسح السنتر.
+                  </p>
                 </div>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  متوافق مع كاميرات الهواتف والماسح الضوئي
-                </span>
-              </button>
+
+                <div className="bg-white/90 dark:bg-slate-900/90 rounded-lg p-3 border border-blue-100 dark:border-blue-900/40 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-slate-100">
+                    <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>2. للطلاب وأولياء الأمور:</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                    عند مسح الرمز بكاميرا الهاتف المحمول، يفتح مباشرة صفحة الطالب المخصصة لمتابعة درجاته وحضوره واشتراكاته.
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Position Controls on Back */}
@@ -527,7 +525,7 @@ export function SimplifiedCardDesigner({
               <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                 • <strong className="text-slate-700 dark:text-slate-300">الوجه الأمامي:</strong> يظهر تصميمك الأصلي بالكامل بدون أي بيانات مشوهة أو متداخلة.
                 <br />
-                • <strong className="text-slate-700 dark:text-slate-300">الوجه الخلفي:</strong> يظهر تصميم الظهر ومثبت عليه ملصق {design.cardFormat === 'qrcode' ? 'رمز QR' : 'الباركود'} مع كود الطالب مطبوعاً أسفله (<span className="font-mono font-bold text-slate-700 dark:text-slate-300">* 1001 *</span>).
+                • <strong className="text-slate-700 dark:text-slate-300">الوجه الخلفي:</strong> يظهر تصميم الظهر ومثبت عليه ملصق رمز QR الذكي مع كود الطالب مطبوعاً أسفله (<span className="font-mono font-bold text-slate-700 dark:text-slate-300">* 1001 *</span>).
               </p>
             </div>
 

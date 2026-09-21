@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Barcode from 'react-barcode';
 import QRCode from 'qrcode';
 import { CardCustomDesign, CardOverlayElement } from '../../types';
+import { buildStudentLookupUrl } from '../../utils/studentCode';
 
 export type CardThemeColor = 'blue' | 'emerald' | 'indigo' | 'amber' | 'rose' | 'slate';
 
@@ -135,7 +136,7 @@ export function QrCardBadge({
   const activeShowSchool = design.showSchool ?? true;
   const activeShowCenterName = design.showCenterName ?? showCenterName ?? true;
   const activeShowCardNumber = design.showCardNumber ?? showCardNumber ?? true;
-  const activeCardFormat = design.codeFormat || design.cardFormat || 'barcode';
+  const activeCardFormat = design.codeFormat || design.cardFormat || 'qrcode';
   const activeFontFamily = design.fontFamily ?? 'Cairo, sans-serif';
   const activeBorderRadius = design.borderRadius ?? 12;
   const activeBorderWidth = design.borderWidth ?? 1;
@@ -144,16 +145,21 @@ export function QrCardBadge({
   const activeShowLogo = design.showLogo ?? true;
   const activeLogoPosition = design.logoPosition ?? 'right';
 
-  // Generate QR
+  // Generate QR Code targeting the student's dedicated portal page (/s/:code)
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
-  const isQrCode = activeCardFormat === 'qrcode';
+  const isQrCode = activeCardFormat !== 'barcode'; // Defaults to QR Code
   const cleanCode = String(cardNumber || qrCodeData || '0001').replace(/\D/g, '') || '0001';
 
   useEffect(() => {
     if (isQrCode) {
+      // If qrCodeData is already a full URL, encode it; otherwise encode /s/{cleanCode}
+      const qrTargetUrl = (qrCodeData && (qrCodeData.startsWith('http://') || qrCodeData.startsWith('https://')))
+        ? qrCodeData
+        : buildStudentLookupUrl(cleanCode);
+
       QRCode.toDataURL(
-        cleanCode,
-        { margin: 1, width: 120, color: { dark: '#000000', light: '#ffffff' } },
+        qrTargetUrl,
+        { margin: 1, width: 140, color: { dark: '#000000', light: '#ffffff' } },
         (err, url) => {
           if (!err && url) {
             setQrCodeUrl(url);
@@ -161,7 +167,7 @@ export function QrCardBadge({
         }
       );
     }
-  }, [cleanCode, isQrCode]);
+  }, [cleanCode, isQrCode, qrCodeData]);
 
   // Is a custom template uploaded for this specific face?
   const hasFrontTemplate = !!design.frontImage;

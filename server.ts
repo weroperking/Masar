@@ -269,9 +269,37 @@ async function startServer() {
       return res.status(404).json({ error: 'Invalid token' });
     }
 
-    const data = lookupTokensMap.get(token);
+    // 1. Direct match in lookupTokensMap (by UUID token, studentId, or studentCode)
+    let data = lookupTokensMap.get(token);
+
+    // 2. Check if token matches studentId in studentToTokenMap
     if (!data) {
-      return res.status(404).json({ error: 'This link is invalid or has expired' });
+      const mappedToken = studentToTokenMap.get(token);
+      if (mappedToken) {
+        data = lookupTokensMap.get(mappedToken);
+      }
+    }
+
+    // 3. Search across all values in lookupTokensMap by studentCode, ID, or clean digits
+    if (!data) {
+      const cleanTokenDigits = token.replace(/\D/g, '');
+      for (const val of lookupTokensMap.values()) {
+        const student = val.student;
+        if (!student) continue;
+
+        if (
+          student.id === token ||
+          student.studentCode === token ||
+          (cleanTokenDigits.length > 0 && student.studentCode?.replace(/\D/g, '') === cleanTokenDigits)
+        ) {
+          data = val;
+          break;
+        }
+      }
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: 'هذا الرابط غير صالح أو لم يتم تسجيل بيانات الطالب بعد' });
     }
 
     return res.status(200).json(data);
@@ -279,6 +307,31 @@ async function startServer() {
 
   app.get('/api/public/lookup/:token', handlePublicLookup);
   app.get('/public/lookup/:token', handlePublicLookup);
+
+  // Bulk sync of student lookup snapshots from client
+  const handleSyncLookups = (req: express.Request, res: express.Response) => {
+    const items: LookupData[] = Array.isArray(req.body) ? req.body : (req.body?.items || []);
+    let count = 0;
+    for (const item of items) {
+      if (item && item.student && item.student.id) {
+        const studentId = item.student.id;
+        const studentCode = item.student.studentCode || '';
+        lookupTokensMap.set(studentId, item);
+        if (studentCode) {
+          lookupTokensMap.set(studentCode, item);
+          const cleanDigits = studentCode.replace(/\D/g, '');
+          if (cleanDigits) {
+            lookupTokensMap.set(cleanDigits, item);
+          }
+        }
+        count++;
+      }
+    }
+    res.status(200).json({ success: true, count });
+  };
+
+  app.post('/api/public/sync-lookups', handleSyncLookups);
+  app.post('/public/sync-lookups', handleSyncLookups);
 
   // Student Details lookup token retrieval
   const handleGetStudent = (req: express.Request, res: express.Response) => {
@@ -348,8 +401,16 @@ async function startServer() {
       subscription: subscriptionInfo
     };
 
-    // Store new mapping
+    // Store new mapping under UUID token, student ID, and studentCode
     lookupTokensMap.set(newToken, record);
+    lookupTokensMap.set(id, record);
+    if (studentInfo.studentCode) {
+      lookupTokensMap.set(studentInfo.studentCode, record);
+      const cleanDigits = studentInfo.studentCode.replace(/\D/g, '');
+      if (cleanDigits) {
+        lookupTokensMap.set(cleanDigits, record);
+      }
+    }
     studentToTokenMap.set(id, newToken);
 
     console.log(`[API] Generated new public lookup token for student ${id} (${studentInfo.name}): ${newToken}`);
