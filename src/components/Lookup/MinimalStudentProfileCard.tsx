@@ -1,14 +1,12 @@
-import { useState } from 'react';
 import { 
   Building2, MapPin, GraduationCap, 
-  School, UserCheck, ShieldCheck, 
-  Share2, Check, Phone, MessageSquare, 
-  Copy, Sparkles
+  UserCheck, ShieldCheck
 } from 'lucide-react';
 import { PublicLookupData } from '../../types';
 
 interface MinimalStudentProfileCardProps {
   data: PublicLookupData;
+  onContactClick?: (type: 'student' | 'parent') => void;
 }
 
 export function MinimalStudentProfileCard({ data }: MinimalStudentProfileCardProps) {
@@ -49,7 +47,7 @@ export function MinimalStudentProfileCard({ data }: MinimalStudentProfileCardPro
         <div className="absolute top-3 inset-x-3 sm:inset-x-4 flex items-center justify-between z-10">
           
           {/* Highlighted Teacher Name Pill */}
-          <div className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-sm px-3 py-1 rounded-full text-xs font-bold border border-blue-500/80 transition-transform">
+          <div className="inline-flex items-center gap-1.5 bg-blue-600 text-white shadow-sm px-3 py-1 rounded-full text-xs font-bold border border-blue-500/80">
             <UserCheck className="w-3.5 h-3.5" />
             <span>الأستاذ / {resolvedTeacher}</span>
           </div>
@@ -62,7 +60,7 @@ export function MinimalStudentProfileCard({ data }: MinimalStudentProfileCardPro
         </div>
       </div>
 
-      {/* 2. Overlapping Circular Avatar with Halo Ring */}
+      {/* 2. Overlapping Circular Avatar with Halo Ring (Spark Removed) */}
       <div className="-mt-14 sm:-mt-16 mb-2 flex justify-center relative z-10">
         <div className="relative group">
           {/* Multi-color Spectrum Ring (Inspired by Reference) */}
@@ -72,11 +70,6 @@ export function MinimalStudentProfileCard({ data }: MinimalStudentProfileCardPro
                 {initialLetter}
               </div>
             </div>
-          </div>
-          
-          {/* Verified Small Badge */}
-          <div className="absolute bottom-1 left-1 bg-emerald-500 text-white p-1 rounded-full shadow-xs border-2 border-white dark:border-slate-900">
-            <Sparkles className="w-2.5 h-2.5" />
           </div>
         </div>
       </div>
@@ -101,7 +94,7 @@ export function MinimalStudentProfileCard({ data }: MinimalStudentProfileCardPro
       </div>
 
       {/* 4. Minimalist Metadata Badges Row */}
-      <div className="flex items-center justify-center gap-1.5 flex-wrap px-4 mt-3">
+      <div className="flex items-center justify-center gap-1.5 flex-wrap px-4 mt-2.5">
         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 dark:text-slate-300 bg-slate-100/90 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/50 px-2.5 py-0.5 rounded-full">
           <MapPin className="w-3 h-3 text-slate-400 dark:text-slate-500" />
           <span>{resolvedBranch}</span>

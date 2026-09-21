@@ -45,7 +45,7 @@ export function LookupDetailSheet({
         <div className="space-y-4 p-1 text-right">
           {/* Status Banner */}
           <div
-            className={`p-3.5 rounded-xl border flex items-center justify-between ${
+            className={`p-4 rounded-2xl border flex items-center justify-between ${
               isPresent
                 ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
                 : isCompensation
@@ -53,15 +53,15 @@ export function LookupDetailSheet({
                 : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
             }`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               {isPresent ? (
-                <CheckCircle2 className="w-5 h-5" />
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
               ) : isCompensation ? (
-                <AlertCircle className="w-5 h-5" />
+                <AlertCircle className="w-5 h-5 shrink-0" />
               ) : (
-                <XCircle className="w-5 h-5" />
+                <XCircle className="w-5 h-5 shrink-0" />
               )}
-              <span className="font-bold text-sm">
+              <span className="font-extrabold text-sm">
                 حالة الطالب: {isPresent ? 'حاضر في الموعد' : isCompensation ? 'حضور تعويضي' : 'غائب عن الحصة'}
               </span>
             </div>
@@ -72,9 +72,9 @@ export function LookupDetailSheet({
 
           {/* Details list */}
           <div className="space-y-2 text-xs">
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-blue-500" />
                 المادة / الكورس
               </span>
               <span className="font-bold text-slate-800 dark:text-slate-200">
@@ -83,9 +83,9 @@ export function LookupDetailSheet({
             </div>
 
             {selectedSession.groupName && (
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-indigo-500" />
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-indigo-500" />
                   المجموعة والموعد
                 </span>
                 <span className="font-bold text-slate-800 dark:text-slate-200">
@@ -94,9 +94,9 @@ export function LookupDetailSheet({
               </div>
             )}
 
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-amber-500" />
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-amber-500" />
                 المقر والفرع
               </span>
               <span className="font-bold text-slate-800 dark:text-slate-200">
@@ -105,8 +105,8 @@ export function LookupDetailSheet({
             </div>
 
             {teacherName && (
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400">المدرس المسؤول</span>
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400">الأستاذ المسؤول</span>
                 <span className="font-bold text-slate-800 dark:text-slate-200">{teacherName}</span>
               </div>
             )}
@@ -132,23 +132,23 @@ export function LookupDetailSheet({
       >
         <div className="space-y-4 p-1 text-right">
           {/* Score Header */}
-          <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 text-center space-y-1">
-            <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+          <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 text-center space-y-1">
+            <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
               الدرجة المحققة
             </span>
-            <div className="text-3xl font-mono font-bold text-blue-900 dark:text-blue-100">
+            <div className="text-3xl font-mono font-black text-blue-900 dark:text-blue-100">
               {selectedExam.grade} <span className="text-base text-blue-500">/ {maxGrade}</span>
             </div>
-            <span className="inline-block mt-1 px-3 py-0.5 rounded-full text-xs font-mono font-bold bg-blue-600 text-white">
+            <span className="inline-block mt-1 px-3 py-1 rounded-full text-xs font-mono font-bold bg-blue-600 text-white shadow-xs">
               نسبة التحصيل: {pct}%
             </span>
           </div>
 
           {/* Details */}
           <div className="space-y-2 text-xs">
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-blue-500" />
                 اسم التقييم
               </span>
               <span className="font-bold text-slate-800 dark:text-slate-200">
@@ -157,9 +157,9 @@ export function LookupDetailSheet({
             </div>
 
             {selectedExam.date && (
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-slate-500" />
                   تاريخ الاختبار
                 </span>
                 <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
@@ -168,9 +168,9 @@ export function LookupDetailSheet({
               </div>
             )}
 
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <Award className="w-3.5 h-3.5 text-amber-500" />
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <Award className="w-4 h-4 text-amber-500" />
                 التقدير العام
               </span>
               <span className="font-bold text-slate-800 dark:text-slate-200">
@@ -179,7 +179,7 @@ export function LookupDetailSheet({
             </div>
 
             {teacherName && (
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <span className="text-slate-500 dark:text-slate-400">إشراف الأستاذ</span>
                 <span className="font-bold text-slate-800 dark:text-slate-200">{teacherName}</span>
               </div>

@@ -20,9 +20,10 @@ async function getDecryptedStudents(): Promise<Student[]> {
     const raw = await db.students.toArray();
     const list: Student[] = [];
     for (const item of raw) {
-      if (item.envelope) {
+      const env = (item as unknown as { envelope?: Envelope }).envelope;
+      if (env) {
         try {
-          const plain = await decryptRecord<Student>(item.envelope as Envelope);
+          const plain = await decryptRecord<Student>(env);
           if (isNotDeleted(plain) && isNotDeleted(item)) {
             list.push({ ...plain, id: item.id });
           }
@@ -416,7 +417,7 @@ export function PublicStudentLookup() {
         {/* 1. Minimalist & Aesthetic Student Profile Card (Inspired by reference) */}
         <MinimalStudentProfileCard data={data} />
 
-        {/* 2. Lessons & Attendance Component */}
+        {/* 4. Lessons & Attendance Component */}
         <LessonsSection
           attendance={attendance}
           onSelectSession={(sess) => {
