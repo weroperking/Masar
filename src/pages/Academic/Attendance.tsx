@@ -76,65 +76,15 @@ export function Attendance() {
   const handleManualAutoCheck = async () => {
     setIsAutoChecking(true);
     try {
-      const now = new Date();
-      const arabicDays = [
-        "الأحد",
-        "الإثنين",
-        "الثلاثاء",
-        "الأربعاء",
-        "الخميس",
-        "الجمعة",
-        "السبت",
-      ];
-      const todayName = arabicDays[now.getDay()];
-
-      const currentTimeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-
-      const startOfDay = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-      ).getTime();
-      const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
-
-      const todaySessions = allSessions.filter(
-        (s) => s.startedAt >= startOfDay && s.startedAt < endOfDay,
-      );
-      const sessionsByGroup = new Set(todaySessions.map((s) => s.groupId));
-
-      let started = 0;
-
-      for (const group of groups || []) {
-        if (group.status !== "in_progress") continue;
-
-        if (group.daysOfWeek && group.daysOfWeek.includes(todayName)) {
-          if (
-            group.startTime &&
-            group.startTime <= currentTimeStr &&
-            !sessionsByGroup.has(group.id)
-          ) {
-            await createSession.mutateAsync({
-              groupId: group.id,
-              courseId: group.courseId,
-              startedAt: Date.now(),
-              endedAt: null,
-              status: "live",
-            });
-            started++;
-          }
-        }
-      }
-
-      if (started > 0) {
-        toast.success(`تم بدء ${started} حصة تلقائياً وفقاً للجدول الزمني!`);
+      const result = await autoScheduleService.checkAndRunSchedules();
+      if (result.started > 0) {
+        toast.success(`تم بدء ${result.started} حصة تلقائياً وفقاً للجدول الزمني!`);
       } else {
         toast.info("تم فحص الجدول: لا توجد حصص جديدة حان موعد بدئها الآن.");
       }
     } catch (e: any) {
       console.error(e);
-      toast.error(
-        "حدث خطأ أثناء فحص الحصص المجدولة: " + (e.message || "Error"),
-      );
+      toast.error("حدث خطأ أثناء فحص الحصص المجدولة.");
     } finally {
       setIsAutoChecking(false);
     }
@@ -200,6 +150,10 @@ export function Attendance() {
     });
 
     if (isConfirmed) {
+      const targetSession = allSessions.find((s) => s.id === sessionId);
+      if (targetSession?.groupId) {
+        autoScheduleService.markSessionCancelledOrEnded(targetSession.groupId);
+      }
       updateSession.mutate(
         {
           id: sessionId,
