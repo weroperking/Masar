@@ -786,7 +786,7 @@ function AttendanceModal({
     setQrInput("");
     if (!rawTrimmed) return;
 
-    // Support dual-purpose QR codes encoding full URL (e.g. https://.../s/1001) as well as raw codes
+    // Support dual-purpose QR codes encoding full URL (e.g. https://.../p/s/MTVi...) as well as raw codes
     const extracted = extractStudentCodeFromScanned(rawTrimmed);
     const code = extracted || rawTrimmed;
 

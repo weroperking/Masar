@@ -98,16 +98,17 @@ export function isStudentCodeTaken(
 /**
  * Builds the canonical public student lookup URL encoded in the card's QR code.
  * When scanned by any smartphone camera, opens the dedicated student profile page.
+ * Uses the new opaque org-scoped format: /p/s/{lookup_code}
  */
-export function buildStudentLookupUrl(codeOrId: string | undefined | null, customOrigin?: string): string {
-  const clean = String(codeOrId || '').trim();
+export function buildStudentLookupUrl(lookupCode: string | undefined | null, customOrigin?: string): string {
+  const clean = String(lookupCode || '').trim();
   if (!clean) return '';
   if (clean.startsWith('http://') || clean.startsWith('https://')) {
     return clean;
   }
 
   const origin = customOrigin || (typeof window !== 'undefined' && window.location.origin ? window.location.origin : '');
-  return `${origin}/s/${clean}`;
+  return `${origin}/p/s/${clean}`;
 }
 
 /**
@@ -123,8 +124,8 @@ export function extractStudentCodeFromScanned(scannedText: string | undefined | 
   if (!scannedText) return '';
   let text = String(scannedText).trim();
 
-  // 1. Check if the string contains a lookup path like /s/:token or /lookup/:token
-  const pathMatch = text.match(/\/(?:s|lookup|student)\/([a-zA-Z0-9_-]+)/i);
+  // 1. Check if the string contains a lookup path like /p/s/:code or /s/:token or /lookup/:token
+  const pathMatch = text.match(/\/(?:p\/s|s|lookup|student)\/([a-zA-Z0-9_-]+)/i);
   if (pathMatch && pathMatch[1]) {
     text = pathMatch[1];
   } else {

@@ -11,6 +11,7 @@ interface LookupData {
     id: string;
     name: string;
     studentCode?: string;
+    lookup_code?: string;
     gradeLevel?: string;
     school?: string;
     phone?: string;
@@ -150,7 +151,7 @@ function savePersistedBookingData() {
 function indexLookupRecord(record: LookupData, customToken?: string) {
   if (!record || !record.student) return;
   const s = record.student;
-  
+
   if (customToken) {
     lookupTokensMap.set(customToken, record);
     if (s.id) {
@@ -165,8 +166,7 @@ function indexLookupRecord(record: LookupData, customToken?: string) {
   if (s.studentCode) {
     const rawCode = String(s.studentCode).trim();
     lookupTokensMap.set(rawCode, record);
-    
-    // Strip # or other symbols
+
     const cleanCode = rawCode.replace(/^[#№\s]+/, '');
     if (cleanCode) {
       lookupTokensMap.set(cleanCode, record);
@@ -181,6 +181,10 @@ function indexLookupRecord(record: LookupData, customToken?: string) {
         lookupTokensMap.set(String(parsedNum), record);
       }
     }
+  }
+
+  if (s.lookup_code) {
+    lookupTokensMap.set(s.lookup_code, record);
   }
 }
 
@@ -747,10 +751,11 @@ async function startServer() {
     const { id } = req.params;
     const token = studentToTokenMap.get(id) || null;
     const lookupData = token ? lookupTokensMap.get(token) : null;
-    
+
     res.status(200).json({
       id,
       public_lookup_token: token,
+      lookup_code: lookupData?.student?.lookup_code || null,
       lookup_data: lookupData
     });
   };
@@ -827,7 +832,7 @@ async function startServer() {
       success: true,
       token: newToken,
       public_lookup_token: newToken,
-      url: `/s/${newToken}`
+      url: `/p/s/${newToken}`
     });
   };
 

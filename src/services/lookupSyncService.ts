@@ -147,6 +147,7 @@ export async function syncAllStudentsToLookupServer(): Promise<void> {
             id: student.id,
             name: student.name,
             studentCode: cleanCode,
+            lookup_code: student.lookup_code,
             gradeLevel: student.gradeLevel || '',
             school: student.school || '',
             phone: student.phone || '',

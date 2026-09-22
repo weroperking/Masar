@@ -9,6 +9,7 @@ export interface BaseRecord {
 export interface Student extends BaseRecord {
   studentCode?: string;
   public_lookup_token?: string;
+  lookup_code?: string;
   name: string;
   phone: string;
   school?: string;

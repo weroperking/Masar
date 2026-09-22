@@ -24,8 +24,9 @@ export interface QrCardBadgeProps {
   backgroundImage?: string;
   className?: string;
   customDesign?: CardCustomDesign;
-  face?: 'front' | 'back'; // Render active face, defaults to 'front'
+  face?: 'front' | 'back';
   id?: string;
+  lookupCode?: string | null;
 }
 
 const themeStyles: Record<CardThemeColor, {
@@ -145,17 +146,16 @@ export function QrCardBadge({
   const activeShowLogo = design.showLogo ?? true;
   const activeLogoPosition = design.logoPosition ?? 'right';
 
-  // Generate QR Code targeting the student's dedicated portal page (/s/:code)
+  // Generate QR Code targeting the student's dedicated portal page (/p/s/:lookup_code)
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
-  const isQrCode = activeCardFormat !== 'barcode'; // Defaults to QR Code
+  const isQrCode = activeCardFormat !== 'barcode';
   const cleanCode = String(cardNumber || qrCodeData || '0001').replace(/\D/g, '') || '0001';
 
   useEffect(() => {
     if (isQrCode) {
-      // If qrCodeData is already a full URL, encode it; otherwise encode /s/{cleanCode}
       const qrTargetUrl = (qrCodeData && (qrCodeData.startsWith('http://') || qrCodeData.startsWith('https://')))
         ? qrCodeData
-        : buildStudentLookupUrl(cleanCode);
+        : buildStudentLookupUrl(lookupCode || cleanCode);
 
       QRCode.toDataURL(
         qrTargetUrl,
@@ -167,7 +167,7 @@ export function QrCardBadge({
         }
       );
     }
-  }, [cleanCode, isQrCode, qrCodeData]);
+  }, [cleanCode, isQrCode, qrCodeData, lookupCode]);
 
   // Is a custom template uploaded for this specific face?
   const hasFrontTemplate = !!design.frontImage;
