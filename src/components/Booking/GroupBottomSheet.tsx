@@ -54,12 +54,15 @@ export function GroupBottomSheet({
           const isSelected = group.id === selectedGroupId;
           const enrolledCount = enrollmentCounts[group.id] || 0;
           
-          // Determine available slots and full status
-          // If availableSlots: null or capacity is null -> always bookable (unlimited capacity)
-          const rawAvailable = (group as any).availableSlots !== undefined 
-            ? (group as any).availableSlots 
-            : ((group as any).available_slots !== undefined ? (group as any).available_slots : undefined);
+          // Determine available slots, total capacity, and full status
+          // If availableSlots/remainingSeats is null or capacity is null -> always bookable (unlimited capacity)
+          const rawAvailable = (group as any).remainingSeats !== undefined
+            ? (group as any).remainingSeats
+            : ((group as any).availableSlots !== undefined 
+                ? (group as any).availableSlots 
+                : ((group as any).available_slots !== undefined ? (group as any).available_slots : undefined));
 
+          const totalCapacity = (group as any).capacity || (group as any).maxStudents || null;
           let isFull = false;
           let availableSeatsDisplay: number | null = null;
 
@@ -129,11 +132,11 @@ export function GroupBottomSheet({
                       </span>
                     ) : availableSeatsDisplay !== null ? (
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60">
-                        متاح {availableSeatsDisplay} مقعد
+                        متاح {availableSeatsDisplay} مقعد{totalCapacity ? ` من ${totalCapacity}` : ''}
                       </span>
                     ) : (
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60">
-                        متاح للتسجيل
+                        متاح للتسجيل{totalCapacity ? ` (السعة: ${totalCapacity})` : ''}
                       </span>
                     )}
 

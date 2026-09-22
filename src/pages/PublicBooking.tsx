@@ -41,15 +41,28 @@ function getOrCreateDeviceId(): string {
 
 export function PublicBooking() {
   const [searchParams] = useSearchParams();
-  const orgCode = searchParams.get('org') || 
-                  searchParams.get('code') || 
-                  searchParams.get('booking_code') || 
-                  searchParams.get('orgCode') || 
-                  searchParams.get('slug') || 
-                  new URLSearchParams(window.location.search).get('org') || 
-                  new URLSearchParams(window.location.search).get('code') || 
-                  new URLSearchParams(window.location.search).get('booking_code') || 
-                  '';
+
+  // Accept ALL of these query params in this strict priority order:
+  // 1. ?code=...
+  // 2. ?booking_code=...
+  // 3. ?orgCode=...
+  // 4. ?org=...
+  const orgCode = useMemo(() => {
+    const windowParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const resolved =
+      searchParams.get('code') ||
+      searchParams.get('booking_code') ||
+      searchParams.get('orgCode') ||
+      searchParams.get('org') ||
+      searchParams.get('slug') ||
+      windowParams?.get('code') ||
+      windowParams?.get('booking_code') ||
+      windowParams?.get('orgCode') ||
+      windowParams?.get('org') ||
+      windowParams?.get('slug') ||
+      '';
+    return resolved.trim();
+  }, [searchParams]);
 
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,6 +72,7 @@ export function PublicBooking() {
   const [publicCourses, setPublicCourses] = useState<Course[]>([]);
   const [publicGroups, setPublicGroups] = useState<Group[]>([]);
   const [publicAcademyName, setPublicAcademyName] = useState<string>('');
+  const [publicAcademyLogo, setPublicAcademyLogo] = useState<string>('');
   const [isPublicLoading, setIsPublicLoading] = useState<boolean>(true);
   const [publicFetchAttempted, setPublicFetchAttempted] = useState<boolean>(false);
 
@@ -94,105 +108,227 @@ export function PublicBooking() {
       try {
         const queryCode = orgCode || 'default';
         const endpoints = [
+          `/public/booking/${encodeURIComponent(queryCode)}`,
           `/api/public/booking/${encodeURIComponent(queryCode)}`,
+          `/public/booking?code=${encodeURIComponent(queryCode)}`,
           `/api/public/booking?code=${encodeURIComponent(queryCode)}`,
+          `/public/booking?org=${encodeURIComponent(queryCode)}`,
           `/api/public/booking?org=${encodeURIComponent(queryCode)}`,
+          '/public/booking',
           '/api/public/booking',
-          `https://masar-api.weroperking.workers.dev/api/public/booking/${encodeURIComponent(queryCode)}`
+          `https://masar-api.weroperking.workers.dev/public/booking/${encodeURIComponent(queryCode)}`,
+          `https://masar-api.weroperking.workers.dev/api/public/booking/${encodeURIComponent(queryCode)}`,
         ];
 
+        const isDev = Boolean(import.meta.env.DEV || process.env.NODE_ENV === 'development');
         let catalogData: any = null;
 
         for (const ep of endpoints) {
+          if (isDev) {
+            console.log('[Booking] Fetching:', ep);
+          }
+
           try {
             const res = await fetch(ep, {
-              headers: { 'Accept': 'application/json' }
+              headers: { 'Accept': 'application/json' },
             });
+
+            if (isDev) {
+              console.log('[Booking] Response status:', res.status);
+            }
+
+            if (res.status === 404) {
+              console.warn(`[Booking] Booking code not found (404 from ${ep})`);
+              continue;
+            }
+
             if (res.ok) {
-              const parsed = await res.json();
+              let parsed: any = null;
+              try {
+                parsed = await res.json();
+              } catch (parseErr) {
+                console.error(`[Booking] Failed to parse JSON response from ${ep}:`, parseErr);
+                continue;
+              }
+
+              if (isDev) {
+                console.log('[Booking] Response body:', parsed);
+              }
+
+              // Check if body is empty or []
+              const isArrayEmpty = Array.isArray(parsed) && parsed.length === 0;
+              const isObjEmpty = parsed && typeof parsed === 'object' && Object.keys(parsed).length === 0;
+              if (!parsed || isArrayEmpty || isObjEmpty) {
+                console.warn(`[Booking] No courses for this org (empty body from ${ep})`);
+                continue;
+              }
+
+              const candidateCourses = parsed?.courses || parsed?.data?.courses || (Array.isArray(parsed) ? parsed : null);
+              if (Array.isArray(candidateCourses) && candidateCourses.length === 0) {
+                console.log('[Booking] No courses for this org');
+              }
+
               const hasCourses = Boolean(
-                parsed?.courses || 
-                parsed?.data?.courses || 
-                parsed?.result?.courses || 
+                parsed?.courses ||
+                parsed?.data?.courses ||
+                parsed?.result?.courses ||
                 parsed?.catalog?.courses ||
                 (Array.isArray(parsed) && parsed.length > 0)
               );
-              if (parsed && (hasCourses || parsed.academyName || parsed.orgName)) {
+
+              const hasOrgInfo = Boolean(
+                parsed?.organization ||
+                parsed?.org ||
+                parsed?.academyName ||
+                parsed?.orgName ||
+                parsed?.name
+              );
+
+              if (hasCourses || hasOrgInfo) {
                 catalogData = parsed;
                 break;
               }
+            } else {
+              console.warn(`[Booking] Fetch returned non-OK status ${res.status} from ${ep}`);
             }
-          } catch (err) {
-            console.warn(`[Public Booking] Failed fetching from ${ep}:`, err);
+          } catch (fetchErr) {
+            console.error(`[Booking] Fetch error from ${ep}:`, fetchErr);
           }
         }
 
         if (!isCancelled && catalogData) {
-          const rawCourses = catalogData.courses || 
-                             catalogData.data?.courses || 
-                             catalogData.result?.courses || 
-                             catalogData.catalog?.courses || 
-                             (Array.isArray(catalogData) && catalogData[0]?.courses ? catalogData[0].courses : null) ||
-                             (Array.isArray(catalogData) ? catalogData : []);
+          // Destructure organization { id, name, logo, ... }
+          const orgObj = catalogData.organization || catalogData.org || catalogData.data?.organization;
+          const rawOrgName =
+            orgObj?.name ||
+            catalogData.academyName ||
+            catalogData.orgName ||
+            catalogData.name ||
+            catalogData.data?.academyName ||
+            catalogData.data?.orgName ||
+            catalogData.result?.academyName ||
+            '';
 
-          const rawGroups = catalogData.groups || 
-                            catalogData.data?.groups || 
-                            catalogData.result?.groups || 
-                            catalogData.catalog?.groups || 
-                            (Array.isArray(catalogData) && catalogData[0]?.groups ? catalogData[0].groups : null) || 
-                            [];
+          const rawOrgLogo =
+            orgObj?.logo ||
+            orgObj?.logoUrl ||
+            catalogData.logo ||
+            catalogData.logoUrl ||
+            catalogData.data?.logo ||
+            '';
 
-          const rawOrgName = catalogData.academyName || 
-                             catalogData.orgName || 
-                             catalogData.name || 
-                             catalogData.data?.academyName || 
-                             catalogData.data?.orgName || 
-                             catalogData.result?.academyName || 
-                             catalogData.organization?.name || 
-                             '';
+          // Destructure courses: backend returns { courses: [ { id, title, groups: [...] } ] }
+          const rawCourses =
+            catalogData.courses ||
+            catalogData.data?.courses ||
+            catalogData.result?.courses ||
+            catalogData.catalog?.courses ||
+            (Array.isArray(catalogData) && catalogData[0]?.courses ? catalogData[0].courses : null) ||
+            (Array.isArray(catalogData) ? catalogData : []);
 
-          if (Array.isArray(rawCourses) && rawCourses.length > 0) {
-            setPublicCourses(rawCourses.map((c: any) => ({
-              id: String(c.id || c._id || c.courseId || Math.random()),
-              name: c.name || c.title || c.courseName || 'كورس تعليمي',
-              subject: c.subject || c.name || c.title || '',
-              price: Number(c.price || c.cost || c.amount) || 0,
-              paymentType: c.paymentType || c.payment_type || 'monthly',
-              isActive: c.isActive !== false && c.is_active !== false && (c as any).active !== false,
-              created_at: Number(c.created_at) || Date.now(),
-              updated_at: Number(c.updated_at) || Date.now(),
-              sync_status: 'synced',
-              gradeLevel: c.gradeLevel || c.grade_level || c.grade || '',
-            } as unknown as Course)));
+          // Extract groups: groups may be nested inside each course (course.groups) or top-level (catalogData.groups)
+          const allExtractedGroups: any[] = [];
+
+          if (Array.isArray(rawCourses)) {
+            for (const c of rawCourses) {
+              const cId = String(c.id || c._id || c.courseId || '');
+              if (Array.isArray(c.groups)) {
+                for (const g of c.groups) {
+                  allExtractedGroups.push({
+                    ...g,
+                    courseId: g.courseId || g.course_id || cId,
+                  });
+                }
+              }
+            }
           }
 
-          if (Array.isArray(rawGroups) && rawGroups.length > 0) {
-            setPublicGroups(rawGroups.map((g: any) => ({
-              id: String(g.id || g._id || g.groupId || Math.random()),
-              courseId: String(g.courseId || g.course_id || g.course || ''),
-              name: g.name || g.groupName || g.title || 'المجموعة الأولى',
-              type: g.type || 'in_person',
-              daysOfWeek: Array.isArray(g.daysOfWeek) ? g.daysOfWeek : (Array.isArray(g.days) ? g.days : (typeof g.days === 'string' ? g.days.split(',') : [])),
-              startTime: g.startTime || g.start_time || g.time || '',
-              endTime: g.endTime || g.end_time || '',
-              startDate: g.startDate || g.start_date || '',
-              endDate: g.endDate || g.end_date || '',
-              maxStudents: Number(g.maxStudents || g.maxCapacity || g.capacity || g.max_students) || 25,
-              availableSlots: g.availableSlots !== undefined ? g.availableSlots : (g.available_slots !== undefined ? g.available_slots : null),
-              room: g.room || '',
-              status: g.status || 'scheduled',
-              created_at: Number(g.created_at) || Date.now(),
-              updated_at: Number(g.updated_at) || Date.now(),
-              sync_status: 'synced',
-            } as unknown as Group)));
+          const topLevelGroups =
+            catalogData.groups ||
+            catalogData.data?.groups ||
+            catalogData.result?.groups ||
+            catalogData.catalog?.groups ||
+            (Array.isArray(catalogData) && catalogData[0]?.groups ? catalogData[0].groups : null) ||
+            [];
+
+          if (Array.isArray(topLevelGroups)) {
+            for (const g of topLevelGroups) {
+              const gId = String(g.id || g._id || g.groupId || '');
+              if (!allExtractedGroups.some((existing) => String(existing.id || existing._id || existing.groupId) === gId)) {
+                allExtractedGroups.push(g);
+              }
+            }
+          }
+
+          if (Array.isArray(rawCourses) && rawCourses.length > 0) {
+            setPublicCourses(
+              rawCourses.map((c: any) => ({
+                id: String(c.id || c._id || c.courseId || Math.random()),
+                name: c.title || c.name || c.courseName || 'كورس تعليمي',
+                subject: c.subject || c.title || c.name || '',
+                price: Number(c.price || c.cost || c.amount) || 0,
+                paymentType: c.paymentType || c.payment_type || 'monthly',
+                isActive: c.isActive !== false && c.is_active !== false && (c as any).active !== false,
+                created_at: Number(c.created_at) || Date.now(),
+                updated_at: Number(c.updated_at) || Date.now(),
+                sync_status: 'synced',
+                gradeLevel: c.gradeLevel || c.grade_level || c.grade || '',
+              } as unknown as Course))
+            );
+          }
+
+          if (allExtractedGroups.length > 0) {
+            setPublicGroups(
+              allExtractedGroups.map((g: any) => {
+                const capacityVal = Number(g.capacity ?? g.maxStudents ?? g.maxCapacity ?? g.max_students) || 25;
+                const remainingVal =
+                  g.remainingSeats !== undefined
+                    ? (g.remainingSeats === null ? null : Number(g.remainingSeats))
+                    : g.availableSlots !== undefined
+                    ? (g.availableSlots === null ? null : Number(g.availableSlots))
+                    : g.available_slots !== undefined
+                    ? (g.available_slots === null ? null : Number(g.available_slots))
+                    : null;
+
+                return {
+                  id: String(g.id || g._id || g.groupId || Math.random()),
+                  courseId: String(g.courseId || g.course_id || g.course || ''),
+                  name: g.name || g.groupName || g.title || 'المجموعة الأولى',
+                  type: g.type || 'in_person',
+                  daysOfWeek: Array.isArray(g.daysOfWeek)
+                    ? g.daysOfWeek
+                    : Array.isArray(g.days)
+                    ? g.days
+                    : typeof g.days === 'string'
+                    ? g.days.split(',')
+                    : [],
+                  startTime: g.startTime || g.start_time || g.time || '',
+                  endTime: g.endTime || g.end_time || '',
+                  startDate: g.startDate || g.start_date || '',
+                  endDate: g.endDate || g.end_date || '',
+                  maxStudents: capacityVal,
+                  capacity: capacityVal,
+                  availableSlots: remainingVal,
+                  remainingSeats: remainingVal,
+                  room: g.room || '',
+                  status: g.status || 'scheduled',
+                  created_at: Number(g.created_at) || Date.now(),
+                  updated_at: Number(g.updated_at) || Date.now(),
+                  sync_status: 'synced',
+                } as unknown as Group;
+              })
+            );
           }
 
           if (rawOrgName) {
             setPublicAcademyName(rawOrgName);
           }
+          if (rawOrgLogo) {
+            setPublicAcademyLogo(rawOrgLogo);
+          }
         }
       } catch (e) {
-        console.warn('[Public Booking] Error loading public booking data:', e);
+        console.error('[Public Booking] Error loading public booking data:', e);
       } finally {
         if (!isCancelled) {
           setIsPublicLoading(false);
@@ -294,7 +430,10 @@ export function PublicBooking() {
     try {
       const deviceId = getOrCreateDeviceId();
       const code = orgCode || 'default';
-      const endpoint = `/api/public/booking/${encodeURIComponent(code)}`;
+      const submitEndpoints = [
+        `/public/booking/${encodeURIComponent(code)}`,
+        `/api/public/booking/${encodeURIComponent(code)}`,
+      ];
 
       const payload = {
         name: formData.name.trim(),
@@ -315,15 +454,30 @@ export function PublicBooking() {
         status: 'pending',
       };
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Device-Id': deviceId,
-          'x-device-id': deviceId,
-        },
-        body: JSON.stringify(payload),
-      });
+      let response: Response | null = null;
+      for (const submitEp of submitEndpoints) {
+        try {
+          const res = await fetch(submitEp, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Device-Id': deviceId,
+              'x-device-id': deviceId,
+            },
+            body: JSON.stringify(payload),
+          });
+          response = res;
+          if (res.ok || res.status === 429) {
+            break;
+          }
+        } catch (postErr) {
+          console.warn(`[Public Booking] Post submission failed at ${submitEp}:`, postErr);
+        }
+      }
+
+      if (!response) {
+        throw new Error('All submission endpoints failed');
+      }
 
       if (response.status === 429) {
         const errJson = await response.json().catch(() => ({}));
@@ -402,200 +556,236 @@ export function PublicBooking() {
 
           {/* Main Card Body */}
           <div className="w-full bg-white dark:bg-slate-900 px-5 sm:px-8 pt-3 pb-6 sm:pb-8 shadow-2xl border-x md:border-b border-slate-100 dark:border-slate-800 md:rounded-b-3xl space-y-4 sm:space-y-5">
-            {/* Header: Academy Name (Verified badge deleted as requested) */}
-            <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
-                  <span>{academyName}</span>
-                </h1>
-              </div>
-            </div>
-
-            {/* Specifications Grid: 3 columns (Course, Grade Level, Group) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
-              {/* Item 1: Course */}
-              <button
-                type="button"
-                disabled={isPublicLoading}
-                onClick={() => setIsCourseSheetOpen(true)}
-                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-wait"
-              >
-                <div className="flex items-center justify-end w-full">
-                  {isPublicLoading ? (
-                    <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
-                  )}
-                </div>
-                <div className="w-full">
-                  <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium block">
-                    الكورس المطلوب
-                  </span>
-                  <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
-                    {isPublicLoading ? (
-                      <span className="text-slate-400">جاري التحميل...</span>
-                    ) : selectedCourse ? (
-                      selectedCourse.name
-                    ) : (
-                      'لا توجد كورسات متاحة'
-                    )}
-                  </p>
-                </div>
-              </button>
-
-              {/* Item 2: Grade Level */}
-              <button
-                type="button"
-                disabled={isPublicLoading}
-                onClick={() => setIsGradeSheetOpen(true)}
-                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-wait"
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <GraduationCap className="w-4 h-4" />
-                  </div>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
-                </div>
-                <div className="w-full">
-                  <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium block">
-                    المرحلة الدراسية
-                  </span>
-                  <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
-                    {selectedGrade || 'اختر المرحلة'}
-                  </p>
-                </div>
-              </button>
-
-              {/* Item 3: Group & Schedule (Selection based on available seats) */}
-              <button
-                type="button"
-                disabled={isPublicLoading}
-                onClick={() => setIsGroupSheetOpen(true)}
-                className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-wait"
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Calendar className="w-4 h-4" />
-                  </div>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
-                </div>
-                <div className="w-full">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium block">
-                      المجموعة والموعد
-                    </span>
-                  </div>
-                  <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
-                    {isPublicLoading ? (
-                      <span className="text-slate-400">جاري التحميل...</span>
-                    ) : selectedGroup ? (
-                      selectedGroup.name
-                    ) : courseGroups.length > 0 ? (
-                      'اختر المجموعة'
-                    ) : (
-                      'لا توجد مجموعات متاحة'
-                    )}
-                  </p>
-                </div>
-              </button>
-            </div>
-
-            {/* Student Information Row (Opens StudentDetailsBottomSheet) */}
-            <button
-              type="button"
-              onClick={() => setIsStudentDetailsSheetOpen(true)}
-              className="w-full p-3 sm:p-3.5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 hover:bg-blue-100/60 dark:hover:bg-blue-950/50 transition-all flex items-center justify-between text-right cursor-pointer"
-            >
+            {/* Header: Organization Name & Logo */}
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3 sm:pb-3.5">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                  <User className="w-4 h-4" />
-                </div>
+                {publicAcademyLogo ? (
+                  <img
+                    src={publicAcademyLogo}
+                    alt={academyName}
+                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shadow-xs shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-base shadow-sm shadow-blue-500/20 shrink-0">
+                    <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </div>
+                )}
                 <div className="min-w-0">
-                  <div className="text-[11px] text-blue-700 dark:text-blue-300 font-medium">
-                    بيانات الطالب للتسجيل والتواصل
-                  </div>
-                  <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                    {formData.name ? `${formData.name} — ${formData.phone}` : 'اضغط لإدخال اسم الطالب ورقم الواتساب'}
-                  </div>
+                  <h1 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight truncate">
+                    {academyName}
+                  </h1>
+                  <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium block mt-0.5">
+                    بوابة الحجز والتسجيل الإلكتروني
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-bold shrink-0 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-blue-200/80 dark:border-blue-900/60 shadow-xs">
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>{formData.name ? 'تعديل' : 'إدخال'}</span>
-              </div>
-            </button>
+            </div>
 
-            {/* Error message alert (e.g. 429 rate limit or network error) */}
-            {errorMessage && (
-              <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center justify-between gap-2 animate-in fade-in">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
-                  <span>{errorMessage}</span>
+            {/* Clear empty state message if there are truly no courses */}
+            {!isPublicLoading && publicFetchAttempted && courses.length === 0 ? (
+              <div className="py-10 px-4 text-center rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center space-y-2.5">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
+                  <BookOpen className="w-6 h-6" />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setErrorMessage(null)}
-                  className="p-1 text-red-400 hover:text-red-600 dark:hover:text-red-300"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                <h3 className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-200">
+                  لا توجد كورسات متاحة للحجز حالياً
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
+                  لم يتم إضافة أي كورسات دراسية نشطة متاحة للتسجيل لهذه الأكاديمية حتى الآن.
+                </p>
               </div>
-            )}
-
-            {/* Bottom Action Area: Status & Pill "Book Now" + Cancel/Reset Button */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              {/* Left Side: Real-time Seat Reservation Status */}
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col items-start">
-                  <span className="text-[11px] font-medium text-slate-400 dark:text-slate-400">حالة المقاعد</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
-                      {!selectedCourse ? 'لا توجد كورسات متاحة' : (courseGroups.length > 0 && selectedGroup && (selectedGroup.maxStudents || 25) <= (enrollmentCounts[selectedGroup.id] || 0) ? 'اكتملت المقاعد' : 'متاح للتسجيل')}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Side: Action Buttons with Cancel option */}
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                {/* Reset / Cancel Button */}
-                {formData.name && (
+            ) : (
+              <>
+                {/* Specifications Grid: 3 columns (Course, Grade Level, Group) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+                  {/* Item 1: Course */}
                   <button
                     type="button"
-                    onClick={handleReset}
-                    className="py-3 px-4 rounded-full border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                    title="إلغاء وتفريغ البيانات"
+                    disabled={isPublicLoading}
+                    onClick={() => setIsCourseSheetOpen(true)}
+                    className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-wait"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>إلغاء</span>
+                    <div className="flex items-center justify-end w-full">
+                      {isPublicLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                      )}
+                    </div>
+                    <div className="w-full">
+                      <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium block">
+                        الكورس المطلوب
+                      </span>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
+                        {isPublicLoading ? (
+                          <span className="text-slate-400">جاري التحميل...</span>
+                        ) : selectedCourse ? (
+                          selectedCourse.name
+                        ) : (
+                          'لا توجد كورسات متاحة'
+                        )}
+                      </p>
+                    </div>
                   </button>
-                )}
 
-                {/* Primary "Book Now" Button in Masar Blue */}
+                  {/* Item 2: Grade Level */}
+                  <button
+                    type="button"
+                    disabled={isPublicLoading}
+                    onClick={() => setIsGradeSheetOpen(true)}
+                    className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-wait"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <GraduationCap className="w-4 h-4" />
+                      </div>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                    </div>
+                    <div className="w-full">
+                      <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium block">
+                        المرحلة الدراسية
+                      </span>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
+                        {selectedGrade || 'اختر المرحلة'}
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Item 3: Group & Schedule (Selection based on available seats) */}
+                  <button
+                    type="button"
+                    disabled={isPublicLoading}
+                    onClick={() => setIsGroupSheetOpen(true)}
+                    className="group p-3 sm:p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 hover:bg-blue-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/70 hover:border-blue-300 dark:hover:border-blue-800 transition-all text-right flex flex-col justify-between gap-2 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-wait"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                    </div>
+                    <div className="w-full">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-slate-400 dark:text-slate-400 font-medium block">
+                          المجموعة والموعد
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
+                        {isPublicLoading ? (
+                          <span className="text-slate-400">جاري التحميل...</span>
+                        ) : selectedGroup ? (
+                          selectedGroup.name
+                        ) : courseGroups.length > 0 ? (
+                          'اختر المجموعة'
+                        ) : (
+                          'لا توجد مجموعات متاحة'
+                        )}
+                      </p>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Student Information Row (Opens StudentDetailsBottomSheet) */}
                 <button
                   type="button"
-                  disabled={!selectedCourse || isSubmitting}
-                  onClick={handleSubmitBooking}
-                  className={`flex-1 sm:flex-initial px-8 sm:px-10 py-3.5 rounded-full font-bold text-sm sm:text-base transition-all shadow-lg flex items-center justify-center gap-2 ${
-                    !selectedCourse || isSubmitting
-                      ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed shadow-none'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/25 active:scale-95 cursor-pointer'
-                  }`}
+                  onClick={() => setIsStudentDetailsSheetOpen(true)}
+                  className="w-full p-3 sm:p-3.5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 hover:bg-blue-100/60 dark:hover:bg-blue-950/50 transition-all flex items-center justify-between text-right cursor-pointer"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>جاري إرسال الطلب...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4 stroke-[2.5]" />
-                      <span>احجز الآن</span>
-                    </>
-                  )}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] text-blue-700 dark:text-blue-300 font-medium">
+                        بيانات الطالب للتسجيل والتواصل
+                      </div>
+                      <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                        {formData.name ? `${formData.name} — ${formData.phone}` : 'اضغط لإدخال اسم الطالب ورقم الواتساب'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-bold shrink-0 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-blue-200/80 dark:border-blue-900/60 shadow-xs">
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>{formData.name ? 'تعديل' : 'إدخال'}</span>
+                  </div>
                 </button>
-              </div>
-            </div>
+
+                {/* Error message alert (e.g. 429 rate limit or network error) */}
+                {errorMessage && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center justify-between gap-2 animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                      <span>{errorMessage}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setErrorMessage(null)}
+                      className="p-1 text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Bottom Action Area: Status & Pill "Book Now" + Cancel/Reset Button */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  {/* Left Side: Real-time Seat Reservation Status */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex flex-col items-start">
+                      <span className="text-[11px] font-medium text-slate-400 dark:text-slate-400">حالة المقاعد</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                          {!selectedCourse ? 'لا توجد كورسات متاحة' : (courseGroups.length > 0 && selectedGroup && (selectedGroup.maxStudents || 25) <= (enrollmentCounts[selectedGroup.id] || 0) ? 'اكتملت المقاعد' : 'متاح للتسجيل')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Action Buttons with Cancel option */}
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {/* Reset / Cancel Button */}
+                    {formData.name && (
+                      <button
+                        type="button"
+                        onClick={handleReset}
+                        className="py-3 px-4 rounded-full border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                        title="إلغاء وتفريغ البيانات"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>إلغاء</span>
+                      </button>
+                    )}
+
+                    {/* Primary "Book Now" Button in Masar Blue */}
+                    <button
+                      type="button"
+                      disabled={!selectedCourse || isSubmitting}
+                      onClick={handleSubmitBooking}
+                      className={`flex-1 sm:flex-initial px-8 sm:px-10 py-3.5 rounded-full font-bold text-sm sm:text-base transition-all shadow-lg flex items-center justify-center gap-2 ${
+                        !selectedCourse || isSubmitting
+                          ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed shadow-none'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/25 active:scale-95 cursor-pointer'
+                      }`}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>جاري إرسال الطلب...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 stroke-[2.5]" />
+                          <span>احجز الآن</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
