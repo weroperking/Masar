@@ -258,10 +258,23 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
 
         if (res && Array.isArray(res.results)) {
           for (const result of res.results) {
-            if (result.status === 'success' || result.status === 'applied') {
+            if (
+              result.status === 'success' ||
+              result.status === 'applied' ||
+              result.status === 'ignored'
+            ) {
               await db.syncQueue.delete(result.idempotencyKey);
             } else {
               console.warn('[syncService] Remote rejected operation:', result);
+              const err = typeof result.error === 'string' ? result.error : '';
+              const isPermanent =
+                err.startsWith('Unknown or unsupported entity type') ||
+                err.startsWith('Invalid envelope') ||
+                err.startsWith('unwrapDek');
+              if (isPermanent) {
+                console.error('[syncService] parking permanently-failed outbox item:', result);
+                await db.syncQueue.delete(result.idempotencyKey);
+              }
             }
           }
         } else if (res && res.success) {

@@ -120,7 +120,8 @@ export function QrCardBadge({
   className = '',
   customDesign,
   face = 'front',
-  id
+  id,
+  lookupCode
 }: QrCardBadgeProps) {
   const isPrint = size === 'print';
   const isCompact = size === 'compact';
