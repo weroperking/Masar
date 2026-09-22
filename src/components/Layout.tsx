@@ -237,12 +237,24 @@ export function Layout() {
       return;
     }
     toast.info('جاري مزامنة البيانات مع الخادم...');
+    let ceilingHit = false;
+    const ceiling = setTimeout(() => {
+      ceilingHit = true;
+      toast.warning('المزامنة استغرقت وقتاً طويلاً — إلغاء الانتظار.');
+      setSyncState(getSyncState());
+    }, 65_000);
     try {
-      await triggerManualSync(getToken);
-      toast.success('تمت المزامنة بنجاح!');
+      await Promise.race([
+        triggerManualSync(getToken),
+        new Promise<void>((resolve) => setTimeout(resolve, 65_000)),
+      ]);
+      if (!ceilingHit) {
+        toast.success('تمت المزامنة بنجاح!');
+      }
     } catch (e: any) {
       toast.error('فشلت المزامنة: ' + (e.message || 'خطأ غير معروف'));
     } finally {
+      clearTimeout(ceiling);
       setSyncState(getSyncState());
     }
   };

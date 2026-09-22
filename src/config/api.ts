@@ -15,6 +15,15 @@ export function syncHeaders(token?: string | null, publicKeyHash?: string | null
   return headers;
 }
 
+export function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 export async function fetchWithAuth(url: string, token: string | null, options: RequestInit = {}) {
   const headers = new Headers(options.headers || {});
   if (token && !headers.has('Authorization')) {
@@ -51,11 +60,15 @@ export async function fetchWithAuth(url: string, token: string | null, options: 
   const targetUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
   const upstreamCtrl = new AbortController();
   const upstreamTimeout = setTimeout(() => upstreamCtrl.abort(), 10000);
-  const response = await fetch(targetUrl, {
-    ...options,
-    headers,
-    signal: options.signal || upstreamCtrl.signal,
-  });
+  const response = await withTimeout(
+    fetch(targetUrl, {
+      ...options,
+      headers,
+      signal: options.signal || upstreamCtrl.signal,
+    }),
+    20_000,
+    'sync fetch'
+  );
   clearTimeout(upstreamTimeout);
 
   console.log('[SYNC RESPONSE upstream]', response.status, response.headers.get('content-type'));

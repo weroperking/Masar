@@ -7,7 +7,6 @@ import {
   decryptRecord, 
   decryptSyncResponse,
   Envelope, 
-  getOrCreateLocalDek,
   getPublicKeyHash
 } from './cryptoService';
 import { fetchWithAuth, syncHeaders } from '../config/api';
@@ -21,6 +20,8 @@ function trace(msg: string, extra?: any) {
 if (typeof window !== 'undefined') {
   (window as any).__syncTrace = () => __syncTrace;
 }
+
+import { withTimeout } from '../config/api';
 
 export type SyncPillStatus = 'synced' | 'pending' | 'paused' | 'syncing';
 
@@ -67,48 +68,42 @@ if (typeof document !== 'undefined') {
 }
 
 export async function performHandshake(getToken: () => Promise<string | null>): Promise<void> {
-  try {
-    const cachedDek = await db.keystore.get('dek');
-    const cachedHash = await db.keystore.get('publicKeyHash');
-    if (cachedDek?.key && cachedHash?.value) {
-      return;
-    }
+  const cachedDek = await db.keystore.get('dek');
+  const cachedHash = await db.keystore.get('publicKeyHash');
+  if (cachedDek?.key && cachedHash?.value) {
+    return;
+  }
 
-    const keypair = await ensureDeviceKeypair();
-    const token = await getToken();
+  const keypair = await ensureDeviceKeypair();
+  const token = await getToken();
 
-    if (!token || !navigator.onLine) {
-      await getOrCreateLocalDek();
-      return;
-    }
+  if (!token) {
+    throw new Error('handshake: no auth token available');
+  }
 
-    try {
-      const pubKeyStr = await exportPublicKey(keypair);
-      const res = await fetchWithAuth('/api/sync/handshake', token, {
-        method: 'POST',
-        headers: syncHeaders(token),
-        body: JSON.stringify({ devicePublicKey: pubKeyStr })
-      });
+  if (!navigator.onLine) {
+    throw new Error('handshake: browser is offline');
+  }
 
-      if (res?.wrappedDek) {
-        await unwrapDek(res.wrappedDek, keypair.privateKey);
-        if (res.publicKeyHash) {
-          await db.keystore.put({
-            id: 'publicKeyHash',
-            value: res.publicKeyHash,
-            at: Date.now(),
-          });
-        }
-        return;
-      }
-    } catch (netErr) {
-      console.warn('[syncService] Handshake server response deferred, using local DEK:', netErr);
-    }
+  const pubKeyStr = await exportPublicKey(keypair);
+  const res = await fetchWithAuth('/api/sync/handshake', token, {
+    method: 'POST',
+    headers: syncHeaders(token),
+    body: JSON.stringify({ devicePublicKey: pubKeyStr })
+  });
 
-    await getOrCreateLocalDek();
-  } catch (err) {
-    console.warn('[syncService] Handshake initialization caught:', err);
-    await getOrCreateLocalDek();
+  if (!res?.wrappedDek) {
+    throw new Error('handshake: server returned no wrappedDek');
+  }
+
+  await unwrapDek(res.wrappedDek, keypair.privateKey);
+
+  if (res.publicKeyHash) {
+    await db.keystore.put({
+      id: 'publicKeyHash',
+      value: res.publicKeyHash,
+      at: Date.now(),
+    });
   }
 }
 
@@ -188,15 +183,24 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
 
   let terminalStatus: SyncPillStatus = 'synced';
 
+  const watchdogId = setTimeout(() => {
+    if (isSyncing) {
+      console.warn('[syncService] watchdog fired — forcing isSyncing reset');
+      isSyncing = false;
+      syncStartedAt = 0;
+      updateSyncStatus('pending');
+    }
+  }, 60_000);
+
   try {
     let token: string | null = null;
     try {
-      token = await getToken();
+      token = await withTimeout(getToken(), 8_000, 'getToken');
     } catch {
       token = null;
     }
 
-    await performHandshake(getToken);
+    await withTimeout(performHandshake(getToken), 25_000, 'handshake');
 
     const queue = await db.syncQueue.orderBy('createdAt').toArray();
     if (queue.length > 0) {
@@ -269,7 +273,7 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
     }
 
     const lastPullStr = localStorage.getItem('masar_last_pull_timestamp');
-    const lastPull = lastPullStr ? parseInt(lastPullStr, 10) : 0;
+    const lastPull = lastPullStr ? (new Date(lastPullStr).getTime() || 0) : 0;
     try {
       const publicKeyHash = await getPublicKeyHash();
       const rawPull = await fetchWithAuth(`/api/sync/pull?since=${lastPull}`, token, {
@@ -324,6 +328,7 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
       processSyncQueue(getToken).catch(console.warn);
     }, delay);
   } finally {
+    clearTimeout(watchdogId);
     trace('executeSyncLoop finally', { isSyncing });
     isSyncing = false;
     syncStartedAt = 0;
