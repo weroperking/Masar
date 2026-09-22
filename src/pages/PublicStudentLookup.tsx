@@ -1,9 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { 
-  AlertCircle, CheckCircle2, RefreshCw, Search
-} from 'lucide-react';
-import { PublicLookupData, Student, QrCard } from '../types';
+import { useParams, useNavigate } from 'react-router-dom';
+import { RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { PublicLookupData, Student } from '../types';
 import { db } from '../db/db';
 import { MasarLogo } from '../components/MasarLogo';
 import { MinimalStudentProfileCard } from '../components/Lookup/MinimalStudentProfileCard';
@@ -11,24 +9,26 @@ import { LessonsSection, LessonSessionItem } from '../components/Lookup/LessonsS
 import { ExamsSection, ExamItem } from '../components/Lookup/ExamsSection';
 import { SubscriptionSection } from '../components/Lookup/SubscriptionSection';
 import { LookupDetailSheet } from '../components/Lookup/LookupDetailSheet';
-import { decryptRecord, Envelope } from '../services/cryptoService';
-import { isNotDeleted } from '../config/queryHooks';
-import { normalizeStudentCode } from '../utils/studentCode';
+
+type LookupErrorType = 'invalid' | 'network';
 
 async function getDecryptedStudents(): Promise<Student[]> {
   try {
     const raw = await db.students.toArray();
     const list: Student[] = [];
     for (const item of raw) {
-      const env = (item as unknown as { envelope?: Envelope }).envelope;
+      const env = (item as unknown as { envelope?: any }).envelope;
       if (env) {
         try {
+          const { decryptRecord } = await import('../services/cryptoService');
           const plain = await decryptRecord<Student>(env);
+          const { isNotDeleted } = await import('../config/queryHooks');
           if (isNotDeleted(plain) && isNotDeleted(item)) {
             list.push({ ...plain, id: item.id });
           }
         } catch {}
       } else {
+        const { isNotDeleted } = await import('../config/queryHooks');
         if (isNotDeleted(item)) {
           list.push(item as Student);
         }
@@ -40,58 +40,22 @@ async function getDecryptedStudents(): Promise<Student[]> {
   }
 }
 
-async function resolveStudentFromDexie(token: string): Promise<PublicLookupData | null> {
+async function resolveStudentFromDexie(code: string): Promise<PublicLookupData | null> {
   try {
-    const rawToken = String(token || '').trim();
-    const cleanToken = rawToken.replace(/\D/g, '');
-    const numToken = cleanToken ? parseInt(cleanToken, 10) : null;
-    const strippedToken = rawToken.replace(/^[#№s_STst-]+\s*/i, '').trim();
+    const lookupCode = String(code || '').trim();
+    if (!lookupCode) return null;
 
     const students = await getDecryptedStudents();
     if (!students || students.length === 0) return null;
 
-    // 1. Match by ID, studentCode, cleanDigits, or stripped
-    let localStudent = students.find(s => {
-      if (!s) return false;
-      const sRaw = String(s.studentCode || '').trim();
-      const sDigits = sRaw.replace(/\D/g, '');
-      const sNum = sDigits ? parseInt(sDigits, 10) : null;
-      const sCleanCode = sRaw.replace(/^[#№\s]+/, '').trim();
-
-      return (
-        s.id === rawToken ||
-        sRaw === rawToken ||
-        sCleanCode === rawToken ||
-        sCleanCode === strippedToken ||
-        (cleanToken.length > 0 && sDigits === cleanToken) ||
-        (cleanToken.length > 0 && sDigits.padStart(4, '0') === cleanToken.padStart(4, '0')) ||
-        (numToken !== null && sNum !== null && !isNaN(numToken) && !isNaN(sNum) && numToken === sNum) ||
-        (s.phone && cleanToken.length >= 8 && s.phone.replace(/\D/g, '').endsWith(cleanToken))
-      );
-    });
-
-    // 2. If still not found, check qrCards table to see if token matches a card's cardNumber
-    if (!localStudent) {
-      const cards = await db.qrCards.toArray().catch(() => []);
-      const matchedCard = cards.find((c: QrCard) => 
-        c.cardNumber === rawToken || 
-        c.qrCodeData === rawToken || 
-        (cleanToken && c.cardNumber && c.cardNumber.replace(/\D/g, '') === cleanToken)
-      );
-      if (matchedCard && matchedCard.studentId) {
-        localStudent = students.find(s => s.id === matchedCard.studentId);
-      }
-    }
-
+    const localStudent = students.find(s => s.lookup_code === lookupCode);
     if (!localStudent) return null;
 
-    // Load Center Settings
     const settingsList = await db.settings.toArray().catch(() => []);
     const currentSettings = settingsList[0];
     let teacherName = currentSettings?.teacherName || localStorage.getItem('masar_teacher_name') || undefined;
     let academyName = currentSettings?.academyName || localStorage.getItem('masar_academy_name') || undefined;
 
-    // Check users table if teacherName is still empty
     if (!teacherName) {
       const teachers = await db.users.where('role').equals('teacher').toArray().catch(() => []);
       if (teachers.length > 0 && teachers[0]?.name) {
@@ -104,7 +68,6 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
       }
     }
 
-    // Resolve Enrollments, Groups, and Branch
     const enrollments = await db.enrollments.where('studentId').equals(localStudent.id).toArray().catch(() => []);
     const activeEnrollment = enrollments.find((e: any) => e.status === 'active') || enrollments[0];
     const group = activeEnrollment ? await db.groups.get(activeEnrollment.groupId).catch(() => null) : null;
@@ -114,14 +77,12 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
     const resolvedTeacher = teacherName || (course ? `مدرس ${course.name}` : 'إدارة المركز التعليمي');
     const resolvedAcademy = academyName || 'سنتر مسار التعليمي';
 
-    // Attendance & Lessons
     const studentRecords = await db.attendanceRecords.where('studentId').equals(localStudent.id).toArray().catch(() => []);
     const attended = studentRecords.filter((r: any) => r.status === 'present' || r.status === 'compensation').length;
     const missed = studentRecords.filter((r: any) => r.status === 'absent').length;
     const total = attended + missed;
     const rate = total > 0 ? Math.round((attended / total) * 100) : 100;
 
-    // Build session list
     const sessionsList: LessonSessionItem[] = [];
     const sortedRecords = studentRecords
       .slice()
@@ -149,7 +110,6 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
       });
     }
 
-    // Exams
     const grades = await db.assessmentGrades.where('studentId').equals(localStudent.id).toArray().catch(() => []);
     const examList: ExamItem[] = [];
     for (const g of grades) {
@@ -169,7 +129,6 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
       });
     }
 
-    // Subscription
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
     const subs = await db.monthlySubscriptions
@@ -182,7 +141,7 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
       student: {
         id: localStudent.id,
         name: localStudent.name,
-        studentCode: localStudent.studentCode || normalizeStudentCode(localStudent.studentCode),
+        studentCode: localStudent.studentCode || '',
         gradeLevel: localStudent.gradeLevel || 'المرحلة العامة',
         school: localStudent.school || 'مدرسة عامة',
         phone: localStudent.phone || '',
@@ -211,7 +170,6 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
       }
     };
 
-    // Auto-sync this resolved record to the server in background
     fetch('/api/public/sync-lookups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -226,98 +184,89 @@ async function resolveStudentFromDexie(token: string): Promise<PublicLookupData 
 }
 
 export function PublicStudentLookup() {
-  const { token } = useParams<{ token: string }>();
+  const { code } = useParams<{ code: string }>();
+  const navigate = useNavigate();
   const [data, setData] = useState<PublicLookupData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [errorType, setErrorType] = useState<LookupErrorType | null>(null);
 
-  // BottomSheet states for mobile & desktop interactive details
   const [sheetType, setSheetType] = useState<'session' | 'exam' | null>(null);
   const [selectedSession, setSelectedSession] = useState<LessonSessionItem | null>(null);
   const [selectedExam, setSelectedExam] = useState<ExamItem | null>(null);
 
-  const fetchLookupData = useCallback(async (tokenToFetch?: string) => {
-    const currentToken = tokenToFetch || token;
-    if (!currentToken) {
-      setError(true);
+  const fetchLookupData = useCallback(async (codeToFetch?: string) => {
+    const currentCode = codeToFetch || code;
+    if (!currentCode) {
+      setErrorType('invalid');
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    setError(false);
+    setErrorType(null);
 
-    // 1. Try URL decoding if base64 encoded
     try {
-      let base64 = currentToken;
-      base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
-      while (base64.length % 4) {
-        base64 += '=';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      let res: Response | undefined;
+      let networkError = false;
+      try {
+        res = await fetch(`/public/lookup/${encodeURIComponent(currentCode)}`, {
+          signal: controller.signal,
+        });
+      } catch (fetchErr: any) {
+        if (fetchErr?.name === 'AbortError') {
+          networkError = true;
+        } else {
+          const apiRes = await fetch(`/api/public/lookup/${encodeURIComponent(currentCode)}`, {
+            signal: controller.signal,
+          }).catch(() => null);
+
+          if (!apiRes) {
+            networkError = true;
+          } else {
+            res = apiRes;
+          }
+        }
       }
-      const decoded = JSON.parse(decodeURIComponent(escape(atob(base64))));
-      if (decoded && decoded.student) {
-        setData(decoded);
+      clearTimeout(timeoutId);
+
+      if (networkError) {
+        setErrorType('network');
         setLoading(false);
         return;
       }
-    } catch (e) {
-      // Not a client-side base64 payload, proceed with server lookup
-    }
 
-    // 2. Fetch live data from backend endpoint (trying variations)
-    const cleanDigits = currentToken.replace(/\D/g, '');
-    const tokensToTry = [
-      currentToken,
-      encodeURIComponent(currentToken),
-      cleanDigits,
-      cleanDigits ? cleanDigits.padStart(4, '0') : '',
-      cleanDigits ? String(parseInt(cleanDigits, 10)) : ''
-    ].filter(Boolean);
-
-    for (const t of tokensToTry) {
-      try {
-        let res = await fetch(`/api/public/lookup/${t}`);
-        if (!res.ok) {
-          res = await fetch(`/public/lookup/${t}`);
+      if (res && res.ok) {
+        const result = await res.json();
+        if (result && result.student) {
+          setData(result);
+          setLoading(false);
+          return;
         }
+      }
 
-        if (res.ok) {
-          const result = await res.json();
-          if (result && result.student) {
-            setData(result);
-            setLoading(false);
-            return;
-          }
-        }
-      } catch {}
-    }
-
-    // 3. Fallback to local Dexie IndexedDB
-    try {
-      const localData = await resolveStudentFromDexie(currentToken);
+      const localData = await resolveStudentFromDexie(currentCode);
       if (localData) {
         setData(localData);
         setLoading(false);
         return;
       }
-    } catch {}
 
-    setError(true);
-    setLoading(false);
-  }, [token]);
+      setErrorType('invalid');
+      setLoading(false);
+    } catch (err) {
+      console.error('Lookup fetch failed:', err);
+      setErrorType('network');
+      setLoading(false);
+    }
+  }, [code]);
 
   useEffect(() => {
     fetchLookupData();
   }, [fetchLookupData]);
 
-  const handleManualSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    fetchLookupData(searchQuery.trim());
-  };
-
-  // Loading State
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 font-cairo" dir="rtl">
@@ -331,40 +280,22 @@ export function PublicStudentLookup() {
     );
   }
 
-  // Error State
-  if (error || !data) {
+  if (errorType === 'network') {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 font-cairo" dir="rtl">
         <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 sm:p-8 text-center space-y-5">
-          <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-900/40">
+          <div className="w-14 h-14 rounded-2xl bg-slate-50 dark:bg-slate-950/50 text-slate-600 dark:text-slate-400 flex items-center justify-center mx-auto border border-slate-200 dark:border-slate-700">
             <AlertCircle className="w-7 h-7" />
           </div>
-          
+
           <div className="space-y-1.5">
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
-              لم يتم العثور على بيانات الطالب
+              تعذر تحميل البيانات
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
-              تأكد من صحة الرابط أو كود الطالب، أو قم بإدخال كود الطالب يدوياً للبحث.
+              حدثت مشكلة في الاتصال بالشبكة. يرجى التحقق من اتصالك ومحاولة مرة أخرى.
             </p>
           </div>
-
-          <form onSubmit={handleManualSearch} className="flex gap-2">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="أدخل كود الطالب (مثال: 0001 أو 1001)..."
-              className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span>بحث</span>
-            </button>
-          </form>
 
           <button
             type="button"
@@ -373,6 +304,36 @@ export function PublicStudentLookup() {
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>إعادة المحاولة</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorType === 'invalid' || !data) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 font-cairo" dir="rtl">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 sm:p-8 text-center space-y-5">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-900/40">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+
+          <div className="space-y-1.5">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
+              هذا الرابط غير صالح
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
+              الرابط أو رمز البحث غير صحيح. يرجى مراجعة الرابط أو التواصل مع المركز التعليمي للحصول على بطاقة طالب صالحة.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="inline-flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 py-1 transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>العودة للصفحة الرئيسية</span>
           </button>
         </div>
       </div>
@@ -394,7 +355,6 @@ export function PublicStudentLookup() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-4 sm:py-8 px-3 sm:px-4 flex flex-col items-center justify-start text-right selection:bg-blue-500/20" dir="rtl">
       <div className="w-full max-w-md space-y-3 sm:space-y-4">
 
-        {/* 1. Top Brand & System Bar */}
         <header className="flex items-center justify-between px-1 py-1">
           <div className="flex items-center gap-2">
             <MasarLogo size="sm" showText={false} className="shrink-0 scale-90" />
@@ -414,10 +374,8 @@ export function PublicStudentLookup() {
           </span>
         </header>
 
-        {/* 1. Minimalist & Aesthetic Student Profile Card (Inspired by reference) */}
         <MinimalStudentProfileCard data={data} />
 
-        {/* 4. Lessons & Attendance Component */}
         <LessonsSection
           attendance={attendance}
           onSelectSession={(sess) => {
@@ -426,7 +384,6 @@ export function PublicStudentLookup() {
           }}
         />
 
-        {/* 5. Exams & Assessments Component */}
         <ExamsSection
           exams={exams}
           onSelectExam={(ex) => {
@@ -435,10 +392,8 @@ export function PublicStudentLookup() {
           }}
         />
 
-        {/* 6. Subscription Section */}
         <SubscriptionSection subscription={subscription} />
 
-        {/* 7. Verification & Footer */}
         <footer className="pt-2 pb-6 text-center space-y-1">
           <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1">
             <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
@@ -448,7 +403,6 @@ export function PublicStudentLookup() {
 
       </div>
 
-      {/* 8. Interactive Mobile-first BottomSheet */}
       <LookupDetailSheet
         isOpen={!!sheetType}
         onClose={() => {

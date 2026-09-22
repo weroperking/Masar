@@ -38,17 +38,15 @@ export function StudentDetails() {
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
-  // The permanent short student code for URL and QR card matching
-  const cleanStudentCodeVal = useMemo(() => {
-    if (!student) return '';
-    return normalizeStudentCode(student.studentCode) || student.studentCode || student.id || '';
-  }, [student]);
+  // The opaque lookup code provided by the backend for the new /p/s/{lookup_code} URL format
+  const lookupCode = student?.lookup_code;
+  const hasLookupCode = Boolean(lookupCode);
 
-  // The exact canonical short URL matching the back of the student card (/s/:code)
+  // The exact canonical short URL matching the back of the student card (/p/s/:lookup_code)
   const shortLookupUrl = useMemo(() => {
-    if (!cleanStudentCodeVal) return '';
-    return buildStudentLookupUrl(cleanStudentCodeVal);
-  }, [cleanStudentCodeVal]);
+    if (!hasLookupCode) return '';
+    return buildStudentLookupUrl(lookupCode);
+  }, [lookupCode, hasLookupCode]);
 
   // Generate the simple, low-density QR code identical to the card back
   useEffect(() => {
@@ -68,7 +66,7 @@ export function StudentDetails() {
   }, [shortLookupUrl]);
 
   const handleCopyLink = () => {
-    if (!shortLookupUrl) return;
+    if (!shortLookupUrl || !hasLookupCode) return;
     navigator.clipboard.writeText(shortLookupUrl);
     setCopied(true);
     toast.success('تم نسخ رابط المتابعة المختصر بنجاح!');
@@ -171,7 +169,8 @@ export function StudentDetails() {
         student: {
           id,
           name: student.name,
-          studentCode: student.studentCode || cleanStudentCodeVal,
+          studentCode: student.studentCode || normalizeStudentCode(student.studentCode),
+          lookup_code: student.lookup_code,
           gradeLevel: student.gradeLevel,
           school: student.school,
           phone: student.phone,
@@ -907,7 +906,7 @@ export function StudentDetails() {
               <div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">رابط المتابعة العام لولي الأمر والطالب</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  نفس الرابط المختصر ورمز الـ QR المطبوع على ظهر كارت الطالب — يتيح لولي الأمر مسح الكود أو فتح الرابط لمتابعة الحضور والدرجات والاشتراكات مباشرة.
+                  رابط مختصر ورمز الـ QR يمكن للطالب وولي الأمر استخدامه لمتابعة الحضور والدرجات والاشتراكات مباشرة.
                 </p>
               </div>
               <button
@@ -921,65 +920,73 @@ export function StudentDetails() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-              <div className="md:col-span-2 space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">رابط المشاركة المباشر (المطابق لكارت الطالب):</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={shortLookupUrl}
-                      dir="ltr"
-                      className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono font-bold text-slate-700 dark:text-slate-300 outline-none select-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                        copied
-                          ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400'
-                      }`}
-                      title="نسخ الرابط"
-                    >
-                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                    <a
-                      href={shortLookupUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-lg transition-colors animate-none"
-                      title="فتح الرابط في نافذة جديدة"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
+            {!hasLookupCode ? (
+              <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 rounded-xl space-y-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  لم يتم إنشاء رابط المتابعة لهذا الطالب بعد. يرجى تحديث بيانات الطالب أو مزامنة البيانات لإنشاء الرابط.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="md:col-span-2 space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">رابط المشاركة المباشر:</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={shortLookupUrl}
+                        dir="ltr"
+                        className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono font-bold text-slate-700 dark:text-slate-300 outline-none select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCopyLink}
+                        className={`p-2 rounded-lg border transition-all cursor-pointer ${
+                          copied
+                            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400'
+                        }`}
+                        title="نسخ الرابط"
+                      >
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                      <a
+                        href={shortLookupUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-lg transition-colors animate-none"
+                        title="فتح الرابط في نافذة جديدة"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 rounded-xl space-y-2">
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      <span>رمز ورابط موحد لكارت الطالب وصفحة المتابعة</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      هذا الرابط يمكن للطالب وولي الأمر استخدامه لمتابعة الحضور والدرجات والاشتراكات مباشرة. عند فتح الرابط يتم عرض البيانات المحدثة.
+                    </p>
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 rounded-xl space-y-2">
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <span>رمز ورابط موحد لكارت الطالب وصفحة المتابعة</span>
-                  </h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    هذا الكود هو نفس رمز الـ QR المطبوع على ظهر بطاقة الطالب التعريفية، بصيغة رابط مختصرة وخفيفة. عند مسحه بكاميرا أي هاتف، يتم فتح صفحة متابعة الطالب مباشرة ومزامنة الحضور والامتحانات وموقف الاشتراكات بشكل ديناميكي ومستمر.
-                  </p>
+                <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800 rounded-xl">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3 font-semibold">رمز الـ QR المباشر (المطابق للكارت):</span>
+                  {qrCodeUrl ? (
+                    <div className="bg-white p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
+                      <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" />
+                    </div>
+                  ) : (
+                    <div className="w-40 h-40 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
+                  )}
+                  <span className="text-[10px] text-slate-400 mt-2 text-center font-medium">نفس رمز الـ QR الموجود على ظهر كارت الطالب</span>
                 </div>
               </div>
-
-              <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800 rounded-xl">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3 font-semibold">رمز الـ QR المباشر (المطابق للكارت):</span>
-                {qrCodeUrl ? (
-                  <div className="bg-white p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
-                    <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" />
-                  </div>
-                ) : (
-                  <div className="w-40 h-40 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
-                )}
-                <span className="text-[10px] text-slate-400 mt-2 text-center font-medium">نفس رمز الـ QR الموجود على ظهر كارت الطالب</span>
-              </div>
-            </div>
+            )}
           </div>
         )}
       </div>

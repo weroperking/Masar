@@ -8,8 +8,9 @@ export interface RenderCardOptions {
   face: 'front' | 'back';
   cardNumber?: string;
   studentName?: string;
-  width?: number; // Standard 300 DPI width (default 1050)
-  height?: number; // Standard 300 DPI height (default 660)
+  lookupCode?: string;
+  width?: number;
+  height?: number;
 }
 
 /**
@@ -59,6 +60,7 @@ export async function renderCardToCanvas(options: RenderCardOptions): Promise<HT
     design,
     face,
     cardNumber = '1001',
+    lookupCode,
     width = 1050,
     height = 660
   } = options;
@@ -71,7 +73,6 @@ export async function renderCardToCanvas(options: RenderCardOptions): Promise<HT
     throw new Error('Canvas 2D context unavailable');
   }
 
-  // Smooth antialiasing and image smoothing
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
@@ -162,7 +163,7 @@ export async function renderCardToCanvas(options: RenderCardOptions): Promise<HT
     }
 
     // 3. DRAW BARCODE OR QR CODE BADGE ON BACK
-    await drawCodeOverlayOnBack(ctx, width, height, design, cleanCode, isQrCode);
+    await drawCodeOverlayOnBack(ctx, width, height, design, cleanCode, lookupCode, isQrCode);
   }
 
   return canvas;
@@ -177,7 +178,8 @@ async function drawCodeOverlayOnBack(
   cardHeight: number,
   design: CardCustomDesign,
   code: string,
-  isQrCode: boolean
+  lookupCode?: string,
+  isQrCode?: boolean
 ) {
   const codeXPercent = (design.codeX ?? 50) / 100;
   const codeYPercent = (design.codeY ?? 55) / 100;
@@ -194,7 +196,7 @@ async function drawCodeOverlayOnBack(
   if (isQrCode) {
     // Render QR Code onto temp canvas with full student lookup URL
     const qrCanvas = document.createElement('canvas');
-    const qrPayload = buildStudentLookupUrl(code);
+    const qrPayload = buildStudentLookupUrl(lookupCode || code);
     await QRCode.toCanvas(qrCanvas, qrPayload, {
       margin: 1,
       width: 220,

@@ -46,7 +46,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   // First-time trigger: Automatically start tour once when authenticated and not completed
   useEffect(() => {
     // Only auto-start on desktop/tablet viewports and not on public standalone routes
-    if (!isSignedIn || hasCompletedTour || window.location.pathname.startsWith('/s/') || window.location.pathname.startsWith('/book')) {
+    if (!isSignedIn || hasCompletedTour || window.location.pathname.startsWith('/p/s/') || window.location.pathname.startsWith('/book')) {
       return;
     }
 

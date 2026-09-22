@@ -700,47 +700,48 @@ export function QrCardModal({
 
             {/* Preview Card */}
             <div className="w-full flex items-center justify-center py-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-              <QrCardBadge
-                cardNumber={mode === 'single_student' ? (cardNumber.replace(/\D/g, '') || '0001') : generateSequentialSerial(getNextSequenceStart())}
-                qrCodeData={mode === 'single_student' ? (cardNumber.replace(/\D/g, '') || '0001') : generateSequentialSerial(getNextSequenceStart())}
-                studentName={
-                  mode === 'single_student'
-                    ? selectedStudent?.name || 'اسم الطالب'
-                    : mode === 'batch_unassigned_students'
-                    ? unassignedStudents[0]?.name || 'محمد أحمد علي'
-                    : null
-                }
-                studentPhone={
-                  mode === 'single_student'
-                    ? selectedStudent?.phone || '01012345678'
-                    : mode === 'batch_unassigned_students'
-                    ? unassignedStudents[0]?.phone || '01012345678'
-                    : null
-                }
-                studentGrade={
-                  mode === 'single_student'
-                    ? selectedStudent?.gradeLevel || 'الصف الثالث الثانوي'
-                    : mode === 'batch_unassigned_students'
-                    ? unassignedStudents[0]?.gradeLevel || 'الصف الثالث الثانوي'
-                    : null
-                }
-                studentSchool={
-                  mode === 'single_student'
-                    ? selectedStudent?.school || 'مدرسة المتفوقين'
-                    : mode === 'batch_unassigned_students'
-                    ? unassignedStudents[0]?.school || 'مدرسة المتفوقين'
-                    : null
-                }
-                centerName={centerName}
-                themeColor={themeColor}
-                showPhone={true}
-                showGrade={true}
-                showCenterName={true}
-                showCardNumber={true}
-                size={cardSize}
-                backgroundImage={backgroundImage}
-                customDesign={customDesign}
-              />
+               <QrCardBadge
+                 cardNumber={mode === 'single_student' ? (cardNumber.replace(/\D/g, '') || '0001') : generateSequentialSerial(getNextSequenceStart())}
+                 qrCodeData={mode === 'single_student' ? (cardNumber.replace(/\D/g, '') || '0001') : generateSequentialSerial(getNextSequenceStart())}
+                 studentName={
+                   mode === 'single_student'
+                     ? selectedStudent?.name || 'اسم الطالب'
+                     : mode === 'batch_unassigned_students'
+                     ? unassignedStudents[0]?.name || 'محمد أحمد علي'
+                     : null
+                 }
+                 studentPhone={
+                   mode === 'single_student'
+                     ? selectedStudent?.phone || '01012345678'
+                     : mode === 'batch_unassigned_students'
+                     ? unassignedStudents[0]?.phone || '01012345678'
+                     : null
+                 }
+                 studentGrade={
+                   mode === 'single_student'
+                     ? selectedStudent?.gradeLevel || 'الصف الثالث الثانوي'
+                     : mode === 'batch_unassigned_students'
+                     ? unassignedStudents[0]?.gradeLevel || 'الصف الثالث الثانوي'
+                     : null
+                 }
+                 studentSchool={
+                   mode === 'single_student'
+                     ? selectedStudent?.school || 'مدرسة المتفوقين'
+                     : mode === 'batch_unassigned_students'
+                     ? unassignedStudents[0]?.school || 'مدرسة المتفوقين'
+                     : null
+                 }
+                 centerName={centerName}
+                 themeColor={themeColor}
+                 showPhone={true}
+                 showGrade={true}
+                 showCenterName={true}
+                 showCardNumber={true}
+                 size={cardSize}
+                 backgroundImage={backgroundImage}
+                 customDesign={customDesign}
+                 lookupCode={mode === 'single_student' ? selectedStudent?.lookup_code : null}
+               />
             </div>
 
             <p className="text-[11px] text-slate-400 text-center mt-4 leading-relaxed">

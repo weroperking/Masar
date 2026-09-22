@@ -264,7 +264,7 @@ function AuthGate() {
 export default function App() {
   useEffect(() => {
     // Standalone public routes must NOT trigger any Dexie/IndexedDB operations
-    if (!window.location.pathname.startsWith('/s/')) {
+    if (!window.location.pathname.startsWith('/p/s/')) {
       seedDatabaseIfEmpty().then(() => {
         sanitizeNumericCodes();
       });
@@ -277,11 +277,11 @@ export default function App() {
         <ConfirmProvider>
           <QueryClientProvider client={queryClient}>
             <BrowserRouter>
-              <Routes>
-                <Route path="/s/:token" element={<PublicStudentLookup />} />
-                <Route path="/book" element={<PublicBooking />} />
-                <Route path="*" element={<AuthGate />} />
-              </Routes>
+               <Routes>
+                 <Route path="/p/s/:code" element={<PublicStudentLookup />} />
+                 <Route path="/book" element={<PublicBooking />} />
+                 <Route path="*" element={<AuthGate />} />
+               </Routes>
             </BrowserRouter>
           </QueryClientProvider>
         </ConfirmProvider>
