@@ -56,10 +56,11 @@ export function CustomUserButton() {
   };
 
   const academyName =
-    organization?.name ||
     localSettings?.academyName ||
     apiSetting?.academyName ||
+    (organization?.id ? localStorage.getItem(`masar_academy_name_${organization.id}`) : null) ||
     localStorage.getItem('masar_academy_name') ||
+    organization?.name ||
     'الأكاديمية الخاصة بك';
 
   return (

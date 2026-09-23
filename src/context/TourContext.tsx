@@ -1,15 +1,21 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useOrganization } from '@clerk/clerk-react';
-import { TOUR_STEPS, TourStep } from '../components/Tour/tourSteps';
+import { ADMIN_TOUR_STEPS, ASSISTANT_TOUR_STEPS, TourStep } from '../components/Tour/tourSteps';
+import { useProfile } from './ProfileContext';
+
+export type TourType = 'admin' | 'assistant';
 
 interface TourContextType {
   isActive: boolean;
+  tourType: TourType;
   currentStepIndex: number;
   currentStep: TourStep;
   totalSteps: number;
   hasCompletedTour: boolean;
-  startTour: (stepIndex?: number) => void;
+  startTour: (stepIndex?: number, type?: TourType) => void;
+  startAdminTour: (stepIndex?: number) => void;
+  startAssistantTour: (stepIndex?: number) => void;
   nextStep: () => void;
   prevStep: () => void;
   skipTour: () => void;
@@ -23,10 +29,16 @@ const TourContext = createContext<TourContextType | undefined>(undefined);
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const { isSignedIn, userId } = useAuth();
   const { organization } = useOrganization();
+  const { currentProfile } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const storageKey = `masar_tour_completed_${organization?.id || userId || 'global'}`;
+  const [activeTourType, setActiveTourType] = useState<TourType>(
+    currentProfile === 'assistant' ? 'assistant' : 'admin'
+  );
+
+  const baseUserKey = organization?.id || userId || 'global';
+  const storageKey = `masar_tour_completed_${activeTourType}_${baseUserKey}`;
 
   const [hasCompletedTour, setHasCompletedTour] = useState<boolean>(() => {
     return localStorage.getItem(storageKey) === 'true';
@@ -37,20 +49,32 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [isReady, setIsReady] = useState<boolean>(false);
 
-  // Update hasCompletedTour when user or org changes
+  // Sync active tour type default with current profile when profile switches
+  useEffect(() => {
+    if (!isActive) {
+      const defaultType: TourType = currentProfile === 'assistant' ? 'assistant' : 'admin';
+      setActiveTourType(defaultType);
+      const key = `masar_tour_completed_${defaultType}_${baseUserKey}`;
+      setHasCompletedTour(localStorage.getItem(key) === 'true');
+    }
+  }, [currentProfile, baseUserKey, isActive]);
+
+  // Update completed status when user/org or tourType changes
   useEffect(() => {
     const completed = localStorage.getItem(storageKey) === 'true';
     setHasCompletedTour(completed);
   }, [storageKey]);
 
-  // First-time trigger: Automatically start tour once when authenticated and not completed
+  // Determine active steps array
+  const activeSteps = activeTourType === 'assistant' ? ASSISTANT_TOUR_STEPS : ADMIN_TOUR_STEPS;
+  const currentStep = activeSteps[currentStepIndex] || activeSteps[0];
+
+  // First-time auto-trigger for current profile tour if not completed
   useEffect(() => {
-    // Only auto-start on desktop/tablet viewports and not on public standalone routes
     if (!isSignedIn || hasCompletedTour || window.location.pathname.startsWith('/p/s/')) {
       return;
     }
 
-    // Short delay to allow initial layout to render
     const timer = setTimeout(() => {
       if (!hasCompletedTour && !isActive) {
         setIsActive(true);
@@ -59,9 +83,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [isSignedIn, hasCompletedTour]);
-
-  const currentStep = TOUR_STEPS[currentStepIndex] || TOUR_STEPS[0];
+  }, [isSignedIn, hasCompletedTour, activeTourType]);
 
   // Route synchronization & Target Element Measurement
   const updateTargetRect = useCallback(() => {
@@ -73,13 +95,11 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
     const element = document.querySelector(currentStep.selector);
     if (element) {
-      // Scroll element smoothly into viewport if needed
       element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       const rect = element.getBoundingClientRect();
       setTargetRect(rect);
       setIsReady(true);
     } else {
-      // Fallback center position if element isn't found immediately
       setTargetRect(null);
       setIsReady(true);
     }
@@ -99,11 +119,10 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isActive) return;
 
-    // Retry finding element in case of page transition
     let attempts = 0;
     const interval = setInterval(() => {
       attempts++;
-      const element = document.querySelector(currentStep.selector);
+      const element = document.querySelector(currentStep?.selector || '');
       if (element || attempts > 10) {
         clearInterval(interval);
         updateTargetRect();
@@ -118,21 +137,32 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('resize', updateTargetRect);
       window.removeEventListener('scroll', updateTargetRect, true);
     };
-  }, [isActive, currentStepIndex, location.pathname, updateTargetRect]);
+  }, [isActive, currentStepIndex, currentStep, location.pathname, updateTargetRect]);
 
-  const startTour = (stepIndex: number = 0) => {
+  const startTour = (stepIndex: number = 0, type?: TourType) => {
+    const selectedType = type || (currentProfile === 'assistant' ? 'assistant' : 'admin');
+    setActiveTourType(selectedType);
     setCurrentStepIndex(stepIndex);
     setIsActive(true);
-    const targetStep = TOUR_STEPS[stepIndex] || TOUR_STEPS[0];
+    const steps = selectedType === 'assistant' ? ASSISTANT_TOUR_STEPS : ADMIN_TOUR_STEPS;
+    const targetStep = steps[stepIndex] || steps[0];
     if (targetStep.route && location.pathname !== targetStep.route) {
       navigate(targetStep.route);
     }
   };
 
+  const startAdminTour = (stepIndex: number = 0) => {
+    startTour(stepIndex, 'admin');
+  };
+
+  const startAssistantTour = (stepIndex: number = 0) => {
+    startTour(stepIndex, 'assistant');
+  };
+
   const nextStep = () => {
-    if (currentStepIndex + 1 < TOUR_STEPS.length) {
+    if (currentStepIndex + 1 < activeSteps.length) {
       const nextIdx = currentStepIndex + 1;
-      const nextTarget = TOUR_STEPS[nextIdx];
+      const nextTarget = activeSteps[nextIdx];
       setCurrentStepIndex(nextIdx);
       if (nextTarget.route && location.pathname !== nextTarget.route) {
         navigate(nextTarget.route);
@@ -145,7 +175,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const prevStep = () => {
     if (currentStepIndex > 0) {
       const prevIdx = currentStepIndex - 1;
-      const prevTarget = TOUR_STEPS[prevIdx];
+      const prevTarget = activeSteps[prevIdx];
       setCurrentStepIndex(prevIdx);
       if (prevTarget.route && location.pathname !== prevTarget.route) {
         navigate(prevTarget.route);
@@ -157,7 +187,6 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     setIsActive(false);
     setHasCompletedTour(true);
     localStorage.setItem(storageKey, 'true');
-    // Navigate back to Dashboard gracefully
     if (location.pathname !== '/') {
       navigate('/');
     }
@@ -176,11 +205,14 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     <TourContext.Provider
       value={{
         isActive,
+        tourType: activeTourType,
         currentStepIndex,
         currentStep,
-        totalSteps: TOUR_STEPS.length,
+        totalSteps: activeSteps.length,
         hasCompletedTour,
         startTour,
+        startAdminTour,
+        startAssistantTour,
         nextStep,
         prevStep,
         skipTour,

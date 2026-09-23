@@ -284,6 +284,15 @@ export interface ProfileAccount {
   pin?: string;
 }
 
+export interface AssistantSubSettings {
+  scannerSoundEnabled?: boolean;
+  scannerBeepVolume?: 'high' | 'medium' | 'low' | 'off';
+  defaultLandingPage?: '/attendance' | '/students' | '/schedule' | '/';
+  whatsappDefaultNote?: string;
+  cameraFacingMode?: 'environment' | 'user';
+  autoOpenStudentInfoOnScan?: boolean;
+}
+
 export interface ProfilesConfig {
   adminPin?: string;
   adminName?: string;
@@ -294,6 +303,7 @@ export interface ProfilesConfig {
   assistantPinRequired?: boolean;
   assistantPin?: string;
   autoLockMinutes?: number; // default 15
+  assistantSubSettings?: AssistantSubSettings;
 }
 
 export interface Settings extends BaseRecord {
@@ -309,6 +319,7 @@ export interface Settings extends BaseRecord {
   theme?: 'light' | 'dark' | 'system';
   cardDesign?: CardCustomDesign;
   profilesConfig?: ProfilesConfig;
+  assistantSubSettings?: AssistantSubSettings;
 }
 
 export interface QrCard extends BaseRecord {

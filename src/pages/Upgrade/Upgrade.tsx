@@ -240,7 +240,8 @@ export function Upgrade() {
   };
 
   const getWhatsAppUrl = (planName?: string) => {
-    const orgName = organization?.name ? `أكاديمية ${organization.name}` : 'أكاديميتنا';
+    const savedName = (organization?.id ? localStorage.getItem(`masar_academy_name_${organization.id}`) : null) || localStorage.getItem('masar_academy_name') || organization?.name;
+    const orgName = savedName ? `أكاديمية ${savedName}` : 'أكاديميتنا';
     let message = '';
 
     if (planName) {

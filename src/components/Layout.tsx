@@ -54,7 +54,13 @@ const getNavigationGroups = (limits: any, isAssistant: boolean = false) => {
         items: [
           { name: 'المنتجات والمبيعات', href: '/inventory', icon: Package },
         ]
-      }] : [])
+      }] : []),
+      {
+        title: 'الإدارة',
+        items: [
+          { name: 'الإعدادات والتفضيلات', href: '/settings', icon: Settings },
+        ]
+      }
     ];
   }
 

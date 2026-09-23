@@ -81,6 +81,29 @@ export function CustomOrganizationList() {
   const handleSelect = async (organizationId: string) => {
     try {
       setLoading(true);
+      
+      const membership = userMemberships.data?.find(m => m.organization.id === organizationId);
+      const selectedOrgName =
+        localStorage.getItem(`masar_academy_name_${organizationId}`) ||
+        membership?.organization?.name;
+
+      if (selectedOrgName) {
+        localStorage.setItem('masar_academy_name', selectedOrgName);
+        localStorage.setItem(`masar_academy_name_${organizationId}`, selectedOrgName);
+
+        try {
+          const existingSettings = await db.settings.toArray();
+          if (existingSettings.length > 0) {
+            await db.settings.update(existingSettings[0].id, {
+              academyName: selectedOrgName,
+              updated_at: Date.now()
+            });
+          }
+        } catch (dbErr) {
+          console.warn('Could not update academyName in db.settings on org select:', dbErr);
+        }
+      }
+
       await setActive({ organization: organizationId });
     } catch (err: any) {
       console.error(err);

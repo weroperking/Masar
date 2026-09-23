@@ -142,11 +142,14 @@ export function TourOverlay() {
 
             {/* Card Header */}
             <div className="px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-md flex items-center gap-1.5">
                   <span className="font-bold">{progressPercentage}%</span>
                   <span className="text-slate-300 dark:text-slate-600">•</span>
                   <span>{currentStepIndex + 1} / {totalSteps}</span>
+                </span>
+                <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 rounded-md">
+                  {currentStep.badge || (currentStep.id.startsWith('assistant') ? 'جولة المساعدين 🛡️' : 'جولة المنصة 🎓')}
                 </span>
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 font-['Readex_Pro']">
                   {currentStep.title}

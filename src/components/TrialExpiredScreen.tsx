@@ -126,8 +126,10 @@ export function TrialExpiredScreen({ status }: TrialExpiredScreenProps) {
     }
   };
 
+  const savedAcademyName = (organization?.id ? localStorage.getItem(`masar_academy_name_${organization.id}`) : null) || localStorage.getItem('masar_academy_name') || organization?.name;
+
   const getWhatsAppUrl = (planName?: string) => {
-    const orgName = organization?.name ? `أكاديمية ${organization.name}` : 'أكاديميتنا';
+    const orgName = savedAcademyName ? `أكاديمية ${savedAcademyName}` : 'أكاديميتنا';
     let message = '';
 
     if (planName) {
@@ -188,10 +190,10 @@ export function TrialExpiredScreen({ status }: TrialExpiredScreenProps) {
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm">
         <div className="flex items-center gap-3">
           <MasarLogo size="sm" />
-          {organization?.name && (
+          {savedAcademyName && (
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300">
               <Building2 className="w-3.5 h-3.5 text-blue-600" />
-              <span>{organization.name}</span>
+              <span>{savedAcademyName}</span>
             </div>
           )}
         </div>

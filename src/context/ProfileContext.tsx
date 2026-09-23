@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { useOrganization, useUser } from '@clerk/clerk-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
-import { ProfileMode, ProfileAccount } from '../types';
+import { ProfileMode, ProfileAccount, AssistantSubSettings } from '../types';
 
 export const DEFAULT_FORMAL_AVATARS = {
   admin: '/avatar-admin.svg',
@@ -16,12 +16,22 @@ export const DEFAULT_FORMAL_AVATARS = {
 // Alias for backwards compatibility
 export const DEFAULT_FLUFFY_AVATARS = DEFAULT_FORMAL_AVATARS;
 
+export const DEFAULT_ASSISTANT_SUB_SETTINGS: AssistantSubSettings = {
+  scannerSoundEnabled: true,
+  scannerBeepVolume: 'medium',
+  defaultLandingPage: '/attendance',
+  whatsappDefaultNote: 'نحيطكم علماً بأنه تم تسجيل حضور الطالب بالحصة بنجاح.',
+  cameraFacingMode: 'environment',
+  autoOpenStudentInfoOnScan: true
+};
+
 interface ProfileContextType {
   currentProfile: ProfileMode;
   accounts: {
     admin: ProfileAccount;
     assistant?: ProfileAccount;
   };
+  assistantSubSettings: AssistantSubSettings;
   isLocked: boolean;
   showProfileSelector: boolean;
   lockProfile: () => void;
@@ -39,6 +49,7 @@ interface ProfileContextType {
     adminAvatarUrl?: string;
     autoLockMinutes?: number;
   }) => Promise<void>;
+  updateAssistantSubSettings: (patch: Partial<AssistantSubSettings>) => Promise<{ success: boolean; error?: string }>;
   autoLockMinutes: number;
 }
 
@@ -80,6 +91,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const [assistantAccount, setAssistantAccount] = useState<ProfileAccount | undefined>(undefined);
   const [autoLockMinutes, setAutoLockMinutes] = useState<number>(15);
+  const [assistantSubSettings, setAssistantSubSettings] = useState<AssistantSubSettings>(DEFAULT_ASSISTANT_SUB_SETTINGS);
 
   // Live query on Dexie settings table for instant reactive updates across all components
   const liveSettings = useLiveQuery(() => db.settings.toArray(), []);
@@ -97,6 +109,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       'المعلم (المدير)';
 
     const storedProfiles = cur?.profilesConfig;
+    const storedAssistantSub = cur?.assistantSubSettings || cur?.profilesConfig?.assistantSubSettings;
+
+    if (storedAssistantSub) {
+      setAssistantSubSettings({
+        ...DEFAULT_ASSISTANT_SUB_SETTINGS,
+        ...storedAssistantSub
+      });
+    }
 
     if (storedProfiles) {
       const rawAdminAvatar = storedProfiles.adminAvatarUrl;
@@ -443,6 +463,35 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
   }, [orgId]);
 
+  const updateAssistantSubSettings = useCallback(async (patch: Partial<AssistantSubSettings>): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const settings = await db.settings.toArray();
+      const currentSub = settings[0]?.assistantSubSettings || settings[0]?.profilesConfig?.assistantSubSettings || DEFAULT_ASSISTANT_SUB_SETTINGS;
+      const updatedSub: AssistantSubSettings = {
+        ...currentSub,
+        ...patch
+      };
+
+      if (settings.length > 0) {
+        const cur = settings[0];
+        const updatedProfilesConfig = {
+          ...(cur.profilesConfig || {}),
+          assistantSubSettings: updatedSub
+        };
+        await db.settings.update(cur.id, {
+          assistantSubSettings: updatedSub,
+          profilesConfig: updatedProfilesConfig,
+          updated_at: Date.now()
+        });
+      }
+
+      setAssistantSubSettings(updatedSub);
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'فشل حفظ إعدادات المساعد' };
+    }
+  }, []);
+
   return (
     <ProfileContext.Provider
       value={{
@@ -451,6 +500,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           admin: adminAccount,
           assistant: assistantAccount
         },
+        assistantSubSettings,
         isLocked,
         showProfileSelector,
         lockProfile,
@@ -464,6 +514,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         updateAssistantPin,
         saveAssistantProfile,
         updateProfilesConfig,
+        updateAssistantSubSettings,
         autoLockMinutes
       }}
     >
@@ -484,6 +535,7 @@ const defaultProfileContextValue: ProfileContextType = {
       pin: '1234'
     }
   },
+  assistantSubSettings: DEFAULT_ASSISTANT_SUB_SETTINGS,
   isLocked: false,
   showProfileSelector: false,
   lockProfile: () => {},
@@ -497,6 +549,7 @@ const defaultProfileContextValue: ProfileContextType = {
   updateAssistantPin: async () => ({ success: true }),
   saveAssistantProfile: async () => ({ success: true }),
   updateProfilesConfig: async () => {},
+  updateAssistantSubSettings: async () => ({ success: true }),
   autoLockMinutes: 15
 };
 

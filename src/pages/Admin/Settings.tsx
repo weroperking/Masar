@@ -62,21 +62,24 @@ export function Settings() {
   });
 
   useEffect(() => {
+    const savedLocalAcademy = (organization?.id ? localStorage.getItem(`masar_academy_name_${organization.id}`) : null) || localStorage.getItem('masar_academy_name');
+    const savedLocalTeacher = (organization?.id ? localStorage.getItem(`masar_teacher_name_${organization.id}`) : null) || localStorage.getItem('masar_teacher_name');
+
     if (settingsData && settingsData.length > 0) {
       setSettings(prev => ({
         ...prev,
         ...settingsData[0],
-        teacherName: settingsData[0].teacherName || prev.teacherName || localStorage.getItem('masar_teacher_name') || '',
-        academyName: settingsData[0].academyName || prev.academyName || organization?.name || localStorage.getItem('masar_academy_name') || ''
+        teacherName: settingsData[0].teacherName || prev.teacherName || savedLocalTeacher || '',
+        academyName: settingsData[0].academyName || prev.academyName || savedLocalAcademy || organization?.name || ''
       }));
     } else {
       setSettings(prev => ({
         ...prev,
-        teacherName: prev.teacherName || localStorage.getItem('masar_teacher_name') || '',
-        academyName: prev.academyName || organization?.name || localStorage.getItem('masar_academy_name') || ''
+        teacherName: prev.teacherName || savedLocalTeacher || '',
+        academyName: prev.academyName || savedLocalAcademy || organization?.name || ''
       }));
     }
-  }, [settingsData, organization?.name]);
+  }, [settingsData, organization?.id, organization?.name]);
 
   const handleSave = async () => {
     try {
@@ -116,29 +119,48 @@ export function Settings() {
         } as SettingsType);
       }
 
-      // 3. Sync teacher & academy names to local storage & Clerk metadata
+      // 3. Sync teacher & academy names to Clerk Organization level, Clerk User Metadata, and local storage
       if (updatedSettings.teacherName) {
         localStorage.setItem('masar_teacher_name', updatedSettings.teacherName);
         if (organization?.id) {
           localStorage.setItem(`masar_teacher_name_${organization.id}`, updatedSettings.teacherName);
         }
-        if (user) {
-          try {
-            await user.update({
-              unsafeMetadata: {
-                ...(user.unsafeMetadata || {}),
-                teacherName: updatedSettings.teacherName
-              }
-            });
-          } catch (e) {
-            console.warn('Could not update clerk metadata:', e);
-          }
-        }
       }
+
       if (updatedSettings.academyName) {
         localStorage.setItem('masar_academy_name', updatedSettings.academyName);
         if (organization?.id) {
           localStorage.setItem(`masar_academy_name_${organization.id}`, updatedSettings.academyName);
+        }
+      }
+
+      // 3a. Update Clerk Organization level name directly
+      if (organization && updatedSettings.academyName && typeof organization.update === 'function') {
+        try {
+          await organization.update({ name: updatedSettings.academyName });
+          if (typeof organization.reload === 'function') {
+            await organization.reload();
+          }
+        } catch (e) {
+          console.warn('Could not update Clerk organization name directly:', e);
+        }
+      }
+
+      // 3b. Update Clerk User level unsafeMetadata
+      if (user) {
+        try {
+          await user.update({
+            unsafeMetadata: {
+              ...(user.unsafeMetadata || {}),
+              teacherName: updatedSettings.teacherName,
+              academyName: updatedSettings.academyName
+            }
+          });
+          if (typeof user.reload === 'function') {
+            await user.reload();
+          }
+        } catch (e) {
+          console.warn('Could not update Clerk user metadata:', e);
         }
       }
 

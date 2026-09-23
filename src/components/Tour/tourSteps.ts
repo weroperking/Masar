@@ -10,7 +10,7 @@ export interface TourStep {
   preferredPosition?: 'top' | 'bottom' | 'left' | 'right' | 'center';
 }
 
-export const TOUR_STEPS: TourStep[] = [
+export const ADMIN_TOUR_STEPS: TourStep[] = [
   // Stage 1: Welcome & Global Header
   {
     id: 'welcome',
@@ -285,3 +285,98 @@ export const TOUR_STEPS: TourStep[] = [
     whyItMatters: 'نتمنى لك تجربة ممتعة وإدارة تعليمية ميسرة وخالية من التعقيد!'
   }
 ];
+
+// Specialized Assistant Onboarding Tour Steps
+export const ASSISTANT_TOUR_STEPS: TourStep[] = [
+  {
+    id: 'assistant-welcome',
+    title: 'مرحباً بك في حساب المساعدين 🛡️',
+    badge: 'دليل المساعد الميداني',
+    selector: '#tour-welcome-target',
+    route: '/',
+    preferredPosition: 'center',
+    whatIsIt: 'أهلاً بك في حساب المساعدين بمنصة مسار (Masar). صُممت هذه الواجهة لتسهيل عمليات السنتر اليومية وسرعة استقبال الطلاب بكفاءة وسلاسة.',
+    howToUse: 'ستأخذك هذه الجولة السريعة للتعرف على أدوات المساعد الأساسية: التحضير السريع بالباركود، استعلام بيانات الطلاب، وجدول الحصص اليومي.',
+    whyItMatters: 'تضمن لك هذه الواجهة سرعة استجابة فائقة وتجربة مريحة مع الحفاظ التام على سرية التقارير والخزينة المالية للسنتر.'
+  },
+  {
+    id: 'assistant-search',
+    title: 'البحث السريع واستعلام الطالب (Ctrl+K) ⚡',
+    badge: 'الاستعلام اللحظي',
+    selector: '#tour-header-search',
+    route: '/',
+    preferredPosition: 'bottom',
+    whatIsIt: 'محرك بحث فوري للبحث عن الطلاب بالاسم، الكود، أو رقم الهاتف للوصول السريع لبطاقة الطالب والتحقق من بياناته.',
+    howToUse: 'اضغط على شريط البحث أو استخدم اختصار Ctrl + K واكتب اسم الطالب للاستعلام اللحظي عن حالة تسجيله والمجموعات المسجل بها.',
+    whyItMatters: 'يوفر عليك الوقت في الاستقبال ويمنع التكدس عند استفسار الطلاب أو أسرهم عن المواعيد والأكواد.'
+  },
+  {
+    id: 'assistant-attendance',
+    title: 'ماسح الـ QR وتسجيل الحضور الفوري 📷',
+    badge: 'العملية اليومية الرئيسية',
+    selector: '#tour-nav-attendance',
+    route: '/',
+    preferredPosition: 'left',
+    whatIsIt: 'شاشة التحضير السريع المباشرة عبر كاميرا الهاتف أو قارئ الباركود الضوئي.',
+    howToUse: 'افتح شاشة الحضور وامسح كود QR الخاص بكارت الطالب؛ سيسجل النظام الحضور فوراً مع إصدار نغمة تأكيد وتنبيه الغياب.',
+    whyItMatters: 'تسجيل حضور عشرات الطلاب في ثوانٍ معدودة مع تنبيهك فوراً إذا كان الطالب غير مسدد أو غائباً.'
+  },
+  {
+    id: 'assistant-students',
+    title: 'سجل الطلاب والملفات الأكاديمية 🎓',
+    badge: 'إدارة ملفات الطلاب',
+    selector: '#tour-nav-students',
+    route: '/attendance',
+    preferredPosition: 'left',
+    whatIsIt: 'قائمة بيانات الطلاب المتاحة للمساعد لإضافة طالب جديد، تسكينه في المجموعات، ومراسلة ولي الأمر.',
+    howToUse: 'يمكنك إضافة طالب جديد، طباعة كروت QR، أو إرسال رسائل التنبيه والغياب لأولياء الأمور عبر واتساب بنقرة واحدة.',
+    whyItMatters: 'إدارة كاملة وسلسة للطلاب الميدانيين دون الحاجة للصلاحيات المحاسبية الحساسة.'
+  },
+  {
+    id: 'assistant-schedule',
+    title: 'جدول القاعات والحصص اليومية 🗓️',
+    badge: 'متابعة مواعيد القاعات',
+    selector: '#tour-nav-schedule',
+    route: '/students',
+    preferredPosition: 'left',
+    whatIsIt: 'جدول تفاعلي أسبوعي لمتابعة الحصص القائمة حالياً وتوزيع المجموعات على القاعات.',
+    howToUse: 'تابع توزيع القاعات والمحاضرات لتجهيز كشوفات وقاعات الدرس وتوجيه الطلاب للمجموعات الصحيحة.',
+    whyItMatters: 'يمنع التداخل في القاعات ويسهل تنظيم دخول وخروج المجموعات أثناء اليوم الدراسي.'
+  },
+  {
+    id: 'assistant-sessionPayments',
+    title: 'تحصيل مدفوعات الحصص (Pay-as-you-go) 🪙',
+    badge: 'التحصيل الميداني',
+    selector: '#tour-nav-sessionPayments',
+    route: '/schedule',
+    preferredPosition: 'left',
+    whatIsIt: 'شاشة تحصيل رسوم المحاضرة بالحصة الواحدة أو شحن الكارت مسبق الدفع.',
+    howToUse: 'قم بتحصيل قيمة الحصة للطلاب المسجلين ونقل المستحقات وتوثيق عملية السداد فوراً.',
+    whyItMatters: 'يسهل التحصيل اليومي البسيط مع توثيق شفاف لجميع المبالغ المحصلة بأسماء الطلاب.'
+  },
+  {
+    id: 'assistant-settings',
+    title: 'إعدادات المساعد والتفضيلات ⚙️',
+    badge: 'التخصيص الشخصي',
+    selector: '#tour-nav-settings',
+    route: '/sessionPayments',
+    preferredPosition: 'left',
+    whatIsIt: 'شاشة التفضيلات الخاصة بالمساعد لضبط نغمات الماسح، الملاحظات التلقائية للواتساب، وإعادة هذه الجولة.',
+    howToUse: 'يمكنك من هنا تخصيص أصوات كاميرا الماسح، كتابة نص رسائل الملاحظات التلقائية، وإعادة تشغيل هذه الجولة التفاعلية عند الحاجة.',
+    whyItMatters: 'تضمن تجربة عمل مخصصة ومريحة لك أثناء إدارة العمليات الميدانية بالسنتر.'
+  },
+  {
+    id: 'assistant-finish',
+    title: 'تهانينا! أنت جاهز لبدء العمل اليومي 🚀',
+    badge: 'اكتمال جولة المساعدين',
+    selector: '#tour-welcome-target',
+    route: '/',
+    preferredPosition: 'center',
+    whatIsIt: 'أصبحت الآن ملماً بكافة الأدوات المتاحة في حساب المساعدين بمنصة مسار (Masar).',
+    howToUse: 'ابدأ الآن بفتح شاشة الحضور أو قائمة الطلاب، وتذكر دائماً استخدام اختصار Ctrl + K للوصول السريع لأي ملف.',
+    whyItMatters: 'نتمنى لك يوماً دراسياً موفقاً وعملاً ميسراً بكفاءة عالية!'
+  }
+];
+
+export const TOUR_STEPS = ADMIN_TOUR_STEPS;
+
