@@ -109,6 +109,7 @@ export function MonthlySubscriptions() {
           studentId: enrollment.studentId,
           courseId: enrollment.courseId,
           studentName: student?.name || 'غير معروف',
+          studentCode: student?.studentCode || '',
           studentPhone: student?.phone || '',
           parentName: student?.parentName || '',
           parentPhone: student?.parentPhone || '',
@@ -131,8 +132,11 @@ export function MonthlySubscriptions() {
   const filteredSubs = expectedSubscriptions.filter(sub => {
     if (selectedCourse !== 'all' && sub.courseId !== selectedCourse) return false;
     if (searchTerm) {
-      if (!sub.studentName.toLowerCase().includes(searchTerm.toLowerCase()) &&
-          !sub.courseName.toLowerCase().includes(searchTerm.toLowerCase())) {
+      const term = searchTerm.toLowerCase();
+      const matchesName = sub.studentName.toLowerCase().includes(term);
+      const matchesCourse = sub.courseName.toLowerCase().includes(term);
+      const matchesCode = sub.studentCode && sub.studentCode.toLowerCase().includes(term);
+      if (!matchesName && !matchesCourse && !matchesCode) {
         return false;
       }
     }

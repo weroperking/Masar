@@ -5,6 +5,7 @@ import { SessionPayment, Student, Course, AttendanceSession, LedgerEntry } from 
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { StudentSelectDropdown } from '../../components/StudentSelectDropdown';
 
 export function SessionPayments() {
   const toast = useToast();
@@ -53,13 +54,25 @@ export function SessionPayments() {
 
   const totalCollected = payments?.reduce((acc, p) => acc + (p.paidAmount || 0), 0) || 0;
 
-  const filteredPayments = payments?.map(p => ({
-    ...p,
-    studentName: studentMap.get(p.studentId) || 'غير معروف',
-    courseName: courseMap.get(p.courseId) || 'غير معروف'
-  })).filter(p => 
-    p.studentName.includes(searchTerm) || p.courseName.includes(searchTerm)
-  );
+  const studentObjMap = new Map(allStudents?.map(s => [s.id, s]));
+
+  const filteredPayments = payments?.map(p => {
+    const student = studentObjMap.get(p.studentId);
+    return {
+      ...p,
+      studentName: student?.name || 'غير معروف',
+      studentCode: student?.studentCode || '',
+      courseName: courseMap.get(p.courseId) || 'غير معروف'
+    };
+  }).filter(p => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      p.studentName.toLowerCase().includes(term) ||
+      p.courseName.toLowerCase().includes(term) ||
+      (p.studentCode && p.studentCode.toLowerCase().includes(term))
+    );
+  });
 
   const handleDelete = async (id: string) => {
     const isConfirmed = await confirm({
@@ -368,16 +381,13 @@ function CreateSessionPaymentModal({
           <div className="p-6 overflow-y-auto flex-1 space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">الطالب *</label>
-              <select
-                required
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              <StudentSelectDropdown
+                students={students}
                 value={formData.studentId}
-                onChange={e => setFormData({ ...formData, studentId: e.target.value })}
-              >
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+                onChange={id => setFormData({ ...formData, studentId: id })}
+                required
+                placeholder="ابحث بالاسم أو كود الطالب أو رقم الهاتف..."
+              />
             </div>
 
             <div>

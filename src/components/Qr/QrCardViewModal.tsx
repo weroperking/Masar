@@ -4,6 +4,7 @@ import { QrCard, Student, CardCustomDesign } from '../../types';
 import { QrCardBadge, CardThemeColor } from './QrCardBadge';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { matchStudent, normalizeStudentCode } from '../../utils/studentCode';
 
 interface QrCardViewModalProps {
   isOpen: boolean;
@@ -47,8 +48,8 @@ export function QrCardViewModal({
   };
 
   const filteredStudents = allStudents.filter(
-    (s) => !s.deleted_at && (s.name.includes(searchTerm) || s.phone.includes(searchTerm))
-  ).slice(0, 10);
+    (s) => !s.deleted_at && matchStudent(s, searchTerm)
+  ).slice(0, 15);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 transition-opacity print:relative print:inset-auto print:bg-transparent print:p-0" onClick={onClose}>
@@ -219,26 +220,42 @@ export function QrCardViewModal({
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="ابحث بالاسم أو رقم الهاتف..."
+                      placeholder="ابحث بالاسم أو كود الطالب (#) أو رقم الهاتف..."
                       className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
 
                     <div className="max-h-36 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
-                      {filteredStudents.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => setSelectedStudentId(s.id)}
-                          className={`w-full text-right px-3 py-2 text-xs flex justify-between items-center transition-colors ${
-                            selectedStudentId === s.id
-                              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold'
-                              : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
-                          }`}
-                        >
-                          <span>{s.name}</span>
-                          <span className="text-slate-400 font-mono">{s.phone}</span>
-                        </button>
-                      ))}
+                      {filteredStudents.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-slate-400">
+                          لا يوجد طلاب مطابقين للبحث
+                        </div>
+                      ) : (
+                        filteredStudents.map((s) => {
+                          const formattedCode = s.studentCode ? `#${normalizeStudentCode(s.studentCode) || s.studentCode}` : '';
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => setSelectedStudentId(s.id)}
+                              className={`w-full text-right px-3 py-2 text-xs flex justify-between items-center transition-colors ${
+                                selectedStudentId === s.id
+                                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold'
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span>{s.name}</span>
+                                {formattedCode && (
+                                  <span className="font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.2 rounded border border-blue-200 dark:border-blue-900/60">
+                                    {formattedCode}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-slate-400 font-mono text-[11px]">{s.phone || 'بدون هاتف'}</span>
+                            </button>
+                          );
+                        })
+                      )}
                     </div>
 
                     <button

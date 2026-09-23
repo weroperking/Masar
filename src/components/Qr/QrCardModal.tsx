@@ -8,6 +8,7 @@ import {
 import { Student, QrCard, CardCustomDesign } from '../../types';
 import { useApiMutation } from '../../config/queryHooks';
 import { QrCardBadge, CardThemeColor } from './QrCardBadge';
+import { matchStudent, normalizeStudentCode } from '../../utils/studentCode';
 
 interface QrCardModalProps {
   isOpen: boolean;
@@ -91,11 +92,10 @@ export function QrCardModal({
 
   // Filtered students for single mode selector
   const filteredStudents = useMemo(() => {
-    if (!studentSearch.trim()) return students.filter(s => !s.deleted_at).slice(0, 6);
-    const term = studentSearch.toLowerCase();
+    if (!studentSearch.trim()) return students.filter(s => !s.deleted_at).slice(0, 8);
     return students
-      .filter(s => !s.deleted_at && (s.name.toLowerCase().includes(term) || (s.phone && s.phone.includes(term))))
-      .slice(0, 6);
+      .filter(s => !s.deleted_at && matchStudent(s, studentSearch))
+      .slice(0, 8);
   }, [students, studentSearch]);
 
   const selectedStudent = useMemo(() => {
@@ -374,9 +374,16 @@ export function QrCardModal({
                         {selectedStudent.name[0]}
                       </div>
                       <div>
-                        <p className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                          {selectedStudent.name}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                            {selectedStudent.name}
+                          </p>
+                          {selectedStudent.studentCode && (
+                            <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900/60">
+                              #{normalizeStudentCode(selectedStudent.studentCode) || selectedStudent.studentCode}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                           {selectedStudent.phone || 'بدون هاتف'} • {selectedStudent.gradeLevel || selectedStudent.school || 'المرحلة الدراسية'}
                         </p>
@@ -385,7 +392,7 @@ export function QrCardModal({
                     <button
                       type="button"
                       onClick={() => setSelectedStudentId('')}
-                      className="text-xs text-slate-400 hover:text-red-600 px-2.5 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="text-xs text-slate-400 hover:text-red-600 px-2.5 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                     >
                       تغيير
                     </button>
@@ -398,7 +405,7 @@ export function QrCardModal({
                         type="text"
                         value={studentSearch}
                         onChange={(e) => setStudentSearch(e.target.value)}
-                        placeholder="ابحث بالاسم أو رقم الهاتف..."
+                        placeholder="ابحث بالاسم أو كود الطالب (#) أو رقم الهاتف..."
                         className="w-full pl-3 pr-9 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
@@ -406,23 +413,31 @@ export function QrCardModal({
                     <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
                       {filteredStudents.length === 0 ? (
                         <div className="p-3 text-center text-xs text-slate-400">
-                          لا يوجد طلاب مطابقين للبحث
+                          لا يوجد طلاب مطابقين للبحث (يمكنك البحث بالاسم أو الكود أو الهاتف)
                         </div>
                       ) : (
                         filteredStudents.map((s) => {
                           const hasCard = studentToCardMap.has(s.id);
+                          const formattedCode = s.studentCode ? `#${normalizeStudentCode(s.studentCode) || s.studentCode}` : '';
                           return (
                             <button
                               key={s.id}
                               type="button"
                               onClick={() => handleSelectStudent(s)}
-                              className="w-full text-right px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                              className="w-full text-right px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
                             >
                               <div>
-                                <span className="font-semibold text-slate-900 dark:text-slate-100 ml-2">
-                                  {s.name}
-                                </span>
-                                <span className="text-slate-400 font-mono text-[11px]">{s.phone}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                    {s.name}
+                                  </span>
+                                  {formattedCode && (
+                                    <span className="font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.2 rounded border border-blue-200 dark:border-blue-900/60">
+                                      {formattedCode}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-slate-400 font-mono text-[11px]">{s.phone || 'بدون هاتف'}</span>
                               </div>
                               {hasCard ? (
                                 <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40">

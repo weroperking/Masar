@@ -8,6 +8,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { Group, Course, Enrollment, Student } from '../../types';
 import { formatTimeRange12 } from '../../utils/time';
+import { StudentSelectDropdown } from '../../components/StudentSelectDropdown';
 
 export function GroupDetails() {
   const { id } = useParams<{ id: string }>();
@@ -278,15 +279,14 @@ function EnrollStudentModal({ groupId, courseId, existingStudentIds, onClose }: 
           <div className="p-6 overflow-y-auto flex-1 space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">الطالب *</label>
-              <select 
-                required 
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                value={selectedStudentId} 
-                onChange={e => setSelectedStudentId(e.target.value)}
-              >
-                <option value="">اختر الطالب...</option>
-                {students?.map(s => <option key={s.id} value={s.id}>{s.name} ({s.phone})</option>)}
-              </select>
+              <StudentSelectDropdown
+                students={students}
+                value={selectedStudentId}
+                onChange={id => setSelectedStudentId(id)}
+                required
+                placeholder="ابحث بالاسم أو كود الطالب أو رقم الهاتف..."
+                emptyMessage="لا يوجد طلاب نشطين متاحين للتسجيل في هذه المجموعة"
+              />
               {students?.length === 0 && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">لا يوجد طلاب نشطين غير مسجلين في هذه المجموعة.</p>
               )}

@@ -109,17 +109,20 @@ export function CommandPalette({
   ];
 
   // Map students to items
-  const studentItems: PaletteItem[] = (students || []).map(s => ({
-    id: `student-${s.id}`,
-    title: s.name,
-    subtitle: `هاتف: ${s.phone} | ولي الأمر: ${s.parentName || '-'}`,
-    category: 'طلاب',
-    icon: Users,
-    action: () => {
-      navigate('/students');
-      toast.info(`تم العثور على الطالب: ${s.name}`);
-    }
-  }));
+  const studentItems: PaletteItem[] = (students || []).map(s => {
+    const codeStr = s.studentCode ? `#${s.studentCode}` : (s.lookup_code ? `#${s.lookup_code}` : '');
+    return {
+      id: `student-${s.id}`,
+      title: s.name,
+      subtitle: `${codeStr ? `كود: ${codeStr} | ` : ''}هاتف: ${s.phone || '-'} | ولي الأمر: ${s.parentName || '-'}`,
+      category: 'طلاب',
+      icon: Users,
+      action: () => {
+        navigate('/students');
+        toast.info(`تم العثور على الطالب: ${s.name}`);
+      }
+    };
+  });
 
   // Map courses to items
   const courseItems: PaletteItem[] = (courses || []).map(c => ({

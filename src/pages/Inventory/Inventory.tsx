@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
+import { StudentSelectDropdown } from '../../components/StudentSelectDropdown';
 
 export function Inventory() {
   const [activeTab, setActiveTab] = useState<'products' | 'sales'>('products');
@@ -533,6 +534,11 @@ function SellProductModal({
       return;
     }
 
+    if (customerType === 'student' && !studentId) {
+      toast.error('يرجى اختيار الطالب من القائمة أولاً');
+      return;
+    }
+
     const finalCustomerName = customerType === 'student'
       ? students.find(s => s.id === studentId)?.name || 'طالب'
       : customerName || 'عميل نقدي';
@@ -682,16 +688,14 @@ function SellProductModal({
             </div>
 
             {customerType === 'student' ? (
-              <select
-                className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              <StudentSelectDropdown
+                students={students}
                 value={studentId}
-                onChange={e => setStudentId(e.target.value)}
+                onChange={id => setStudentId(id)}
                 disabled={isPending}
-              >
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.phone})</option>
-                ))}
-              </select>
+                accentColor="emerald"
+                placeholder="ابحث باسم الطالب أو الكود أو رقم الهاتف..."
+              />
             ) : (
               <input 
                 type="text"

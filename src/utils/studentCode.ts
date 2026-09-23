@@ -96,6 +96,68 @@ export function isStudentCodeTaken(
 }
 
 /**
+ * Normalizes Arabic text for flexible search (unifies alef, taa marbuta, yaa, strips diacritics).
+ */
+export function normalizeArabicText(text: string | undefined | null): string {
+  if (!text) return '';
+  return String(text)
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString())
+    .replace(/[\u064B-\u065F]/g, ''); // strip Arabic tashkeel (diacritics)
+}
+
+/**
+ * Comprehensive student matching by name, student code/ID, internal ID, lookup code, or phone.
+ * Supports Eastern Arabic numerals, prefix padding, and partial matches.
+ */
+export function matchStudent(student: Student, query: string): boolean {
+  if (!query || !query.trim()) return true;
+  const qTrim = query.trim();
+  const qNorm = normalizeArabicText(qTrim);
+  const qDigits = qTrim.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).replace(/\D/g, '');
+
+  // 1. Name match (Arabic normalized)
+  if (student.name && normalizeArabicText(student.name).includes(qNorm)) {
+    return true;
+  }
+
+  // 2. Student code / ID match
+  if (student.studentCode) {
+    const normCode = normalizeStudentCode(student.studentCode);
+    const rawCodeNorm = normalizeArabicText(student.studentCode);
+    if (rawCodeNorm.includes(qNorm)) return true;
+    if (normCode.includes(qNorm)) return true;
+
+    // Digits comparison (e.g. searching "5" matches "0005" or "#0005")
+    if (qDigits) {
+      const codeDigits = normCode.replace(/\D/g, '');
+      if (codeDigits.includes(qDigits)) return true;
+      if (codeDigits.replace(/^0+/, '') === qDigits.replace(/^0+/, '')) return true;
+    }
+  }
+
+  // 3. Internal ID & lookup code match
+  if (student.id && student.id.toLowerCase().includes(qNorm)) return true;
+  if (student.lookup_code && student.lookup_code.toLowerCase().includes(qNorm)) return true;
+
+  // 4. Phone numbers match
+  if (student.phone) {
+    const cleanPhone = student.phone.replace(/\D/g, '');
+    if (cleanPhone.includes(qDigits || qNorm)) return true;
+  }
+  if (student.parentPhone) {
+    const cleanParentPhone = student.parentPhone.replace(/\D/g, '');
+    if (cleanParentPhone.includes(qDigits || qNorm)) return true;
+  }
+
+  return false;
+}
+
+/**
  * Builds the canonical public student lookup URL encoded in the card's QR code.
  * When scanned by any smartphone camera, opens the dedicated student profile page.
  * Uses the new opaque org-scoped format: /p/s/{lookup_code}
