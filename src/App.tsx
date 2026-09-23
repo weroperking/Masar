@@ -30,6 +30,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { SubscriptionProvider } from './context/SubscriptionContext';
+import { ProfileProvider } from './context/ProfileContext';
+import { ProfileSelectorModal } from './components/ProfileSelectorModal';
 
 // Admin
 import { Users } from './pages/Admin/Users';
@@ -42,6 +44,7 @@ import { PublicStudentLookup } from './pages/PublicStudentLookup';
 import { CustomAuth } from './pages/Auth/CustomAuth';
 import { CustomOrganizationList } from './pages/Auth/CustomOrganizationList';
 import { HydrationGate } from './components/HydrationGate';
+import { AdminRouteGuard } from './components/AdminRouteGuard';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './config/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -216,42 +219,45 @@ function AuthGate() {
   return (
     <ErrorBoundary>
       <SubscriptionProvider>
-        <TourProvider>
-          <HydrationGate>
-            <CheckUpdate />
-            <TourOverlay />
-            <Routes>
-              <Route path="/" element={<Layout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="students" element={<Students />} />
-                <Route path="students/:id" element={<StudentDetails />} />
-                <Route path="courses" element={<Courses />} />
-                <Route path="payments" element={<MonthlySubscriptions />} />
-                
-                <Route path="groups" element={<Groups />} />
-                <Route path="groups/:id" element={<GroupDetails />} />
-                <Route path="attendance" element={<Attendance />} />
-                <Route path="schedule" element={<Schedule />} />
-                <Route path="assessments" element={<Assessments />} />
-                <Route path="courseProducts" element={<CourseProducts />} />
-                
-                <Route path="sessionPayments" element={<SessionPayments />} />
-                <Route path="ledgers" element={<Ledgers />} />
-                <Route path="dues" element={<Dues />} />
-                <Route path="booking" element={<Navigate to="/" replace />} />
-                
-                <Route path="inventory" element={<Inventory />} />
-                <Route path="reports" element={<Reports />} />
-                
-                <Route path="users" element={<Users />} />
-                <Route path="messaging" element={<Navigate to="/students" replace />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="qrcards" element={<QrCards />} />
-                <Route path="upgrade" element={<Upgrade />} />
-              </Route>
-            </Routes>
-          </HydrationGate>
-        </TourProvider>
+        <ProfileProvider>
+          <TourProvider>
+            <HydrationGate>
+              <CheckUpdate />
+              <TourOverlay />
+              <ProfileSelectorModal />
+              <Routes>
+                <Route path="/" element={<Layout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="students" element={<Students />} />
+                  <Route path="students/:id" element={<StudentDetails />} />
+                  <Route path="courses" element={<Courses />} />
+                  <Route path="payments" element={<AdminRouteGuard><MonthlySubscriptions /></AdminRouteGuard>} />
+                  
+                  <Route path="groups" element={<Groups />} />
+                  <Route path="groups/:id" element={<GroupDetails />} />
+                  <Route path="attendance" element={<Attendance />} />
+                  <Route path="schedule" element={<Schedule />} />
+                  <Route path="assessments" element={<Assessments />} />
+                  <Route path="courseProducts" element={<CourseProducts />} />
+                  
+                  <Route path="sessionPayments" element={<AdminRouteGuard><SessionPayments /></AdminRouteGuard>} />
+                  <Route path="ledgers" element={<AdminRouteGuard><Ledgers /></AdminRouteGuard>} />
+                  <Route path="dues" element={<AdminRouteGuard><Dues /></AdminRouteGuard>} />
+                  <Route path="booking" element={<Navigate to="/" replace />} />
+                  
+                  <Route path="inventory" element={<Inventory />} />
+                  <Route path="reports" element={<AdminRouteGuard><Reports /></AdminRouteGuard>} />
+                  
+                  <Route path="users" element={<AdminRouteGuard><Users /></AdminRouteGuard>} />
+                  <Route path="messaging" element={<Navigate to="/students" replace />} />
+                  <Route path="settings" element={<AdminRouteGuard><Settings /></AdminRouteGuard>} />
+                  <Route path="qrcards" element={<QrCards />} />
+                  <Route path="upgrade" element={<Upgrade />} />
+                </Route>
+              </Routes>
+            </HydrationGate>
+          </TourProvider>
+        </ProfileProvider>
       </SubscriptionProvider>
     </ErrorBoundary>
   );

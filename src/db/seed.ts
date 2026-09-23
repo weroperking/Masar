@@ -14,8 +14,6 @@ export async function seedDatabaseIfEmpty() {
       const now = Date.now();
       await db.settings.add({
         id: 'default-settings',
-        autoStartEndSessions: false,
-        autoConfirmPaymentOnAttendance: true,
         autoCreateAssignmentPerSession: false,
         freeSessionLimitPerStudent: 1,
         assignmentGradingMethod: 'numeric',

@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useApiQuery } from '../config/queryHooks';
-import { Users, Wallet, CreditCard, TrendingUp, ArrowUpRight, AlertCircle, BarChart3, Filter } from 'lucide-react';
+import { Users, Wallet, CreditCard, TrendingUp, ArrowUpRight, AlertCircle, BarChart3, Filter, UserCheck, BookOpen, Calendar, QrCode } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toMajorUnits } from '../utils/currency';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subMonths, isWithinInterval, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Student, LedgerEntry, MonthlySubscription, SessionPayment } from '../types';
+import { Student, LedgerEntry, MonthlySubscription, SessionPayment, Course, AttendanceSession } from '../types';
+import { useProfile } from '../context/ProfileContext';
 
 export function Dashboard() {
   const [dateRange, setDateRange] = useState<'today' | 'month' | 'year' | 'last12' | 'custom'>('month');
@@ -136,14 +137,27 @@ export function Dashboard() {
     return { revenue, expense, refund, outstanding, chartData };
   }, [ledgerEntries, payments, sessionPayments, dateRange, startDate, endDate, customStart, customEnd]);
 
+  const { currentProfile } = useProfile();
+  const isAssistant = currentProfile === 'assistant';
+
+  const { data: courses = [] } = useApiQuery<Course>('courses', 60 * 1000);
+  const { data: sessions = [] } = useApiQuery<AttendanceSession>('attendanceSessions', 60 * 1000);
+
   const netProfit = stats.revenue - stats.expense - stats.refund;
 
-  const statCards = [
-    { name: 'إجمالي الطلاب (نشط)', value: activeStudentsCount ?? '...', icon: Users, href: '/students', color: 'text-blue-600 dark:text-blue-400' },
-    { name: 'إجمالي الإيرادات', value: `${toMajorUnits(stats.revenue).toLocaleString()} ج.م`, icon: Wallet, href: '/ledgers', color: 'text-emerald-600 dark:text-emerald-400' },
-    { name: 'إجمالي المصروفات', value: `${toMajorUnits(stats.expense).toLocaleString()} ج.م`, icon: CreditCard, href: '/ledgers', color: 'text-red-600 dark:text-red-400' },
-    { name: 'صافي الأرباح', value: `${toMajorUnits(netProfit).toLocaleString()} ج.م`, icon: TrendingUp, href: '/reports', color: netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-amber-600 dark:text-amber-400' },
-  ];
+  const statCards = isAssistant
+    ? [
+        { name: 'إجمالي الطلاب (نشط)', value: activeStudentsCount ?? '...', icon: Users, href: '/students', color: 'text-blue-600 dark:text-blue-400' },
+        { name: 'الكورسات المتاحة', value: courses.length, icon: BookOpen, href: '/courses', color: 'text-emerald-600 dark:text-emerald-400' },
+        { name: 'جلسات الحضور المسجلة', value: sessions.length, icon: UserCheck, href: '/attendance', color: 'text-indigo-600 dark:text-indigo-400' },
+        { name: 'بطاقات وكروت QR', value: 'نشطة', icon: QrCode, href: '/qrcards', color: 'text-blue-600 dark:text-blue-400' },
+      ]
+    : [
+        { name: 'إجمالي الطلاب (نشط)', value: activeStudentsCount ?? '...', icon: Users, href: '/students', color: 'text-blue-600 dark:text-blue-400' },
+        { name: 'إجمالي الإيرادات', value: `${toMajorUnits(stats.revenue).toLocaleString()} ج.م`, icon: Wallet, href: '/ledgers', color: 'text-emerald-600 dark:text-emerald-400' },
+        { name: 'إجمالي المصروفات', value: `${toMajorUnits(stats.expense).toLocaleString()} ج.م`, icon: CreditCard, href: '/ledgers', color: 'text-red-600 dark:text-red-400' },
+        { name: 'صافي الأرباح', value: `${toMajorUnits(netProfit).toLocaleString()} ج.م`, icon: TrendingUp, href: '/reports', color: netProfit >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-amber-600 dark:text-amber-400' },
+      ];
 
   return (
     <div id="tour-welcome-target" className="space-y-6">
@@ -215,64 +229,108 @@ export function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">
-          <div className="flex items-center gap-2 mb-5">
-            <BarChart3 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">التدفقات النقدية (إيرادات ومصروفات)</h2>
-          </div>
-          
-          <div className="h-72 w-full" dir="ltr">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(value) => `${value >= 1000 ? value / 1000 + 'k' : value}`} />
-                <Tooltip 
-                  cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }}
-                  contentStyle={{ 
-                    backgroundColor: '#0f172a', 
-                    borderRadius: '6px', 
-                    border: '1px solid #334155',
-                    color: '#f8fafc',
-                    fontSize: '12px'
-                  }}
-                  formatter={(value: number) => [`${value} ج.م`, '']}
-                />
-                <Bar dataKey="revenue" name="إيرادات" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={36} />
-                <Bar dataKey="expenses" name="مصروفات" fill="#64748b" radius={[3, 3, 0, 0]} maxBarSize={36} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Clean, Non-Slop Outstanding Dues Panel */}
-        <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <AlertCircle className="w-4 h-4 text-amber-500" />
-              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">المتأخرات غير المحصلة</h2>
+      {!isAssistant ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5">
+            <div className="flex items-center gap-2 mb-5">
+              <BarChart3 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">التدفقات النقدية (إيرادات ومصروفات)</h2>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
-              مجموع المبالغ المتبقية على الطلاب من اشتراكات شهرية وحصص غير مسددة بالكامل.
-            </p>
             
-            <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 my-2">
-              <span className="text-[11px] text-slate-400 block mb-1">إجمالي المستحقات المعلقة</span>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-                {toMajorUnits(stats.outstanding).toLocaleString()} <span className="text-xs font-normal text-slate-500">ج.م</span>
+            <div className="h-72 w-full" dir="ltr">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(value) => `${value >= 1000 ? value / 1000 + 'k' : value}`} />
+                  <Tooltip 
+                    cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }}
+                    contentStyle={{ 
+                      backgroundColor: '#0f172a', 
+                      borderRadius: '6px', 
+                      border: '1px solid #334155',
+                      color: '#f8fafc',
+                      fontSize: '12px'
+                    }}
+                    formatter={(value: number) => [`${value} ج.م`, '']}
+                  />
+                  <Bar dataKey="revenue" name="إيرادات" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={36} />
+                  <Bar dataKey="expenses" name="مصروفات" fill="#64748b" radius={[3, 3, 0, 0]} maxBarSize={36} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Clean, Non-Slop Outstanding Dues Panel */}
+          <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="w-4 h-4 text-amber-500" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">المتأخرات غير المحصلة</h2>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
+                مجموع المبالغ المتبقية على الطلاب من اشتراكات شهرية وحصص غير مسددة بالكامل.
+              </p>
+              
+              <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 my-2">
+                <span className="text-[11px] text-slate-400 block mb-1">إجمالي المستحقات المعلقة</span>
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
+                  {toMajorUnits(stats.outstanding).toLocaleString()} <span className="text-xs font-normal text-slate-500">ج.م</span>
+                </div>
               </div>
             </div>
+
+            <Link 
+              to="/dues" 
+              className="mt-4 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg transition-colors text-center shadow-xs"
+            >
+              مراجعة سجل المستحقات
+            </Link>
+          </div>
+        </div>
+      ) : (
+        /* Academic Assistant Quick Access */
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-blue-600" />
+              <span>مهام المساعدين اليومية السريعة</span>
+            </h2>
+            <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full">
+              الملف الأكاديمي نشط
+            </span>
           </div>
 
-          <Link 
-            to="/dues" 
-            className="mt-4 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg transition-colors text-center shadow-xs"
-          >
-            مراجعة سجل المستحقات
-          </Link>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <Link
+              to="/attendance"
+              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/30 transition-all flex flex-col items-center text-center gap-2"
+            >
+              <UserCheck className="w-6 h-6 text-blue-600" />
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100">تسجيل الحضور بالباركود</span>
+              <span className="text-[11px] text-slate-500">مسح كروت الطلاب وتوثيق الحضور والغياب</span>
+            </Link>
+
+            <Link
+              to="/students"
+              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/30 transition-all flex flex-col items-center text-center gap-2"
+            >
+              <Users className="w-6 h-6 text-emerald-600" />
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100">دليل وبيانات الطلاب</span>
+              <span className="text-[11px] text-slate-500">البحث السريع واستعراض أرقام أولياء الأمور</span>
+            </Link>
+
+            <Link
+              to="/qrcards"
+              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/30 transition-all flex flex-col items-center text-center gap-2"
+            >
+              <QrCode className="w-6 h-6 text-indigo-600" />
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100">طباعة كروت الباركود</span>
+              <span className="text-[11px] text-slate-500">توليد وطباعة بطاقات الهوية للطلاب</span>
+            </Link>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

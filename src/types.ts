@@ -273,20 +273,42 @@ export interface CardCustomDesign {
   schoolElement?: CardOverlayElement;
 }
 
+export type ProfileMode = 'admin' | 'assistant';
+
+export interface ProfileAccount {
+  id: ProfileMode;
+  name: string;
+  role: 'admin' | 'assistant';
+  avatarUrl: string;
+  pinRequired: boolean;
+  pin?: string;
+}
+
+export interface ProfilesConfig {
+  adminPin?: string;
+  adminName?: string;
+  adminAvatarUrl?: string;
+  assistantEnabled?: boolean;
+  assistantName?: string;
+  assistantAvatarUrl?: string;
+  assistantPinRequired?: boolean;
+  assistantPin?: string;
+  autoLockMinutes?: number; // default 15
+}
+
 export interface Settings extends BaseRecord {
   numericMaxGrade?: number;
   assignmentGradingMethod?: string;
   freeSessionLimitPerStudent?: number;
   autoCreateAssignmentPerSession?: boolean;
-  autoStartEndSessions?: boolean;
   academyName?: string;
   teacherName?: string;
   branch?: string;
   whatsappNumber?: string;
   currency?: string;
-  autoConfirmPaymentOnAttendance: boolean;
   theme?: 'light' | 'dark' | 'system';
   cardDesign?: CardCustomDesign;
+  profilesConfig?: ProfilesConfig;
 }
 
 export interface QrCard extends BaseRecord {

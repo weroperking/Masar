@@ -18,8 +18,6 @@ import {
   UserX,
   Trash2,
   ArrowRight,
-  RefreshCw,
-  Zap,
   Camera,
   Image,
 } from "lucide-react";
@@ -48,7 +46,6 @@ import { useConfirm } from "../../context/ConfirmContext";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { getWhatsAppUrl } from "../../utils/phone";
-import { autoScheduleService } from "../../services/autoScheduleService";
 import { motion, AnimatePresence } from "motion/react";
 
 export function Attendance() {
@@ -60,35 +57,8 @@ export function Attendance() {
   const [markingSession, setMarkingSession] =
     useState<AttendanceSession | null>(null);
   const [startWithCamera, setStartWithCamera] = useState(false);
-  const [isAutoChecking, setIsAutoChecking] = useState(false);
   const { data: groups = [] } = useApiQuery<Group>("groups", 60 * 1000);
   const { data: courses = [] } = useApiQuery<Course>("courses", 60 * 1000);
-
-  // Periodic auto-check when on attendance page
-  useEffect(() => {
-    autoScheduleService.checkAndRunSchedules();
-    const timer = setInterval(() => {
-      autoScheduleService.checkAndRunSchedules();
-    }, 10000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const handleManualAutoCheck = async () => {
-    setIsAutoChecking(true);
-    try {
-      const result = await autoScheduleService.checkAndRunSchedules();
-      if (result.started > 0) {
-        toast.success(`تم بدء ${result.started} حصة تلقائياً وفقاً للجدول الزمني!`);
-      } else {
-        toast.info("تم فحص الجدول: لا توجد حصص جديدة حان موعد بدئها الآن.");
-      }
-    } catch (e: any) {
-      console.error(e);
-      toast.error("حدث خطأ أثناء فحص الحصص المجدولة.");
-    } finally {
-      setIsAutoChecking(false);
-    }
-  };
 
   const { data: allSessions = [] } = useApiQuery<AttendanceSession>(
     "attendanceSessions",
@@ -150,10 +120,6 @@ export function Attendance() {
     });
 
     if (isConfirmed) {
-      const targetSession = allSessions.find((s) => s.id === sessionId);
-      if (targetSession?.groupId) {
-        autoScheduleService.markSessionCancelledOrEnded(targetSession.groupId);
-      }
       updateSession.mutate(
         {
           id: sessionId,
@@ -204,29 +170,6 @@ export function Attendance() {
             اليوم: {todayName}،{" "}
             {format(new Date(), "dd MMMM yyyy", { locale: ar })}
           </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <Zap className="w-3.5 h-3.5 ml-1" />
-            <span>البدء التلقائي للحصص: نشط</span>
-          </div>
-
-          <button
-            onClick={handleManualAutoCheck}
-            disabled={isAutoChecking}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
-            title="فحص الجدول وبدء الحصص التي حان موعدها فوراً"
-          >
-            <RefreshCw
-              className={`w-3.5 h-3.5 ${isAutoChecking ? "animate-spin" : ""}`}
-            />
-            <span>فحص الجدول الآن</span>
-          </button>
         </div>
       </div>
 

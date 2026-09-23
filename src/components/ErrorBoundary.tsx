@@ -62,6 +62,18 @@ export class ErrorBoundary extends Component<Props, State> {
               واجه التطبيق خطأً أثناء معالجة هذه الصفحة. يمكنك المحاولة مجدداً أو إعادة تحميل التطبيق.
             </p>
 
+            {this.state.error && (
+              <details className="mb-6 text-right bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                <summary className="cursor-pointer font-medium text-slate-600 dark:text-slate-400 select-none">
+                  تفاصيل الخطأ الفني (Debug Info)
+                </summary>
+                <pre className="mt-2 text-[11px] font-mono text-red-600 dark:text-red-400 overflow-x-auto whitespace-pre-wrap text-left" dir="ltr">
+                  {this.state.error.toString()}
+                  {this.state.error.stack ? `\n${this.state.error.stack.slice(0, 500)}...` : ''}
+                </pre>
+              </details>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"

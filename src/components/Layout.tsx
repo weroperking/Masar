@@ -14,6 +14,7 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../context/SubscriptionContext';
+import { useProfile } from '../context/ProfileContext';
 import { CommandPalette } from './CommandPalette';
 import { QuickNewModal } from './QuickNewModal';
 import { ShortcutsHelpModal } from './ShortcutsHelpModal';
@@ -24,8 +25,39 @@ import { MasarLogo } from './MasarLogo';
 import { getSyncState, triggerManualSync, processSyncQueue } from '../services/syncService';
 import { formatTime12 } from '../utils/time';
 
-// Base navigation groups (we will filter them inside the component)
-const getNavigationGroups = (limits: any) => {
+// Base navigation groups (filtered by limits and profile role)
+const getNavigationGroups = (limits: any, isAssistant: boolean = false) => {
+  if (isAssistant) {
+    // Assistances will see academic modules and inventory/products/sales (while hiding general ledger and finance)
+    return [
+      {
+        title: 'رئيسي',
+        items: [
+          { name: 'لوحة التحكم', href: '/', icon: LayoutDashboard },
+        ]
+      },
+      {
+        title: 'أكاديمي',
+        items: [
+          { name: 'الطلاب', href: '/students', icon: Users },
+          { name: 'بطاقات وكروت QR', href: '/qrcards', icon: QrCode },
+          { name: 'الكورسات', href: '/courses', icon: BookOpen },
+          { name: 'المجموعات', href: '/groups', icon: Users },
+          { name: 'الحضور والغياب', href: '/attendance', icon: UserCheck },
+          { name: 'الجدول الزمني', href: '/schedule', icon: Calendar },
+          { name: 'الاختبارات والواجبات', href: '/assessments', icon: FileText },
+          { name: 'الكتب التعليمية', href: '/courseProducts', icon: Library },
+        ]
+      },
+      ...(limits?.inventory_sales !== false ? [{
+        title: 'المخزون',
+        items: [
+          { name: 'المنتجات والمبيعات', href: '/inventory', icon: Package },
+        ]
+      }] : [])
+    ];
+  }
+
   return [
     {
       title: 'رئيسي',
@@ -169,7 +201,9 @@ export function Layout() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [hideTrialBanner, setHideTrialBanner] = useState(false);
   const { subscription, isBlocked } = useSubscription();
-  const navigationGroups = getNavigationGroups(subscription?.limits);
+  const { currentProfile } = useProfile();
+  const isAssistant = currentProfile === 'assistant';
+  const navigationGroups = getNavigationGroups(subscription?.limits, isAssistant);
 
   const showNav = true;
 

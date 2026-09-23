@@ -4,6 +4,7 @@ import {
   Users, CreditCard, Wallet, FileSpreadsheet, 
   ShoppingCart, FileText, X, PlusCircle 
 } from 'lucide-react';
+import { useProfile } from '../context/ProfileContext';
 
 interface QuickOption {
   num: string;
@@ -22,8 +23,10 @@ export function QuickNewModal({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
+  const { currentProfile } = useProfile();
+  const isAssistant = currentProfile === 'assistant';
 
-  const options: QuickOption[] = [
+  const baseOptions: QuickOption[] = [
     {
       num: '1',
       title: 'إضافة طالب جديد',
@@ -91,6 +94,11 @@ export function QuickNewModal({
       }
     },
   ];
+
+  // If assistant profile, allow student, book sales, and assessment creation
+  const options = isAssistant
+    ? baseOptions.filter(opt => opt.num === '1' || opt.num === '5' || opt.num === '6').map((opt, idx) => ({ ...opt, num: String(idx + 1) }))
+    : baseOptions;
 
   // Number key shortcuts 1-6 when modal is open
   useEffect(() => {

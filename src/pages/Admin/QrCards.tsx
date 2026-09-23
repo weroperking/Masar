@@ -469,8 +469,7 @@ export function QrCards() {
         });
       } else {
         await createSettings.mutateAsync({
-          cardDesign: design,
-          autoConfirmPaymentOnAttendance: true
+          cardDesign: design
         } as Settings);
       }
       toast.success('تم حفظ إعدادات تصميم الكروت بنجاح!');

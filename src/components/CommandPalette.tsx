@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApiQuery } from '../config/queryHooks';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { useProfile } from '../context/ProfileContext';
 import { Student, Course, Product } from '../types';
 import { 
   Search, Users, BookOpen, CreditCard, LayoutDashboard, Settings, 
@@ -37,6 +38,9 @@ export function CommandPalette({
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const toast = useToast();
+
+  const { currentProfile } = useProfile();
+  const isAssistant = currentProfile === 'assistant';
 
   const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
   const students = allStudents.slice(0, 100);
@@ -149,15 +153,31 @@ export function CommandPalette({
   }));
 
   const allItems: PaletteItem[] = [
-    ...actionItems,
-    ...navigationItems,
+    ...actionItems.filter(act => !isAssistant || act.id !== 'act-new-ledger'),
+    ...navigationItems.filter(nav => {
+      if (isAssistant) {
+        // Assistant can see academic and inventory modules (hiding financial ledgers, settings, users, reports)
+        const hiddenIds = ['nav-payments', 'nav-sessionPayments', 'nav-ledgers', 'nav-dues', 'nav-reports', 'nav-users', 'nav-settings'];
+        return !hiddenIds.includes(nav.id);
+      }
+      return true;
+    }),
     ...studentItems,
     ...courseItems,
     ...productItems
   ];
 
   const filteredItems = query.trim() === ''
-    ? [...actionItems, ...navigationItems]
+    ? [
+        ...actionItems.filter(act => !isAssistant || act.id !== 'act-new-ledger'),
+        ...navigationItems.filter(nav => {
+          if (isAssistant) {
+            const hiddenIds = ['nav-payments', 'nav-sessionPayments', 'nav-ledgers', 'nav-dues', 'nav-reports', 'nav-users', 'nav-settings'];
+            return !hiddenIds.includes(nav.id);
+          }
+          return true;
+        })
+      ]
     : allItems.filter(item => 
         item.title.toLowerCase().includes(query.toLowerCase()) || 
         (item.subtitle && item.subtitle.toLowerCase().includes(query.toLowerCase()))

@@ -16,7 +16,10 @@ import {
   FileText,
   BarChart3,
   Settings,
-  MessageSquare
+  MessageSquare,
+  KeyRound,
+  Lock,
+  ArrowLeft
 } from 'lucide-react';
 import { MasarLogo } from '../../components/MasarLogo';
 import { db } from '../../db/db';
@@ -29,9 +32,18 @@ export function CustomOrganizationList() {
   const { user } = useUser();
 
   const [mode, setMode] = useState<'list' | 'create'>('list');
+  const [setupStep, setSetupStep] = useState<'org_details' | 'profile_pins'>('org_details');
   const [orgName, setOrgName] = useState('');
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
+  
+  // Profile PIN setup states
+  const [adminPin, setAdminPin] = useState('1234');
+  const [enableAssistant, setEnableAssistant] = useState(false);
+  const [assistantName, setAssistantName] = useState('فريق المساعدين');
+  const [assistantPinRequired, setAssistantPinRequired] = useState(false);
+  const [assistantPin, setAssistantPin] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const hasAutoSelectedRef = React.useRef(false);
@@ -85,6 +97,19 @@ export function CustomOrganizationList() {
       setLoading(true);
       setError('');
 
+      if (enableAssistant && assistantPinRequired) {
+        if (!assistantPin || assistantPin.length !== 4) {
+          setError('رمز PIN للمساعد يجب أن يتكون من 4 أرقام');
+          setLoading(false);
+          return;
+        }
+        if (assistantPin === adminPin) {
+          setError('لا يمكن أن يكون رمز PIN الخاص بالمساعد مطابقاً لرمز المعلم (المدير). يرجى اختيار رمزين مختلفين.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const teacherFullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
 
       // 1. Update Clerk user profile with the entered teacher name
@@ -125,11 +150,24 @@ export function CustomOrganizationList() {
 
       // 4. Save to IndexedDB (Settings & Users)
       try {
+        const profilesConfig = {
+          adminPin: adminPin || '1234',
+          adminName: teacherFullName,
+          adminAvatarUrl: '/avatar-admin.svg',
+          assistantEnabled: enableAssistant,
+          assistantName: assistantName.trim() || 'فريق المساعدين',
+          assistantAvatarUrl: '/avatar-assistant.svg',
+          assistantPinRequired: assistantPinRequired,
+          assistantPin: assistantPinRequired ? assistantPin : '',
+          autoLockMinutes: 15
+        };
+
         const existingSettings = await db.settings.toArray();
         if (existingSettings.length > 0) {
           await db.settings.update(existingSettings[0].id, {
             teacherName: teacherFullName || existingSettings[0].teacherName,
             academyName: orgName.trim(),
+            profilesConfig,
             updated_at: Date.now()
           });
         } else {
@@ -137,12 +175,11 @@ export function CustomOrganizationList() {
             id: 'default-settings',
             teacherName: teacherFullName,
             academyName: orgName.trim(),
-            autoConfirmPaymentOnAttendance: true,
-            autoStartEndSessions: false,
             autoCreateAssignmentPerSession: false,
             freeSessionLimitPerStudent: 1,
             assignmentGradingMethod: 'numeric',
             numericMaxGrade: 100,
+            profilesConfig,
             created_at: Date.now(),
             updated_at: Date.now(),
             sync_status: 'synced'
@@ -297,107 +334,231 @@ export function CustomOrganizationList() {
             </div>
           )}
 
-          <form onSubmit={handleCreate} className="space-y-4 font-['Cairo']">
-            {/* User Name Inputs (First & Last Name) */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  الاسم الأول
-                </label>
-                <input
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="محمد"
-                  className="block w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all text-sm"
-                />
-              </div>
+          {setupStep === 'org_details' ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!orgName.trim()) return;
+                setSetupStep('profile_pins');
+              }}
+              className="space-y-4 font-['Cairo']"
+            >
+              {/* User Name Inputs (First & Last Name) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    الاسم الأول
+                  </label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="محمد"
+                    className="block w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all text-sm"
+                  />
+                </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  اسم العائلة
-                </label>
-                <input
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder="خالد"
-                  className="block w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Academy Name (Main Field) */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                اسم الأكاديمية أو السنتر
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  className="block w-full px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all text-sm font-medium"
-                  placeholder="مثال: سنتر الأوائل التعليمي"
-                  autoFocus
-                />
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                  <School className="w-4 h-4 text-blue-600/70" />
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    اسم العائلة
+                  </label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="خالد"
+                    className="block w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all text-sm"
+                  />
                 </div>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                سيظهر هذا الاسم للطلاب وفي التقارير والإيصالات.
-              </p>
-            </div>
 
-            {/* CTA Button */}
-            <div className="pt-3 space-y-3">
-              <button
-                type="submit"
-                disabled={loading || !orgName.trim()}
-                className="w-full py-3.5 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm shadow-blue-500/20 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>جاري تجهيز الأكاديمية...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>المتابعة إلى لوحة التحكم</span>
-                    <ArrowRight className="w-4 h-4 rotate-180" />
-                  </>
-                )}
-              </button>
+              {/* Academy Name (Main Field) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  اسم الأكاديمية أو السنتر
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    className="block w-full px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all text-sm font-medium"
+                    placeholder="مثال: سنتر الأوائل التعليمي"
+                    autoFocus
+                  />
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                    <School className="w-4 h-4 text-blue-600/70" />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  سيظهر هذا الاسم للطلاب وفي التقارير والإيصالات.
+                </p>
+              </div>
 
-              <div className="flex items-center justify-between pt-2 text-xs">
-                {userMemberships.data && userMemberships.data.length > 0 ? (
+              {/* Next Step Button */}
+              <div className="pt-3 space-y-3">
+                <button
+                  type="submit"
+                  disabled={!orgName.trim()}
+                  className="w-full py-3.5 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm shadow-blue-500/20 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>التالي: إعداد رمز الحماية والملفات</span>
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                </button>
+
+                <div className="flex items-center justify-between pt-2 text-xs">
+                  {userMemberships.data && userMemberships.data.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('list');
+                        setError('');
+                      }}
+                      className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
+                    >
+                      العودة لقائمة الأكاديميات
+                    </button>
+                  ) : (
+                    <span className="text-slate-400">إعداد فوري وآمن بالكامل</span>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode('list');
-                      setError('');
-                    }}
-                    className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
+                    onClick={() => signOut()}
+                    className="text-slate-500 hover:text-red-600 transition-colors flex items-center gap-1"
                   >
-                    العودة لقائمة الأكاديميات
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>تسجيل الخروج</span>
                   </button>
-                ) : (
-                  <span className="text-slate-400">إعداد فوري وآمن بالكامل</span>
+                </div>
+              </div>
+            </form>
+          ) : (
+            /* STEP 2: PROFILE PIN & ASSISTANT SETUP (Requested by User) */
+            <form onSubmit={handleCreate} className="space-y-4 font-['Cairo']">
+              <div className="p-3 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 rounded-xl text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                <KeyRound className="w-4 h-4 shrink-0 text-blue-600" />
+                <span>قم بتعيين رمز PIN لملف المعلم، ويمكنك إضافة ملف للمساعدين الآن أو لاحقاً.</span>
+              </div>
+
+              {/* Admin PIN */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-blue-600" />
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    رمز PIN الخاص بحساب المعلم (المدير)
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  رمز من 4 أرقام لحماية الإعدادات والتقارير المالية والخزينة.
+                </p>
+                <input
+                  type="password"
+                  required
+                  maxLength={4}
+                  value={adminPin}
+                  onChange={(e) => setAdminPin(e.target.value.replace(/\D/g, ''))}
+                  placeholder="1234"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-sm font-mono tracking-widest focus:outline-none focus:border-blue-600"
+                />
+              </div>
+
+              {/* Assistant Profile Option */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                      تفعيل ملف إضافي لفريق المساعدين؟
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      يسمح للمساعدين بتسجيل الحضور مع حجب تام لكافة الماليات.
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={enableAssistant}
+                    onChange={(e) => setEnableAssistant(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                  />
+                </div>
+
+                {enableAssistant && (
+                  <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                        اسم ملف المساعدين
+                      </label>
+                      <input
+                        type="text"
+                        value={assistantName}
+                        onChange={(e) => setAssistantName(e.target.value)}
+                        placeholder="مثال: فريق المساعدين أو الاستقبال"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                        طلب رمز PIN للمساعدين أيضاً؟
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={assistantPinRequired}
+                        onChange={(e) => setAssistantPinRequired(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                      />
+                    </div>
+
+                    {assistantPinRequired && (
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          رمز PIN للمساعد (4 أرقام)
+                        </label>
+                        <input
+                          type="password"
+                          maxLength={4}
+                          value={assistantPin}
+                          onChange={(e) => setAssistantPin(e.target.value.replace(/\D/g, ''))}
+                          placeholder="****"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono tracking-widest text-center"
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={loading || adminPin.length !== 4}
+                  className="flex-1 py-3.5 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>جاري حفظ الأكاديمية...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>إنهاء وبدء الاستخدام</span>
+                      <ArrowRight className="w-4 h-4 rotate-180" />
+                    </>
+                  )}
+                </button>
 
                 <button
                   type="button"
-                  onClick={() => signOut()}
-                  className="text-slate-500 hover:text-red-600 transition-colors flex items-center gap-1"
+                  onClick={() => setSetupStep('org_details')}
+                  className="py-3.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>تسجيل الخروج</span>
+                  رجوع
                 </button>
               </div>
-            </div>
-          </form>
+            </form>
+          )}
         </div>
       </div>
 
