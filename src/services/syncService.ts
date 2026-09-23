@@ -270,7 +270,8 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
               const isPermanent =
                 err.startsWith('Unknown or unsupported entity type') ||
                 err.startsWith('Invalid envelope') ||
-                err.startsWith('unwrapDek');
+                err.startsWith('unwrapDek') ||
+                err.startsWith('Failed query:');
               if (isPermanent) {
                 console.error('[syncService] parking permanently-failed outbox item:', result);
                 await db.syncQueue.delete(result.idempotencyKey);
