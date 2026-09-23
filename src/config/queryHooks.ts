@@ -4,7 +4,6 @@ import { useAuth } from '@clerk/clerk-react';
 import { processSyncQueue } from '../services/syncService';
 import { decryptRecord, encryptRecord, Envelope } from '../services/cryptoService';
 import { syncAllStudentsToLookupServer } from '../services/lookupSyncService';
-import { syncBookingCatalogToServer } from '../services/bookingSyncService';
 import { useState, useEffect } from 'react';
 
 /**
@@ -100,9 +99,6 @@ export function useApiQuery<T extends { id?: string; deleted_at?: number | null;
 }
 
 function triggerPublicSync(resource: string) {
-  if (resource === 'courses' || resource === 'groups' || resource === 'settings') {
-    syncBookingCatalogToServer().catch(() => {});
-  }
   if (['students', 'attendanceRecords', 'attendanceSessions', 'assessments', 'assessmentGrades', 'monthlySubscriptions', 'enrollments', 'courses', 'groups', 'settings'].includes(resource)) {
     syncAllStudentsToLookupServer().catch(() => {});
   }

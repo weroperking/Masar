@@ -21,7 +21,6 @@ import { CourseProducts } from './pages/Academic/CourseProducts';
 import { SessionPayments } from './pages/Finance/SessionPayments';
 import { Ledgers } from './pages/Finance/Ledgers';
 import { Dues } from './pages/Finance/Dues';
-import { Booking } from './pages/Finance/Booking';
 
 // Inventory & Reports
 import { Inventory } from './pages/Inventory/Inventory';
@@ -38,7 +37,6 @@ import { Settings } from './pages/Admin/Settings';
 import { QrCards } from './pages/Admin/QrCards';
 import { Upgrade } from './pages/Upgrade/Upgrade';
 
-import { PublicBooking } from './pages/PublicBooking';
 import { PublicStudentLookup } from './pages/PublicStudentLookup';
 
 import { CustomAuth } from './pages/Auth/CustomAuth';
@@ -49,7 +47,6 @@ import { queryClient } from './config/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { performHandshake } from './services/syncService';
 import { syncAllStudentsToLookupServer } from './services/lookupSyncService';
-import { syncBookingCatalogToServer } from './services/bookingSyncService';
 import { TourProvider } from './context/TourContext';
 import { TourOverlay } from './components/Tour/TourOverlay';
 
@@ -140,7 +137,7 @@ function AuthGate() {
     }
   }, [clerk.loaded, clerk.session, clerk.client?.sessions]);
 
-  // Perform local-first encryption handshake, public lookup sync, and booking catalog sync once authenticated
+  // Perform local-first encryption handshake and public lookup sync once authenticated
   const { getToken } = useAuth();
   useEffect(() => {
     if (hasSession) {
@@ -150,9 +147,8 @@ function AuthGate() {
         });
       }
       syncAllStudentsToLookupServer().catch(() => {});
-      syncBookingCatalogToServer(organization).catch(() => {});
     }
-  }, [hasSession, organization?.id, (organization as any)?.publicMetadata?.booking_code, organization?.slug, getToken]);
+  }, [hasSession, organization?.id, organization?.slug, getToken]);
 
   useEffect(() => {
     // Fallback in case onComplete doesn't fire for some reason
@@ -242,7 +238,7 @@ function AuthGate() {
                 <Route path="sessionPayments" element={<SessionPayments />} />
                 <Route path="ledgers" element={<Ledgers />} />
                 <Route path="dues" element={<Dues />} />
-                <Route path="booking" element={<Booking />} />
+                <Route path="booking" element={<Navigate to="/" replace />} />
                 
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="reports" element={<Reports />} />
@@ -279,7 +275,7 @@ export default function App() {
             <BrowserRouter>
                <Routes>
                  <Route path="/p/s/:code" element={<PublicStudentLookup />} />
-                 <Route path="/book" element={<PublicBooking />} />
+                 <Route path="/book" element={<Navigate to="/" replace />} />
                  <Route path="*" element={<AuthGate />} />
                </Routes>
             </BrowserRouter>

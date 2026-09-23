@@ -1,4 +1,4 @@
-import { BottomSheet } from '../Booking/BottomSheet';
+import { BottomSheet } from './BottomSheet';
 import { LessonSessionItem } from './LessonsSection';
 import { ExamItem } from './ExamsSection';
 import { 

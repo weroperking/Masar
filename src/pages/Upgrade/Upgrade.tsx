@@ -104,7 +104,7 @@ const COMPARISON_CATEGORIES: FeatureCategory[] = [
       { name: 'تسجيل الحضور بقارئ الكاميرا وكروت QR', starter: true, growth: true, pro: true },
       { name: 'طباعة وتصميم بطاقات QR الطلاب', starter: true, growth: true, pro: true },
       { name: 'الجدول الزمني والتنبيهات المباشرة', starter: true, growth: true, pro: true },
-      { name: 'نظام الحجز أونلاين وبوابة الطلاب', starter: true, growth: true, pro: true },
+      { name: 'بوابة الاستعلام للطلاب وأولياء الأمور بالـ QR', starter: true, growth: true, pro: true },
     ]
   },
   {

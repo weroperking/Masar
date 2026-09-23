@@ -7,7 +7,7 @@ import { Student, Course, Product } from '../types';
 import { 
   Search, Users, BookOpen, CreditCard, LayoutDashboard, Settings, 
   UserCheck, Calendar, FileText, Library, Wallet, 
-  FileSpreadsheet, Globe, Package, BarChart3, UserCog, 
+  FileSpreadsheet, Package, BarChart3, UserCog, 
   MessageSquare, QrCode, Moon, Sun, Plus, ArrowRight, CornerDownLeft, Zap
 } from 'lucide-react';
 
@@ -66,7 +66,6 @@ export function CommandPalette({
     { id: 'nav-sessionPayments', title: 'مدفوعات الحصص', subtitle: 'تحصيل الحصص الفردية', category: 'صفحات', icon: Wallet, action: () => navigate('/sessionPayments') },
     { id: 'nav-ledgers', title: 'السجلات المالية', subtitle: 'الدفتر العام والإيرادات والمصروفات', category: 'صفحات', icon: FileSpreadsheet, action: () => navigate('/ledgers') },
     { id: 'nav-dues', title: 'المستحقات والمتأخرات', subtitle: 'المطالبات المالية وتنبيهات واتساب', category: 'صفحات', icon: FileSpreadsheet, action: () => navigate('/dues') },
-    { id: 'nav-booking', title: 'الحجز الأونلاين (Leads)', subtitle: 'طلبات الانضمام عبر الرابط', category: 'صفحات', icon: Globe, action: () => navigate('/booking') },
     { id: 'nav-inventory', title: 'المخزون والمبيعات', subtitle: 'بيع المذكرات وجرد الأصناف', category: 'صفحات', icon: Package, action: () => navigate('/inventory') },
     { id: 'nav-reports', title: 'التقارير والتحليلات', subtitle: 'تصدير التقارير ومؤشرات الأداء', category: 'صفحات', icon: BarChart3, action: () => navigate('/reports') },
     { id: 'nav-users', title: 'المستخدمين والصلاحيات', subtitle: 'إدارة طاقم العمل', category: 'صفحات', icon: UserCog, action: () => navigate('/users') },

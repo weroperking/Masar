@@ -1,6 +1,6 @@
 import { PhoneCall, MessageCircle, Copy, Check, User, Users } from 'lucide-react';
 import { useState } from 'react';
-import { BottomSheet } from '../Booking/BottomSheet';
+import { BottomSheet } from './BottomSheet';
 import { getWhatsAppUrl } from '../../utils/phone';
 
 export interface ContactTarget {

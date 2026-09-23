@@ -5,7 +5,7 @@ import { CustomUserButton } from './CustomUserButton';
 import { 
   Users, BookOpen, CreditCard, LayoutDashboard, Settings, 
   UserCheck, Calendar, FileText, Library, Wallet, 
-  FileSpreadsheet, Globe, Package, 
+  FileSpreadsheet, Package, 
   BarChart3, UserCog, MessageSquare, QrCode, LogOut,
   Search, Sun, Moon, Plus, Keyboard, RefreshCw, CheckCircle2, WifiOff, Menu, X, ArrowUpCircle, AlertCircle,
   PanelLeftClose, PanelLeftOpen
@@ -53,7 +53,6 @@ const getNavigationGroups = (limits: any) => {
         { name: 'مدفوعات الحصص', href: '/sessionPayments', icon: Wallet },
         { name: 'السجلات المالية', href: '/ledgers', icon: FileSpreadsheet },
         { name: 'المستحقات', href: '/dues', icon: FileSpreadsheet },
-        { name: 'الحجز الأونلاين', href: '/booking', icon: Globe },
       ]
     },
     ...(limits?.inventory_sales !== false ? [{
