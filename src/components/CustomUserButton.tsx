@@ -87,9 +87,6 @@ export function CustomUserButton() {
           <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate tracking-tight">
             {currentDisplayName}
           </span>
-          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium leading-none truncate">
-            {isAssistantActive ? 'فريق المساعدين' : 'المعلم (المدير)'}
-          </span>
         </div>
         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>

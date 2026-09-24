@@ -242,7 +242,7 @@ function AuthGate() {
                   
                   <Route path="sessionPayments" element={<AdminRouteGuard><SessionPayments /></AdminRouteGuard>} />
                   <Route path="ledgers" element={<AdminRouteGuard><Ledgers /></AdminRouteGuard>} />
-                  <Route path="dues" element={<AdminRouteGuard><Dues /></AdminRouteGuard>} />
+                  <Route path="dues" element={<Dues />} />
                   <Route path="booking" element={<Navigate to="/" replace />} />
                   
                   <Route path="inventory" element={<Inventory />} />

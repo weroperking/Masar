@@ -156,8 +156,8 @@ export function CommandPalette({
     ...actionItems.filter(act => !isAssistant || act.id !== 'act-new-ledger'),
     ...navigationItems.filter(nav => {
       if (isAssistant) {
-        // Assistant can see academic and inventory modules (hiding financial ledgers, settings, users, reports)
-        const hiddenIds = ['nav-payments', 'nav-sessionPayments', 'nav-ledgers', 'nav-dues', 'nav-reports', 'nav-users', 'nav-settings'];
+        // Assistant can see academic, dues, and inventory modules (hiding financial ledgers, settings, users, reports)
+        const hiddenIds = ['nav-payments', 'nav-sessionPayments', 'nav-ledgers', 'nav-reports', 'nav-users', 'nav-settings'];
         return !hiddenIds.includes(nav.id);
       }
       return true;
@@ -172,7 +172,7 @@ export function CommandPalette({
         ...actionItems.filter(act => !isAssistant || act.id !== 'act-new-ledger'),
         ...navigationItems.filter(nav => {
           if (isAssistant) {
-            const hiddenIds = ['nav-payments', 'nav-sessionPayments', 'nav-ledgers', 'nav-dues', 'nav-reports', 'nav-users', 'nav-settings'];
+            const hiddenIds = ['nav-payments', 'nav-sessionPayments', 'nav-ledgers', 'nav-reports', 'nav-users', 'nav-settings'];
             return !hiddenIds.includes(nav.id);
           }
           return true;

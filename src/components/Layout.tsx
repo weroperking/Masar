@@ -49,6 +49,12 @@ const getNavigationGroups = (limits: any, isAssistant: boolean = false) => {
           { name: 'الكتب التعليمية', href: '/courseProducts', icon: Library },
         ]
       },
+      {
+        title: 'المالية',
+        items: [
+          { name: 'المستحقات', href: '/dues', icon: FileSpreadsheet },
+        ]
+      },
       ...(limits?.inventory_sales !== false ? [{
         title: 'المخزون',
         items: [

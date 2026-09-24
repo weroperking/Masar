@@ -289,44 +289,73 @@ export function Dashboard() {
           </div>
         </div>
       ) : (
-        /* Academic Assistant Quick Access */
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-blue-600" />
-              <span>مهام المساعدين اليومية السريعة</span>
-            </h2>
-            <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full">
-              الملف الأكاديمي نشط
-            </span>
+        /* Academic Assistant Quick Access & Outstanding Dues Widget */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-blue-600" />
+                <span>مهام المساعدين اليومية السريعة</span>
+              </h2>
+              <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full">
+                الملف الأكاديمي نشط
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <Link
+                to="/attendance"
+                className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/30 transition-all flex flex-col items-center text-center gap-2"
+              >
+                <UserCheck className="w-6 h-6 text-blue-600" />
+                <span className="text-xs font-bold text-slate-900 dark:text-slate-100">تسجيل الحضور بالباركود</span>
+                <span className="text-[11px] text-slate-500">مسح كروت الطلاب وتوثيق الحضور والغياب</span>
+              </Link>
+
+              <Link
+                to="/students"
+                className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/30 transition-all flex flex-col items-center text-center gap-2"
+              >
+                <Users className="w-6 h-6 text-emerald-600" />
+                <span className="text-xs font-bold text-slate-900 dark:text-slate-100">دليل وبيانات الطلاب</span>
+                <span className="text-[11px] text-slate-500">البحث السريع واستعراض أرقام أولياء الأمور</span>
+              </Link>
+
+              <Link
+                to="/qrcards"
+                className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/30 transition-all flex flex-col items-center text-center gap-2"
+              >
+                <QrCode className="w-6 h-6 text-indigo-600" />
+                <span className="text-xs font-bold text-slate-900 dark:text-slate-100">طباعة كروت الباركود</span>
+                <span className="text-[11px] text-slate-500">توليد وطباعة بطاقات الهوية للطلاب</span>
+              </Link>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-            <Link
-              to="/attendance"
-              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/30 transition-all flex flex-col items-center text-center gap-2"
-            >
-              <UserCheck className="w-6 h-6 text-blue-600" />
-              <span className="text-xs font-bold text-slate-900 dark:text-slate-100">تسجيل الحضور بالباركود</span>
-              <span className="text-[11px] text-slate-500">مسح كروت الطلاب وتوثيق الحضور والغياب</span>
-            </Link>
+          {/* Clean Outstanding Dues Panel for Assistants */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="w-4 h-4 text-amber-500" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">المتأخرات غير المحصلة</h2>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
+                مجموع المبالغ المتبقية على الطلاب من اشتراكات شهرية وحصص غير مسددة بالكامل.
+              </p>
+              
+              <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 my-2">
+                <span className="text-[11px] text-slate-400 block mb-1">إجمالي المستحقات المعلقة</span>
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
+                  {toMajorUnits(stats.outstanding).toLocaleString()} <span className="text-xs font-normal text-slate-500">ج.م</span>
+                </div>
+              </div>
+            </div>
 
-            <Link
-              to="/students"
-              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/30 transition-all flex flex-col items-center text-center gap-2"
+            <Link 
+              to="/dues" 
+              className="mt-4 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg transition-colors text-center shadow-xs"
             >
-              <Users className="w-6 h-6 text-emerald-600" />
-              <span className="text-xs font-bold text-slate-900 dark:text-slate-100">دليل وبيانات الطلاب</span>
-              <span className="text-[11px] text-slate-500">البحث السريع واستعراض أرقام أولياء الأمور</span>
-            </Link>
-
-            <Link
-              to="/qrcards"
-              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/30 transition-all flex flex-col items-center text-center gap-2"
-            >
-              <QrCode className="w-6 h-6 text-indigo-600" />
-              <span className="text-xs font-bold text-slate-900 dark:text-slate-100">طباعة كروت الباركود</span>
-              <span className="text-[11px] text-slate-500">توليد وطباعة بطاقات الهوية للطلاب</span>
+              مراجعة سجل المستحقات
             </Link>
           </div>
         </div>

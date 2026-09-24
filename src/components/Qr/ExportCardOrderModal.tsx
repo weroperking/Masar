@@ -112,7 +112,7 @@ export function ExportCardOrderModal({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="relative bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-[24px] sm:rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] z-10"
+            className="relative bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-[24px] sm:rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col h-full sm:h-auto max-h-[100dvh] sm:max-h-[96vh] z-10"
           >
             {/* Grab Handle for mobile */}
             <div className="pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing sm:hidden shrink-0 bg-white dark:bg-slate-900">
