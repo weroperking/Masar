@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { useUser, useOrganization } from '@clerk/clerk-react';
 import { Shield, Lock, Unlock, Check, X, UserCheck, AlertCircle, ArrowLeft, UserPlus, KeyRound } from 'lucide-react';
 import { useProfile, DEFAULT_FORMAL_AVATARS } from '../context/ProfileContext';
 import { ProfileMode } from '../types';
 import { MasarLogo } from './MasarLogo';
+import { verifyPin, isLockedOut } from '../services/pinService';
 
 export function ProfileSelectorModal() {
   const { user } = useUser();
+  const { organization } = useOrganization();
+  const orgId = organization?.id || 'default_org';
   const {
     currentProfile,
     accounts,
@@ -35,12 +38,22 @@ export function ProfileSelectorModal() {
   const [assistantConfirmPin, setAssistantConfirmPin] = useState<string>('');
 
   const isOpen = isLocked || showProfileSelector;
+  const lockoutRemaining = selectedTarget ? isLockedOut(orgId, selectedTarget) : 0;
 
   // Reset PIN when selectedTarget changes
   useEffect(() => {
     setPinDigits(['', '', '', '']);
-    setErrorMsg('');
-  }, [selectedTarget]);
+    if (selectedTarget) {
+      const remaining = isLockedOut(orgId, selectedTarget);
+      if (remaining > 0) {
+        setErrorMsg('تم قفل الإدخال مؤقتاً');
+      } else {
+        setErrorMsg('');
+      }
+    } else {
+      setErrorMsg('');
+    }
+  }, [selectedTarget, orgId]);
 
   // Load current assistant name when opening edit
   useEffect(() => {
@@ -78,6 +91,10 @@ export function ProfileSelectorModal() {
   if (!isOpen) return null;
 
   const handleDigitPress = (num: string) => {
+    if (selectedTarget && isLockedOut(orgId, selectedTarget) > 0) {
+      setErrorMsg('تم قفل الإدخال مؤقتاً');
+      return;
+    }
     setErrorMsg('');
     const emptyIndex = pinDigits.findIndex(d => d === '');
     if (emptyIndex !== -1) {
@@ -146,10 +163,11 @@ export function ProfileSelectorModal() {
   };
 
   // Verify Admin PIN before granting access to create/configure new assistant
-  const handleVerifyAdminToManageAssistant = (e: React.FormEvent) => {
+  const handleVerifyAdminToManageAssistant = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPin = adminAuthPin.trim();
-    if (cleanPin !== (accounts.admin.pin || '1234')) {
+    const ok = await verifyPin(orgId, 'admin', cleanPin);
+    if (!ok) {
       setErrorMsg('رمز PIN الخاص بالمعلم (المدير) غير صحيح');
       return;
     }
@@ -170,23 +188,24 @@ export function ProfileSelectorModal() {
     }
 
     // 1. If assistant currently has a PIN required, check the current PIN
-    if (accounts.assistant?.pinRequired && accounts.assistant.pin) {
+    if (accounts.assistant?.pinRequired) {
       const cleanCurrent = currentAssistantPin.trim();
       if (!cleanCurrent) {
         setErrorMsg('يجب إدخال رمز PIN الحالي للمساعد للمتابعة');
         return;
       }
-      if (cleanCurrent !== accounts.assistant.pin && cleanCurrent !== accounts.admin.pin) {
+      const isAssistantOk = await verifyPin(orgId, 'assistant', cleanCurrent);
+      const isAdminOk = await verifyPin(orgId, 'admin', cleanCurrent);
+      if (!isAssistantOk && !isAdminOk) {
         setErrorMsg('رمز PIN الحالي للمساعد غير صحيح - لا يمكن تعديل الرمز إلا بعد إدخال الرمز الحالي الصحيح');
         return;
       }
     }
 
     // 2. If new PIN protection is enabled, validate new PIN
-    let targetPin = accounts.assistant?.pin || '';
+    let targetPin = '';
     if (assistantPinRequired) {
-      // If user typed a new PIN or creating for first time
-      if (assistantNewPin || !accounts.assistant?.pin) {
+      if (assistantNewPin || !accounts.assistant?.pinRequired) {
         if (assistantNewPin.length !== 4 || !/^\d{4}$/.test(assistantNewPin)) {
           setErrorMsg('رمز PIN الجديد للمساعد يجب أن يتكون من 4 أرقام بالضبط');
           return;
@@ -197,8 +216,6 @@ export function ProfileSelectorModal() {
         }
         targetPin = assistantNewPin;
       }
-    } else {
-      targetPin = '';
     }
 
     const res = await saveAssistantProfile({
@@ -473,7 +490,7 @@ export function ProfileSelectorModal() {
                 <button
                   key={num}
                   type="button"
-                  disabled={isVerifying}
+                  disabled={isVerifying || lockoutRemaining > 0}
                   onClick={() => handleDigitPress(num)}
                   className="h-14 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 hover:border-slate-300 shadow-2xs text-slate-800 font-bold text-xl transition-all active:scale-95 cursor-pointer disabled:opacity-50"
                 >
@@ -483,7 +500,7 @@ export function ProfileSelectorModal() {
               <div />
               <button
                 type="button"
-                disabled={isVerifying}
+                disabled={isVerifying || lockoutRemaining > 0}
                 onClick={() => handleDigitPress('0')}
                 className="h-14 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 hover:border-slate-300 shadow-2xs text-slate-800 font-bold text-xl transition-all active:scale-95 cursor-pointer disabled:opacity-50"
               >
@@ -491,7 +508,7 @@ export function ProfileSelectorModal() {
               </button>
               <button
                 type="button"
-                disabled={isVerifying}
+                disabled={isVerifying || lockoutRemaining > 0}
                 onClick={handleBackspace}
                 className="h-14 rounded-xl bg-white hover:bg-red-50 border border-slate-200 hover:border-red-200 shadow-2xs text-slate-600 hover:text-red-600 font-bold text-sm transition-all active:scale-95 flex items-center justify-center cursor-pointer disabled:opacity-50"
                 title="مسح الرقم"
@@ -574,7 +591,7 @@ export function ProfileSelectorModal() {
                 </div>
 
                 {/* If Assistant already has a PIN, require current correct PIN before modifying/saving */}
-                {accounts.assistant?.pinRequired && accounts.assistant.pin && (
+                {accounts.assistant?.pinRequired && (
                   <div className="pt-3 border-t border-slate-200 space-y-1.5">
                     <label className="block text-xs font-semibold text-slate-700 flex items-center justify-between">
                       <span>رمز PIN الحالي للمساعد (مطلوب للتأكيد)</span>
@@ -597,12 +614,12 @@ export function ProfileSelectorModal() {
                   <div className="pt-3 border-t border-slate-200 space-y-3">
                     <div className="space-y-1.5">
                       <label className="block text-xs font-semibold text-slate-700">
-                        {accounts.assistant?.pin ? 'رمز PIN الجديد (4 أرقام - اتركه فارغاً للإبقاء على الرمز الحالي)' : 'رمز PIN الخاص بالمساعد (4 أرقام)'}
+                        {accounts.assistant?.pinRequired ? 'رمز PIN الجديد (4 أرقام - اتركه فارغاً للإبقاء على الرمز الحالي)' : 'رمز PIN الخاص بالمساعد (4 أرقام)'}
                       </label>
                       <input
                         type="password"
                         maxLength={4}
-                        required={!accounts.assistant?.pin}
+                        required={!accounts.assistant?.pinRequired}
                         value={assistantNewPin}
                         onChange={(e) => setAssistantNewPin(e.target.value.replace(/\D/g, ''))}
                         placeholder="****"
@@ -641,9 +658,11 @@ export function ProfileSelectorModal() {
                   <button
                     type="button"
                     onClick={async () => {
-                      if (accounts.assistant?.pinRequired && accounts.assistant.pin) {
+                      if (accounts.assistant?.pinRequired) {
                         const clean = currentAssistantPin.trim();
-                        if (clean !== accounts.assistant.pin && clean !== accounts.admin.pin) {
+                        const isAssistantOk = await verifyPin(orgId, 'assistant', clean);
+                        const isAdminOk = await verifyPin(orgId, 'admin', clean);
+                        if (!isAssistantOk && !isAdminOk) {
                           setErrorMsg('يجب إدخال رمز PIN الحالي للمساعد لحذف أو تعطيل الملف');
                           return;
                         }

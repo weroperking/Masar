@@ -1,8 +1,21 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useOrganization, useUser } from '@clerk/clerk-react';
+import { useOrganization, useUser, useAuth } from '@clerk/clerk-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { ProfileMode, ProfileAccount, AssistantSubSettings } from '../types';
+import {
+  verifyPin,
+  setPin,
+  isLockedOut,
+  recordFailedAttempt,
+  clearFailedAttempts,
+  updatePinFlags,
+  deletePin
+} from '../services/pinService';
+import { migrateLegacyPins } from '../services/pinMigration';
+import { pullPinConfigs, flushPendingPinPushes, registerAuthTokenGetter, setActiveOrgId } from '../services/syncService';
+import { isValidPinFormat } from '../utils/pinCrypto';
+import { AdminPinChangeModal } from '../components/AdminPinChangeModal';
 
 export const DEFAULT_FORMAL_AVATARS = {
   admin: '/avatar-admin.svg',
@@ -13,7 +26,6 @@ export const DEFAULT_FORMAL_AVATARS = {
   formalFemale2: '/avatar-assistant.svg'
 };
 
-// Alias for backwards compatibility
 export const DEFAULT_FLUFFY_AVATARS = DEFAULT_FORMAL_AVATARS;
 
 export const DEFAULT_ASSISTANT_SUB_SETTINGS: AssistantSubSettings = {
@@ -34,6 +46,8 @@ interface ProfileContextType {
   assistantSubSettings: AssistantSubSettings;
   isLocked: boolean;
   showProfileSelector: boolean;
+  forcePinChange: boolean;
+  setForcePinChange: (val: boolean) => void;
   lockProfile: () => void;
   unlockWithPin: (profile: ProfileMode, enteredPin?: string) => Promise<{ success: boolean; error?: string }>;
   switchProfileDirect: (profile: ProfileMode) => boolean;
@@ -58,7 +72,14 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { organization } = useOrganization();
   const { user } = useUser();
+  const { getToken } = useAuth();
   const orgId = organization?.id || 'default_org';
+
+  // Register token getter and active org for sync
+  useEffect(() => {
+    registerAuthTokenGetter(getToken);
+    setActiveOrgId(orgId);
+  }, [getToken, orgId]);
 
   const [currentProfile, setCurrentProfile] = useState<ProfileMode>(() => {
     return (sessionStorage.getItem(`masar_active_profile_${orgId}`) as ProfileMode) || 'admin';
@@ -70,6 +91,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   });
 
   const [showProfileSelector, setShowProfileSelector] = useState<boolean>(false);
+  const [forcePinChange, setForcePinChange] = useState<boolean>(false);
+
+  // Sync state when org changes
+  useEffect(() => {
+    const active = sessionStorage.getItem(`masar_active_profile_${orgId}`) as ProfileMode;
+    setCurrentProfile(active || 'admin');
+    const unlocked = sessionStorage.getItem(`masar_profile_unlocked_${orgId}`);
+    setIsLocked(unlocked !== 'true');
+  }, [orgId]);
 
   // Profile data state
   const [adminAccount, setAdminAccount] = useState<ProfileAccount>(() => {
@@ -84,8 +114,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       name: initialTeacherName,
       role: 'admin',
       avatarUrl: DEFAULT_FORMAL_AVATARS.admin,
-      pinRequired: true,
-      pin: '1234'
+      pinRequired: true
     };
   });
 
@@ -93,8 +122,29 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [autoLockMinutes, setAutoLockMinutes] = useState<number>(15);
   const [assistantSubSettings, setAssistantSubSettings] = useState<AssistantSubSettings>(DEFAULT_ASSISTANT_SUB_SETTINGS);
 
-  // Live query on Dexie settings table for instant reactive updates across all components
+  // Live queries on Dexie settings & pinConfigs tables
   const liveSettings = useLiveQuery(() => db.settings.toArray(), []);
+  const livePinConfigs = useLiveQuery(
+    () => db.pinConfigs.where('orgId').equals(orgId).toArray(),
+    [orgId]
+  );
+
+  // Run migration and pull on startup / org switch
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      await migrateLegacyPins(orgId);
+      await pullPinConfigs(orgId);
+      await flushPendingPinPushes().catch(() => {});
+      if (mounted) {
+        const isDefault = await verifyPin(orgId, 'admin', '1234');
+        setForcePinChange(isDefault);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [orgId]);
 
   // Sync profile data reactively whenever settings, user metadata, or localStorage changes
   useEffect(() => {
@@ -118,14 +168,23 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    const assistantPinRow = livePinConfigs?.find(p => p.profileType === 'assistant' && !p.deletedAt);
+    const adminPinRow = livePinConfigs?.find(p => p.profileType === 'admin' && !p.deletedAt);
+
+    const isAssistantPinReq = assistantPinRow 
+      ? assistantPinRow.assistantPinRequired 
+      : Boolean(storedProfiles?.assistantPinRequired);
+
+    const effectiveAutoLock = adminPinRow?.autoLockMinutes ?? storedProfiles?.autoLockMinutes ?? 15;
+    setAutoLockMinutes(effectiveAutoLock);
+
     if (storedProfiles) {
       setAdminAccount({
         id: 'admin',
         name: cur?.teacherName || storedProfiles.adminName || resolvedTeacherName,
         role: 'admin',
         avatarUrl: DEFAULT_FORMAL_AVATARS.admin,
-        pinRequired: true,
-        pin: storedProfiles.adminPin || '1234'
+        pinRequired: true
       });
 
       if (storedProfiles.assistantEnabled) {
@@ -134,24 +193,33 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           name: storedProfiles.assistantName || 'فريق المساعدين',
           role: 'assistant',
           avatarUrl: DEFAULT_FORMAL_AVATARS.assistant,
-          pinRequired: Boolean(storedProfiles.assistantPinRequired),
-          pin: storedProfiles.assistantPin || ''
+          pinRequired: isAssistantPinReq
         });
       } else {
         setAssistantAccount(undefined);
-      }
-
-      if (typeof storedProfiles.autoLockMinutes === 'number') {
-        setAutoLockMinutes(storedProfiles.autoLockMinutes);
       }
     } else {
       setAdminAccount(prev => ({
         ...prev,
         name: cur?.teacherName || resolvedTeacherName,
-        avatarUrl: DEFAULT_FORMAL_AVATARS.admin
+        avatarUrl: DEFAULT_FORMAL_AVATARS.admin,
+        pinRequired: true
       }));
     }
-  }, [liveSettings, orgId, user?.fullName, (user?.unsafeMetadata as any)?.teacherName]);
+  }, [liveSettings, livePinConfigs, orgId, user?.fullName, (user?.unsafeMetadata as any)?.teacherName]);
+
+  // Check if forcePinChange should be updated
+  useEffect(() => {
+    let mounted = true;
+    verifyPin(orgId, 'admin', '1234').then(isDefault => {
+      if (mounted) {
+        setForcePinChange(isDefault);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [livePinConfigs, orgId]);
 
   // Listen to custom cross-component update events
   useEffect(() => {
@@ -171,7 +239,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Handle 15-minute idle lock
+  // Handle idle lock timer
   useEffect(() => {
     if (autoLockMinutes <= 0) return;
 
@@ -225,115 +293,125 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     profile: ProfileMode,
     enteredPin?: string
   ): Promise<{ success: boolean; error?: string }> => {
-    if (profile === 'admin') {
-      const cleanEntered = (enteredPin || '').trim();
-      const expectedPin = adminAccount.pin || '1234';
-      if (cleanEntered === expectedPin) {
-        setCurrentProfile('admin');
-        setIsLocked(false);
-        setShowProfileSelector(false);
-        sessionStorage.setItem(`masar_active_profile_${orgId}`, 'admin');
-        sessionStorage.setItem(`masar_profile_unlocked_${orgId}`, 'true');
-        return { success: true };
-      }
-      return { success: false, error: 'رمز PIN الخاص بالمعلم غير صحيح' };
+    // 1. Check brute-force lockout
+    const remaining = isLockedOut(orgId, profile);
+    if (remaining > 0) {
+      return { success: false, error: 'تم قفل الإدخال مؤقتاً' };
     }
 
-    if (profile === 'assistant') {
-      if (!assistantAccount) {
-        return { success: false, error: 'ملف المساعدين غير مفعل بعد' };
-      }
-      if (!assistantAccount.pinRequired) {
-        setCurrentProfile('assistant');
-        setIsLocked(false);
-        setShowProfileSelector(false);
-        sessionStorage.setItem(`masar_active_profile_${orgId}`, 'assistant');
-        sessionStorage.setItem(`masar_profile_unlocked_${orgId}`, 'true');
-        return { success: true };
-      }
-      const cleanEntered = (enteredPin || '').trim();
-      if (cleanEntered === (assistantAccount.pin || '')) {
-        setCurrentProfile('assistant');
-        setIsLocked(false);
-        setShowProfileSelector(false);
-        sessionStorage.setItem(`masar_active_profile_${orgId}`, 'assistant');
-        sessionStorage.setItem(`masar_profile_unlocked_${orgId}`, 'true');
-        return { success: true };
-      }
-      return { success: false, error: 'رمز PIN الخاص بالمساعدين غير صحيح' };
+    if (profile === 'assistant' && !assistantAccount) {
+      return { success: false, error: 'ملف المساعدين غير مفعل بعد' };
     }
 
-    return { success: false, error: 'ملف غير معروف' };
-  }, [adminAccount.pin, assistantAccount, orgId]);
+    if (profile === 'assistant' && !assistantAccount?.pinRequired) {
+      setCurrentProfile('assistant');
+      setIsLocked(false);
+      setShowProfileSelector(false);
+      sessionStorage.setItem(`masar_active_profile_${orgId}`, 'assistant');
+      sessionStorage.setItem(`masar_profile_unlocked_${orgId}`, 'true');
+      return { success: true };
+    }
 
-  // Direct Admin PIN update with current PIN verification if supplied
+    // 2. Verify hashed PIN
+    const ok = await verifyPin(orgId, profile, (enteredPin || '').trim());
+    if (ok) {
+      clearFailedAttempts(orgId, profile);
+      setCurrentProfile(profile);
+      setIsLocked(false);
+      setShowProfileSelector(false);
+      sessionStorage.setItem(`masar_active_profile_${orgId}`, profile);
+      sessionStorage.setItem(`masar_profile_unlocked_${orgId}`, 'true');
+      return { success: true };
+    } else {
+      await recordFailedAttempt(orgId, profile);
+      const isNowLocked = isLockedOut(orgId, profile);
+      if (isNowLocked > 0) {
+        return { success: false, error: 'تم قفل الإدخال مؤقتاً' };
+      }
+      return { success: false, error: 'رمز PIN غير صحيح' };
+    }
+  }, [assistantAccount, orgId]);
+
+  // Admin PIN update with verification
   const updateAdminPin = useCallback(async (
     newPin: string,
     currentPin?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
       const cleanNewPin = newPin.trim();
-      if (cleanNewPin.length !== 4 || !/^\d{4}$/.test(cleanNewPin)) {
+      if (!isValidPinFormat(cleanNewPin)) {
         return { success: false, error: 'يجب أن يتكون رمز PIN الجديد من 4 أرقام' };
       }
 
       if (currentPin !== undefined && currentPin.trim() !== '') {
-        const expectedPin = adminAccount.pin || '1234';
-        if (currentPin.trim() !== expectedPin) {
+        const ok = await verifyPin(orgId, 'admin', currentPin.trim());
+        if (!ok) {
           return { success: false, error: 'رمز PIN الحالي غير صحيح' };
         }
       }
 
+      await setPin(orgId, 'admin', cleanNewPin);
+
+      // Scrub plaintext from settings if any remained
       const settings = await db.settings.toArray();
       if (settings.length > 0) {
         const cur = settings[0];
-        const updatedConfig = {
-          ...(cur.profilesConfig || {}),
-          adminPin: cleanNewPin
-        };
-        await db.settings.update(cur.id, {
-          profilesConfig: updatedConfig,
-          updated_at: Date.now()
-        });
+        if (cur.profilesConfig && ('adminPin' in cur.profilesConfig || 'assistantPin' in cur.profilesConfig)) {
+          const cfg = { ...cur.profilesConfig };
+          delete (cfg as any).adminPin;
+          delete (cfg as any).assistantPin;
+          await db.settings.update(cur.id, {
+            profilesConfig: cfg,
+            updated_at: Date.now()
+          });
+        }
       }
 
-      setAdminAccount(prev => ({
-        ...prev,
-        pin: cleanNewPin
-      }));
+      if (cleanNewPin !== '1234') {
+        setForcePinChange(false);
+      }
 
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message || 'فشل تحديث رمز PIN' };
     }
-  }, [adminAccount.pin]);
+  }, [orgId]);
 
-  // Assistant PIN update requiring current correct PIN verification
+  // Assistant PIN update
   const updateAssistantPin = useCallback(async (
     newPin: string,
     currentPin?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      if (assistantAccount?.pinRequired && assistantAccount.pin) {
-        if (!currentPin || (currentPin.trim() !== assistantAccount.pin && currentPin.trim() !== adminAccount.pin)) {
+      if (assistantAccount?.pinRequired) {
+        if (!currentPin) {
+          return { success: false, error: 'رمز PIN الحالي للمساعد غير صحيح' };
+        }
+        const isAssistantOk = await verifyPin(orgId, 'assistant', currentPin.trim());
+        const isAdminOk = await verifyPin(orgId, 'admin', currentPin.trim());
+        if (!isAssistantOk && !isAdminOk) {
           return { success: false, error: 'رمز PIN الحالي للمساعد غير صحيح' };
         }
       }
 
       const cleanNewPin = newPin.trim();
-      if (cleanNewPin.length !== 4 || !/^\d{4}$/.test(cleanNewPin)) {
+      if (!isValidPinFormat(cleanNewPin)) {
         return { success: false, error: 'يجب أن يتكون رمز PIN الجديد من 4 أرقام' };
       }
 
-      const settings = await db.settings.toArray();
-      const updatedProfilesConfig = {
-        ...(settings[0]?.profilesConfig || {}),
-        assistantPin: cleanNewPin,
-        assistantPinRequired: true
-      };
+      await setPin(orgId, 'assistant', cleanNewPin, { assistantPinRequired: true });
 
+      // Scrub plaintext from settings
+      const settings = await db.settings.toArray();
       if (settings.length > 0) {
-        await db.settings.update(settings[0].id, {
+        const cur = settings[0];
+        const updatedProfilesConfig = {
+          ...(cur.profilesConfig || {}),
+          assistantPinRequired: true
+        };
+        delete (updatedProfilesConfig as any).adminPin;
+        delete (updatedProfilesConfig as any).assistantPin;
+        await db.settings.update(cur.id, {
           profilesConfig: updatedProfilesConfig,
           updated_at: Date.now()
         });
@@ -341,7 +419,6 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
       setAssistantAccount(prev => prev ? {
         ...prev,
-        pin: cleanNewPin,
         pinRequired: true
       } : undefined);
 
@@ -349,7 +426,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     } catch (e: any) {
       return { success: false, error: e.message || 'فشل تحديث رمز PIN للمساعد' };
     }
-  }, [assistantAccount, adminAccount.pin]);
+  }, [assistantAccount, orgId]);
 
   const requestAdminPinOtp = useCallback(async (): Promise<{ success: boolean; previewCode?: string; message?: string }> => {
     return {
@@ -377,10 +454,25 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     currentPinToVerify?: string
   ): Promise<{ success: boolean; error?: string }> => {
     // If assistant currently exists and has a PIN required, enforce current PIN verification
-    if (assistantAccount?.pinRequired && assistantAccount.pin) {
-      if (!currentPinToVerify || (currentPinToVerify.trim() !== assistantAccount.pin && currentPinToVerify.trim() !== adminAccount.pin)) {
+    if (assistantAccount?.pinRequired) {
+      if (!currentPinToVerify) {
         return { success: false, error: 'رمز PIN الحالي غير صحيح، يرجى إدخال الرمز الصحيح للمتابعة' };
       }
+      const isAssistantOk = await verifyPin(orgId, 'assistant', currentPinToVerify.trim());
+      const isAdminOk = await verifyPin(orgId, 'admin', currentPinToVerify.trim());
+      if (!isAssistantOk && !isAdminOk) {
+        return { success: false, error: 'رمز PIN الحالي غير صحيح، يرجى إدخال الرمز الصحيح للمتابعة' };
+      }
+    }
+
+    if (config.enabled) {
+      if (config.pinRequired && config.pin) {
+        await setPin(orgId, 'assistant', config.pin, { assistantPinRequired: true });
+      } else {
+        await updatePinFlags(orgId, 'assistant', { assistantPinRequired: false });
+      }
+    } else {
+      await deletePin(orgId, 'assistant');
     }
 
     const settings = await db.settings.toArray();
@@ -389,9 +481,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       assistantEnabled: config.enabled,
       assistantName: config.name,
       assistantAvatarUrl: config.avatarUrl || DEFAULT_FORMAL_AVATARS.assistant,
-      assistantPinRequired: config.pinRequired,
-      assistantPin: config.pinRequired ? (config.pin || '') : ''
+      assistantPinRequired: config.pinRequired
     };
+    delete (updatedProfilesConfig as any).adminPin;
+    delete (updatedProfilesConfig as any).assistantPin;
 
     if (settings.length > 0) {
       await db.settings.update(settings[0].id, {
@@ -406,8 +499,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         name: config.name,
         role: 'assistant',
         avatarUrl: config.avatarUrl || DEFAULT_FORMAL_AVATARS.assistant,
-        pinRequired: config.pinRequired,
-        pin: config.pinRequired ? (config.pin || '') : ''
+        pinRequired: config.pinRequired
       });
     } else {
       setAssistantAccount(undefined);
@@ -417,7 +509,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
 
     return { success: true };
-  }, [assistantAccount, adminAccount.pin, currentProfile]);
+  }, [assistantAccount, currentProfile, orgId]);
 
   const updateProfilesConfig = useCallback(async (patch: {
     adminName?: string;
@@ -431,6 +523,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       ...(patch.adminAvatarUrl ? { adminAvatarUrl: patch.adminAvatarUrl } : {}),
       ...(typeof patch.autoLockMinutes === 'number' ? { autoLockMinutes: patch.autoLockMinutes } : {})
     };
+    delete (updated as any).adminPin;
+    delete (updated as any).assistantPin;
 
     if (settings.length > 0) {
       await db.settings.update(settings[0].id, {
@@ -438,6 +532,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         profilesConfig: updated,
         updated_at: Date.now()
       });
+    }
+
+    if (typeof patch.autoLockMinutes === 'number') {
+      await updatePinFlags(orgId, 'admin', { autoLockMinutes: patch.autoLockMinutes });
+      setAutoLockMinutes(patch.autoLockMinutes);
     }
 
     if (patch.adminName) {
@@ -449,9 +548,6 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
     if (patch.adminAvatarUrl) {
       setAdminAccount(prev => ({ ...prev, avatarUrl: patch.adminAvatarUrl! }));
-    }
-    if (typeof patch.autoLockMinutes === 'number') {
-      setAutoLockMinutes(patch.autoLockMinutes);
     }
   }, [orgId]);
 
@@ -470,6 +566,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           ...(cur.profilesConfig || {}),
           assistantSubSettings: updatedSub
         };
+        delete (updatedProfilesConfig as any).adminPin;
+        delete (updatedProfilesConfig as any).assistantPin;
         await db.settings.update(cur.id, {
           assistantSubSettings: updatedSub,
           profilesConfig: updatedProfilesConfig,
@@ -495,6 +593,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         assistantSubSettings,
         isLocked,
         showProfileSelector,
+        forcePinChange,
+        setForcePinChange,
         lockProfile,
         unlockWithPin,
         switchProfileDirect,
@@ -510,6 +610,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         autoLockMinutes
       }}
     >
+      {forcePinChange && (
+        <AdminPinChangeModal
+          isOpen={true}
+          isForced={true}
+          onClose={() => {}}
+        />
+      )}
       {children}
     </ProfileContext.Provider>
   );
@@ -523,13 +630,14 @@ const defaultProfileContextValue: ProfileContextType = {
       name: 'المعلم (المدير)',
       role: 'admin',
       avatarUrl: DEFAULT_FORMAL_AVATARS.admin,
-      pinRequired: true,
-      pin: '1234'
+      pinRequired: true
     }
   },
   assistantSubSettings: DEFAULT_ASSISTANT_SUB_SETTINGS,
   isLocked: false,
   showProfileSelector: false,
+  forcePinChange: false,
+  setForcePinChange: () => {},
   lockProfile: () => {},
   unlockWithPin: async () => ({ success: true }),
   switchProfileDirect: () => true,

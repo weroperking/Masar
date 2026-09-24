@@ -275,6 +275,21 @@ export interface CardCustomDesign {
 
 export type ProfileMode = 'admin' | 'assistant';
 
+export interface PinConfigRecord {
+  id: string;
+  orgId: string;
+  profileType: 'admin' | 'assistant';
+  pinHash: string;
+  pinSalt: string;
+  pinIterations: number;
+  pinAlgorithm: string;
+  assistantPinRequired: boolean;
+  autoLockMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 export interface ProfileAccount {
   id: ProfileMode;
   name: string;

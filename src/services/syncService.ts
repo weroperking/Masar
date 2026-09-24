@@ -1,4 +1,4 @@
-import { db } from '../db/db';
+import { db, PinConfigRecord } from '../db/db';
 import { 
   ensureDeviceKeypair, 
   exportPublicKey, 
@@ -9,7 +9,7 @@ import {
   Envelope, 
   getPublicKeyHash
 } from './cryptoService';
-import { fetchWithAuth, syncHeaders } from '../config/api';
+import { fetchWithAuth, syncHeaders, API_BASE_URL, withTimeout } from '../config/api';
 
 const __syncTrace: Array<{ t: number; msg: string; extra?: any }> = [];
 function trace(msg: string, extra?: any) {
@@ -21,9 +21,217 @@ if (typeof window !== 'undefined') {
   (window as any).__syncTrace = () => __syncTrace;
 }
 
-import { withTimeout } from '../config/api';
-
 export type SyncPillStatus = 'synced' | 'pending' | 'paused' | 'syncing';
+
+let globalTokenGetter: (() => Promise<string | null>) | null = null;
+let currentActiveOrgId: string = 'default_org';
+
+export function registerAuthTokenGetter(getter: () => Promise<string | null>) {
+  globalTokenGetter = getter;
+}
+
+export function setActiveOrgId(orgId: string) {
+  currentActiveOrgId = orgId;
+}
+
+export function getActiveOrgId(): string {
+  return currentActiveOrgId;
+}
+
+export async function getClerkToken(): Promise<string | null> {
+  if (globalTokenGetter) {
+    try {
+      const t = await globalTokenGetter();
+      if (t) return t;
+    } catch {}
+  }
+  if (typeof window !== 'undefined' && (window as any).Clerk?.session) {
+    try {
+      return await (window as any).Clerk.session.getToken();
+    } catch {}
+  }
+  return null;
+}
+
+export async function pushPinConfig(record: PinConfigRecord): Promise<void> {
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  try {
+    const token = await getClerkToken();
+    if (!token || !isOnline) {
+      await db.pendingPinPushes.put({
+        id: record.id,
+        orgId: record.orgId,
+        profileType: record.profileType,
+        queuedAt: Date.now()
+      });
+      return;
+    }
+
+    const { orgId, ...bodyWithoutOrgId } = record;
+    const url = `${API_BASE_URL}/api/pin-configs/${record.profileType}`;
+
+    if (record.deletedAt) {
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (res.ok) {
+        await db.pendingPinPushes.delete(record.id);
+      } else {
+        console.warn('[syncService] pushPinConfig DELETE non-2xx:', res.status);
+        await db.pendingPinPushes.put({
+          id: record.id,
+          orgId: record.orgId,
+          profileType: record.profileType,
+          queuedAt: Date.now()
+        });
+      }
+    } else {
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bodyWithoutOrgId)
+      });
+      if (res.ok) {
+        await db.pendingPinPushes.delete(record.id);
+      } else {
+        console.warn('[syncService] pushPinConfig PUT non-2xx:', res.status);
+        await db.pendingPinPushes.put({
+          id: record.id,
+          orgId: record.orgId,
+          profileType: record.profileType,
+          queuedAt: Date.now()
+        });
+      }
+    }
+  } catch (err) {
+    // Non-2xx / network error -> queue for retry and swallow
+    try {
+      await db.pendingPinPushes.put({
+        id: record.id,
+        orgId: record.orgId,
+        profileType: record.profileType,
+        queuedAt: Date.now()
+      });
+    } catch {}
+    console.warn('[syncService] pushPinConfig network error:', err);
+  }
+}
+
+export async function flushPendingPinPushes(): Promise<void> {
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  if (!isOnline) return;
+
+  try {
+    const token = await getClerkToken();
+    if (!token) return;
+
+    const pending = await db.pendingPinPushes.toArray();
+    for (const item of pending) {
+      const rec = await db.pinConfigs.where('[orgId+profileType]').equals([item.orgId, item.profileType]).first();
+      if (!rec) {
+        await db.pendingPinPushes.delete(item.id);
+        continue;
+      }
+
+      const { orgId, ...bodyWithoutOrgId } = rec;
+      const url = `${API_BASE_URL}/api/pin-configs/${rec.profileType}`;
+
+      if (rec.deletedAt) {
+        const res = await fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (res.ok) {
+          await db.pendingPinPushes.delete(item.id);
+        }
+      } else {
+        const res = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(bodyWithoutOrgId)
+        });
+        if (res.ok) {
+          await db.pendingPinPushes.delete(item.id);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[syncService] flushPendingPinPushes error:', err);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    flushPendingPinPushes().catch(() => {});
+  });
+}
+
+export async function pullPinConfigs(activeOrgId?: string): Promise<void> {
+  try {
+    const targetOrg = activeOrgId || currentActiveOrgId;
+    const token = await getClerkToken();
+    if (!token || !navigator.onLine) {
+      return;
+    }
+
+    const url = `${API_BASE_URL}/api/pin-configs`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!res.ok) {
+      console.warn('[syncService] pullPinConfigs non-2xx:', res.status);
+      return;
+    }
+
+    const remoteConfigs = await res.json();
+    if (!Array.isArray(remoteConfigs)) return;
+
+    for (const r of remoteConfigs) {
+      // Defense in depth: skip if r.orgId !== activeOrgId
+      if (r.orgId && targetOrg && r.orgId !== targetOrg) {
+        continue;
+      }
+
+      const rowOrgId = r.orgId || targetOrg;
+      const local = await db.pinConfigs
+        .where('[orgId+profileType]')
+        .equals([rowOrgId, r.profileType])
+        .first();
+
+      const isoUpdatedAt = new Date(r.updatedAt).toISOString();
+      const remoteUpdatedTime = new Date(isoUpdatedAt).getTime() || 0;
+      const localUpdatedTime = local ? (new Date(local.updatedAt).getTime() || 0) : 0;
+
+      if (!local || remoteUpdatedTime > localUpdatedTime) {
+        await db.pinConfigs.put({
+          ...r,
+          updatedAt: isoUpdatedAt,
+          orgId: rowOrgId
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[syncService] pullPinConfigs error:', err);
+  }
+}
 
 const MAX_ATTEMPTS = 6;
 const BASE_MS = 500;
@@ -232,6 +440,17 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
       if (operationsToPush.length > 0) {
         const wireOps = await Promise.all(
           operationsToPush.map(async (o) => {
+            if (o.entityType === 'pinConfigs') {
+              const { orgId, ...cleanPayload } = o.payload || {};
+              return {
+                idempotencyKey: o.id,
+                entityType: 'pinConfigs',
+                entityId: o.entityId,
+                operation: 'upsert',
+                payload: cleanPayload,
+                localTimestamp: o.createdAt
+              };
+            }
             let payload = o.payload;
             if (payload && !payload.envelope && !payload.ct) {
               const env = await encryptRecord(payload);
@@ -302,6 +521,22 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
           localStorage.setItem('masar_last_pull_timestamp', pullRes.timestamp.toString());
         }
       }
+
+      if (pullRes && Array.isArray((pullRes as any).pinConfigs)) {
+        for (const r of (pullRes as any).pinConfigs) {
+          if (r.orgId && currentActiveOrgId && r.orgId !== currentActiveOrgId) continue;
+          const rowOrgId = r.orgId || currentActiveOrgId;
+          const local = await db.pinConfigs.where('[orgId+profileType]').equals([rowOrgId, r.profileType]).first();
+          const remoteTime = new Date(r.updatedAt).getTime() || 0;
+          const localTime = local ? (new Date(local.updatedAt).getTime() || 0) : 0;
+          if (!local || remoteTime > localTime) {
+            await db.pinConfigs.put({ ...r, orgId: rowOrgId });
+          }
+        }
+      }
+
+      // Also invoke dedicated pullPinConfigs on existing generic sync cycle
+      await pullPinConfigs(currentActiveOrgId).catch(() => {});
     } catch (pullErr: any) {
       console.warn('[syncService] Delta pull deferred:', pullErr?.message || pullErr);
     }

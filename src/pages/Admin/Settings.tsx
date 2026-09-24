@@ -473,7 +473,7 @@ export function Settings() {
                 </div>
 
                 {/* If Assistant already has a PIN, require current PIN */}
-                {accounts.assistant?.pinRequired && accounts.assistant.pin && (
+                {accounts.assistant?.pinRequired && (
                   <div className="space-y-1">
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                       رمز PIN الحالي للمساعد (مطلوب للتأكيد)
@@ -492,7 +492,7 @@ export function Settings() {
                 {tempAssistantPinReq && (
                   <div className="space-y-1">
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      {accounts.assistant?.pin ? 'رمز PIN الجديد (اتركه فارغاً للإبقاء على الرمز الحالي)' : 'رمز PIN للمساعد (4 أرقام)'}
+                      {accounts.assistant?.pinRequired ? 'رمز PIN الجديد (اتركه فارغاً للإبقاء على الرمز الحالي)' : 'رمز PIN للمساعد (4 أرقام)'}
                     </label>
                     <input
                       type="password"
@@ -510,19 +510,12 @@ export function Settings() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (accounts.assistant?.pinRequired && accounts.assistant.pin) {
-                      if (!tempAssistantCurrentPin) {
-                        toast.error('يجب إدخال رمز PIN الحالي للمساعد للمتابعة');
-                        return;
-                      }
-                      if (tempAssistantCurrentPin !== accounts.assistant.pin && tempAssistantCurrentPin !== accounts.admin.pin) {
-                        toast.error('رمز PIN الحالي غير صحيح');
-                        return;
-                      }
+                    if (accounts.assistant?.pinRequired && !tempAssistantCurrentPin) {
+                      toast.error('يجب إدخال رمز PIN الحالي للمساعد للمتابعة');
+                      return;
                     }
 
-                    const newPinToSave = tempAssistantPin ? tempAssistantPin : (accounts.assistant?.pin || '');
-                    if (tempAssistantPinReq && (!newPinToSave || newPinToSave.length !== 4)) {
+                    if (tempAssistantPinReq && tempAssistantPin && tempAssistantPin.length !== 4) {
                       toast.error('يجب أن يتكون رمز PIN من 4 أرقام');
                       return;
                     }
@@ -531,7 +524,7 @@ export function Settings() {
                       enabled: true,
                       name: tempAssistantName.trim() || 'فريق المساعدين',
                       pinRequired: tempAssistantPinReq,
-                      pin: tempAssistantPinReq ? newPinToSave : ''
+                      pin: tempAssistantPinReq ? tempAssistantPin : ''
                     }, tempAssistantCurrentPin);
 
                     if (res.success) {
@@ -551,20 +544,22 @@ export function Settings() {
                   <button
                     type="button"
                     onClick={async () => {
-                      if (accounts.assistant?.pinRequired && accounts.assistant.pin) {
-                        if (!tempAssistantCurrentPin || (tempAssistantCurrentPin !== accounts.assistant.pin && tempAssistantCurrentPin !== accounts.admin.pin)) {
-                          toast.error('يجب إدخال رمز PIN الحالي الصحيح لتعطيل الملف');
-                          return;
-                        }
+                      if (accounts.assistant?.pinRequired && !tempAssistantCurrentPin) {
+                        toast.error('يجب إدخال رمز PIN الحالي الصحيح لتعطيل الملف');
+                        return;
                       }
-                      await saveAssistantProfile({
+                      const res = await saveAssistantProfile({
                         enabled: false,
                         name: '',
                         pinRequired: false
                       }, tempAssistantCurrentPin);
-                      setAssistantModalOpen(false);
-                      setTempAssistantCurrentPin('');
-                      toast.info('تم تعطيل ملف المساعد');
+                      if (res.success) {
+                        setAssistantModalOpen(false);
+                        setTempAssistantCurrentPin('');
+                        toast.info('تم تعطيل ملف المساعد');
+                      } else {
+                        toast.error(res.error || 'فشل تعطيل ملف المساعد');
+                      }
                     }}
                     className="py-2.5 px-3 rounded-xl border border-red-200 text-red-600 text-xs"
                   >

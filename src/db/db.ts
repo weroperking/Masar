@@ -6,6 +6,28 @@ import {
   Settings, QrCard, SyncMeta, Enrollment, SubscriptionCache, SyncQueueItem
 } from '../types';
 
+export interface PinConfigRecord {
+  id: string;
+  orgId: string;
+  profileType: 'admin' | 'assistant';
+  pinHash: string;
+  pinSalt: string;
+  pinIterations: number;
+  pinAlgorithm: string;
+  assistantPinRequired: boolean;
+  autoLockMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface PendingPinPush {
+  id: string;
+  orgId: string;
+  profileType: 'admin' | 'assistant';
+  queuedAt: number;
+}
+
 export class AppDatabase extends Dexie {
   students!: Table<Student>;
   courses!: Table<Course>;
@@ -31,6 +53,8 @@ export class AppDatabase extends Dexie {
   subscriptionCache!: Table<SubscriptionCache>;
   syncQueue!: Table<SyncQueueItem>;
   keystore!: Table<{ id: string; key?: CryptoKey; keypair?: CryptoKeyPair; value?: any; at?: number; issuedAt?: number }>;
+  pinConfigs!: Table<PinConfigRecord, string>;
+  pendingPinPushes!: Table<PendingPinPush, string>;
 
   constructor() {
     super('MasarDB');
@@ -91,6 +115,16 @@ export class AppDatabase extends Dexie {
     // Version 8 - Dedicated Keystore for non-extractable keys & hydration tracking
     this.version(8).stores({
       keystore: 'id'
+    });
+
+    // Version 9 - Secure Hashed PIN storage
+    this.version(9).stores({
+      pinConfigs: 'id, orgId, [orgId+profileType], updatedAt'
+    });
+
+    // Version 10 - Offline retry queue for PIN configurations
+    this.version(10).stores({
+      pendingPinPushes: 'id, orgId, profileType, queuedAt'
     });
   }
 }
