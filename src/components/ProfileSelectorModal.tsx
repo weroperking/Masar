@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { Shield, Lock, Unlock, Check, X, UserCheck, AlertCircle, ArrowLeft, UserPlus, KeyRound } from 'lucide-react';
 import { useProfile, DEFAULT_FORMAL_AVATARS } from '../context/ProfileContext';
 import { ProfileMode } from '../types';
 import { MasarLogo } from './MasarLogo';
 
 export function ProfileSelectorModal() {
+  const { user } = useUser();
   const {
     currentProfile,
     accounts,
@@ -269,9 +271,12 @@ export function ProfileSelectorModal() {
               >
                 <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl overflow-hidden border-4 border-slate-200 group-hover:border-blue-600 transition-all duration-300 shadow-xl group-hover:shadow-blue-500/20 bg-white">
                   <img
-                    src={accounts.admin.avatarUrl || DEFAULT_FORMAL_AVATARS.admin}
+                    src={DEFAULT_FORMAL_AVATARS.admin}
                     alt={accounts.admin.name}
                     className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = DEFAULT_FORMAL_AVATARS.admin;
+                    }}
                   />
                   {/* Subtle Gradient Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent to-transparent opacity-40 group-hover:opacity-10 transition-opacity" />
@@ -301,9 +306,12 @@ export function ProfileSelectorModal() {
                 >
                   <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-2xl overflow-hidden border-4 border-slate-200 group-hover:border-emerald-600 transition-all duration-300 shadow-xl group-hover:shadow-emerald-500/20 bg-white">
                     <img
-                      src={accounts.assistant.avatarUrl || DEFAULT_FORMAL_AVATARS.assistant}
+                      src={DEFAULT_FORMAL_AVATARS.assistant}
                       alt={accounts.assistant.name}
                       className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_FORMAL_AVATARS.assistant;
+                      }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent to-transparent opacity-40 group-hover:opacity-10 transition-opacity" />
 
@@ -418,13 +426,12 @@ export function ProfileSelectorModal() {
             {/* Avatar Header */}
             <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-3 border-blue-600 shadow-lg mb-4 bg-white">
               <img
-                src={
-                  selectedTarget === 'admin'
-                    ? accounts.admin.avatarUrl || DEFAULT_FORMAL_AVATARS.admin
-                    : accounts.assistant?.avatarUrl || DEFAULT_FORMAL_AVATARS.assistant
-                }
+                src={selectedTarget === 'admin' ? DEFAULT_FORMAL_AVATARS.admin : DEFAULT_FORMAL_AVATARS.assistant}
                 alt="Profile"
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = selectedTarget === 'admin' ? DEFAULT_FORMAL_AVATARS.admin : DEFAULT_FORMAL_AVATARS.assistant;
+                }}
               />
             </div>
 

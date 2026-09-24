@@ -1,0 +1,58 @@
+[
+  {
+    "student": {
+      "id": "471142e2-19e6-4a16-9c2f-78827abf11ac",
+      "name": "Hhhahaha",
+      "studentCode": "0001",
+      "gradeLevel": "الصف الأول الثانوي",
+      "school": "Kafr aldwa4 ",
+      "phone": "0764674949",
+      "parentPhone": "04619611",
+      "parentName": "Hfht4brh",
+      "branch": "الفرع الرئيسي"
+    },
+    "teacherName": "الصياد",
+    "academyName": "السلام",
+    "centerName": "السلام",
+    "branch": "الفرع الرئيسي",
+    "attendance": {
+      "attended": 0,
+      "missed": 0,
+      "total": 0,
+      "rate": 100,
+      "sessions": []
+    },
+    "exams": [],
+    "subscription": {
+      "status": "no_record",
+      "month": 9,
+      "year": 2026,
+      "amountTotal": 0,
+      "amountPaid": 0
+    }
+  },
+  {
+    "student": {
+      "id": "test-id-123",
+      "name": "Test Student",
+      "phone": "",
+      "parentPhone": "",
+      "parentName": "",
+      "branch": ""
+    },
+    "attendance": {
+      "attended": 0,
+      "missed": 0,
+      "total": 0,
+      "rate": 100
+    },
+    "exams": [],
+    "subscription": {
+      "status": "no_record",
+      "month": 9,
+      "year": 2026,
+      "amountTotal": 0,
+      "amountPaid": 0
+    }
+  }
+]

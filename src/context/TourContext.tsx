@@ -29,7 +29,7 @@ const TourContext = createContext<TourContextType | undefined>(undefined);
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const { isSignedIn, userId } = useAuth();
   const { organization } = useOrganization();
-  const { currentProfile } = useProfile();
+  const { currentProfile, isLocked, showProfileSelector } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -69,21 +69,21 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const activeSteps = activeTourType === 'assistant' ? ASSISTANT_TOUR_STEPS : ADMIN_TOUR_STEPS;
   const currentStep = activeSteps[currentStepIndex] || activeSteps[0];
 
-  // First-time auto-trigger for current profile tour if not completed
+  // First-time auto-trigger for current profile tour if not completed and profile is selected/unlocked
   useEffect(() => {
-    if (!isSignedIn || hasCompletedTour || window.location.pathname.startsWith('/p/s/')) {
+    if (!isSignedIn || hasCompletedTour || isLocked || showProfileSelector || window.location.pathname.startsWith('/p/s/')) {
       return;
     }
 
     const timer = setTimeout(() => {
-      if (!hasCompletedTour && !isActive) {
+      if (!hasCompletedTour && !isActive && !isLocked && !showProfileSelector) {
         setIsActive(true);
         setCurrentStepIndex(0);
       }
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [isSignedIn, hasCompletedTour, activeTourType]);
+  }, [isSignedIn, hasCompletedTour, activeTourType, isLocked, showProfileSelector, isActive]);
 
   // Route synchronization & Target Element Measurement
   const updateTargetRect = useCallback(() => {

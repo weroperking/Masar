@@ -126,8 +126,15 @@ export function Users() {
                     <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
-                            {user.name.charAt(0) || <UserIcon className="w-4 h-4" />}
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0 ring-1 ring-slate-200 dark:ring-slate-700">
+                            <img
+                              src={user.role === 'assistant' ? '/avatar-assistant.svg' : '/avatar-admin.svg'}
+                              alt={user.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = user.role === 'assistant' ? '/avatar-assistant.svg' : '/avatar-admin.svg';
+                              }}
+                            />
                           </div>
                           <div>
                             <span className="font-bold text-slate-900 dark:text-slate-100 block">{user.name}</span>

@@ -154,7 +154,7 @@ export function useApiMutation<T extends { id?: string }>(resource: string) {
           entityType: resource,
           entityId: id,
           operation: 'create',
-          payload: { id, envelope, updatedAt: now },
+          payload: { ...record, envelope, updatedAt: now },
           createdAt: now
         });
 
@@ -224,7 +224,7 @@ export function useApiMutation<T extends { id?: string }>(resource: string) {
           entityType: resource,
           entityId: params.id,
           operation: 'update',
-          payload: { id: params.id, envelope, updatedAt: now },
+          payload: { ...updated, envelope, updatedAt: now },
           createdAt: now
         });
 

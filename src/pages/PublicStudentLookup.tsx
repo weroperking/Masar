@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { PublicLookupData, Student } from '../types';
 import { db } from '../db/db';
+import { API_BASE_URL } from '../config/api';
 import { MasarLogo } from '../components/MasarLogo';
 import { MinimalStudentProfileCard } from '../components/Lookup/MinimalStudentProfileCard';
 import { LessonsSection, LessonSessionItem } from '../components/Lookup/LessonsSection';
@@ -170,7 +171,7 @@ async function resolveStudentFromDexie(code: string): Promise<PublicLookupData |
       }
     };
 
-    fetch('/api/public/sync-lookups', {
+    fetch(`${API_BASE_URL}/api/public/sync-lookups`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify([fullResult])
@@ -212,23 +213,11 @@ export function PublicStudentLookup() {
       let res: Response | undefined;
       let networkError = false;
       try {
-        res = await fetch(`/public/lookup/${encodeURIComponent(currentCode)}`, {
+        res = await fetch(`${API_BASE_URL}/public/lookup/${encodeURIComponent(currentCode)}`, {
           signal: controller.signal,
         });
       } catch (fetchErr: any) {
-        if (fetchErr?.name === 'AbortError') {
-          networkError = true;
-        } else {
-          const apiRes = await fetch(`/api/public/lookup/${encodeURIComponent(currentCode)}`, {
-            signal: controller.signal,
-          }).catch(() => null);
-
-          if (!apiRes) {
-            networkError = true;
-          } else {
-            res = apiRes;
-          }
-        }
+        networkError = true;
       }
       clearTimeout(timeoutId);
 

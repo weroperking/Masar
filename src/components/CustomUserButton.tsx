@@ -72,13 +72,11 @@ export function CustomUserButton() {
       >
         <div className="relative w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden shrink-0 ring-1 ring-slate-200 dark:ring-slate-700">
           <img
-            src={activeProfileAccount.avatarUrl || '/download.png'}
+            src={isAssistantActive ? '/avatar-assistant.svg' : '/avatar-admin.svg'}
             alt={currentDisplayName}
             className="w-full h-full object-cover"
             onError={(e) => {
-              if (user.imageUrl) {
-                (e.target as HTMLImageElement).src = user.imageUrl;
-              }
+              (e.target as HTMLImageElement).src = isAssistantActive ? '/avatar-assistant.svg' : '/avatar-admin.svg';
             }}
           />
           {isAssistantActive && (
@@ -103,9 +101,12 @@ export function CustomUserButton() {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 ring-2 ring-blue-500/30 flex items-center justify-center overflow-hidden shrink-0">
                 <img
-                  src={activeProfileAccount.avatarUrl || '/download.png'}
+                  src={isAssistantActive ? '/avatar-assistant.svg' : '/avatar-admin.svg'}
                   alt={currentDisplayName}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = isAssistantActive ? '/avatar-assistant.svg' : '/avatar-admin.svg';
+                  }}
                 />
               </div>
               <div className="flex flex-col min-w-0">

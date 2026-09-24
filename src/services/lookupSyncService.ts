@@ -2,6 +2,7 @@ import { db } from '../db/db';
 import { decryptRecord, Envelope } from './cryptoService';
 import { isNotDeleted } from '../config/queryHooks';
 import { normalizeStudentCode } from '../utils/studentCode';
+import { API_BASE_URL } from '../config/api';
 import { Student, Course, Group, Enrollment, AttendanceRecord, AttendanceSession, Assessment, AssessmentGrade, MonthlySubscription, Settings } from '../types';
 
 async function getDecryptedTable<T extends { id?: string; envelope?: any; deleted_at?: number | null; deletedAt?: number | null }>(tableName: string): Promise<T[]> {
@@ -37,7 +38,7 @@ let syncTimeout: any = null;
 
 /**
  * Compiles all students' public lookup profiles and syncs them to the backend server
- * so that any QR code or short link (/s/:code) resolves instantly on any device.
+ * so that any QR code or short link (/p/s/:lookup_code) resolves instantly on any device.
  */
 export async function syncAllStudentsToLookupServer(): Promise<void> {
   if (syncTimeout) {
@@ -178,13 +179,13 @@ export async function syncAllStudentsToLookupServer(): Promise<void> {
       });
 
       // Send to server
-      await fetch('/api/public/sync-lookups', {
+      await fetch(`${API_BASE_URL}/api/public/sync-lookups`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(snapshots)
       }).catch(() => {
         // Fallback endpoint
-        return fetch('/public/sync-lookups', {
+        return fetch(`${API_BASE_URL}/public/sync-lookups`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(snapshots)

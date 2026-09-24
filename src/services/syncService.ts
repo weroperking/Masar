@@ -235,7 +235,8 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
             let payload = o.payload;
             if (payload && !payload.envelope && !payload.ct) {
               const env = await encryptRecord(payload);
-              payload = { id: o.entityId, envelope: env, updatedAt: o.createdAt };
+              // Preserve original fields while adding the envelope for the backend to use as it needs
+              payload = { ...payload, id: o.entityId, envelope: env, updatedAt: o.createdAt };
             }
             return {
               idempotencyKey: o.id,

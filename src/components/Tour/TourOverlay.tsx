@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTour } from '../../context/TourContext';
+import { useProfile } from '../../context/ProfileContext';
 import { 
   ChevronLeft, ChevronRight, X, HelpCircle, 
   Lightbulb, CheckCircle2, ArrowRight
@@ -8,6 +9,7 @@ import {
 import { cn } from '../../lib/utils';
 
 export function TourOverlay() {
+  const { isLocked, showProfileSelector } = useProfile();
   const { 
     isActive, 
     currentStepIndex, 
@@ -90,7 +92,7 @@ export function TourOverlay() {
     };
   }, [targetRect, currentStep]);
 
-  if (!isActive) return null;
+  if (!isActive || isLocked || showProfileSelector) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] pointer-events-auto font-cairo overflow-hidden select-none" dir="rtl">

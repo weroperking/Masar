@@ -17,6 +17,7 @@ import { Enrollment, MonthlySubscription, Student, Settings } from '../../types'
 import { StudentFormModal } from './Students';
 import { calculateEnrollmentFee, syncStudentMonthlySubscriptions, recordLedgerRevenue } from '../../utils/pricing';
 import { buildStudentLookupUrl, normalizeStudentCode } from '../../utils/studentCode';
+import { API_BASE_URL } from '../../config/api';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { useAuth } from '@clerk/clerk-react';
 import { triggerPennyDrop } from '../../components/PennyDropAnimation';
@@ -34,12 +35,13 @@ export function StudentDetails() {
 
   const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
   const student = allStudents.find(s => s.id === id);
+  const { update: updateStudent } = useApiMutation<Student>('students');
 
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
-  // The opaque lookup code provided by the backend for the new /p/s/{lookup_code} URL format
-  const lookupCode = student?.lookup_code;
+  // The lookup code: uses opaque lookup_code, falling back to studentCode or student ID
+  const lookupCode = student?.lookup_code || student?.studentCode || student?.id;
   const hasLookupCode = Boolean(lookupCode);
 
   // The exact canonical short URL matching the back of the student card (/p/s/:lookup_code)
@@ -199,9 +201,10 @@ export function StudentDetails() {
         }
       };
 
+      let tokenToPersist: string | null = student.lookup_code || null;
       try {
         const sessionToken = await getToken();
-        await fetch(`/api/students/${id}/lookup-token`, {
+        const res = await fetch(`${API_BASE_URL}/api/students/${id}/lookup-token`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -209,8 +212,23 @@ export function StudentDetails() {
           },
           body: JSON.stringify(payload)
         });
+
+        if (res.ok) {
+          const resData = await res.json().catch(() => null);
+          const newCode = resData?.lookup_code || resData?.token || resData?.public_lookup_token;
+          if (newCode) {
+            tokenToPersist = newCode;
+          }
+        }
       } catch (srvErr) {
         console.warn('[Sync lookup background] Server lookup storage was deferred:', srvErr);
+      }
+
+      if (tokenToPersist && tokenToPersist !== student.lookup_code) {
+        await updateStudent.mutateAsync({
+          id: student.id,
+          data: { lookup_code: tokenToPersist }
+        });
       }
 
       if (showToast) {

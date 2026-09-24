@@ -28,7 +28,7 @@ import { formatTime12 } from '../utils/time';
 // Base navigation groups (filtered by limits and profile role)
 const getNavigationGroups = (limits: any, isAssistant: boolean = false) => {
   if (isAssistant) {
-    // Assistances will see academic modules and inventory/products/sales (while hiding general ledger and finance)
+    // Assistances will see academic modules and inventory/products/sales (while hiding general ledger, finance, users and settings)
     return [
       {
         title: 'رئيسي',
@@ -54,13 +54,7 @@ const getNavigationGroups = (limits: any, isAssistant: boolean = false) => {
         items: [
           { name: 'المنتجات والمبيعات', href: '/inventory', icon: Package },
         ]
-      }] : []),
-      {
-        title: 'الإدارة',
-        items: [
-          { name: 'الإعدادات والتفضيلات', href: '/settings', icon: Settings },
-        ]
-      }
+      }] : [])
     ];
   }
 

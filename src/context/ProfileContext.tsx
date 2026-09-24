@@ -119,19 +119,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
 
     if (storedProfiles) {
-      const rawAdminAvatar = storedProfiles.adminAvatarUrl;
-      const isOldFluffyAdmin = !rawAdminAvatar || rawAdminAvatar.includes('534528741775') || rawAdminAvatar.includes('fluffy') || rawAdminAvatar.includes('1560250097-0b93528c311a') || rawAdminAvatar.includes('dicebear.com');
-      const finalAdminAvatar = isOldFluffyAdmin ? DEFAULT_FORMAL_AVATARS.admin : rawAdminAvatar;
-
-      const rawAssistantAvatar = storedProfiles.assistantAvatarUrl;
-      const isOldFluffyAssistant = !rawAssistantAvatar || rawAssistantAvatar.includes('517841905240') || rawAssistantAvatar.includes('fluffy') || rawAssistantAvatar.includes('1573496359142') || rawAssistantAvatar.includes('dicebear.com');
-      const finalAssistantAvatar = isOldFluffyAssistant ? DEFAULT_FORMAL_AVATARS.assistant : rawAssistantAvatar;
-
       setAdminAccount({
         id: 'admin',
         name: cur?.teacherName || storedProfiles.adminName || resolvedTeacherName,
         role: 'admin',
-        avatarUrl: finalAdminAvatar,
+        avatarUrl: DEFAULT_FORMAL_AVATARS.admin,
         pinRequired: true,
         pin: storedProfiles.adminPin || '1234'
       });
@@ -141,7 +133,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           id: 'assistant',
           name: storedProfiles.assistantName || 'فريق المساعدين',
           role: 'assistant',
-          avatarUrl: finalAssistantAvatar,
+          avatarUrl: DEFAULT_FORMAL_AVATARS.assistant,
           pinRequired: Boolean(storedProfiles.assistantPinRequired),
           pin: storedProfiles.assistantPin || ''
         });
@@ -156,10 +148,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setAdminAccount(prev => ({
         ...prev,
         name: cur?.teacherName || resolvedTeacherName,
-        avatarUrl: user?.imageUrl || DEFAULT_FORMAL_AVATARS.admin
+        avatarUrl: DEFAULT_FORMAL_AVATARS.admin
       }));
     }
-  }, [liveSettings, orgId, user?.fullName, user?.imageUrl, (user?.unsafeMetadata as any)?.teacherName]);
+  }, [liveSettings, orgId, user?.fullName, (user?.unsafeMetadata as any)?.teacherName]);
 
   // Listen to custom cross-component update events
   useEffect(() => {

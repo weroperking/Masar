@@ -20,7 +20,11 @@ import {
   CheckCircle2,
   Lock,
   KeyRound,
-  Users2
+  Users2,
+  Volume2,
+  Camera,
+  MessageSquare,
+  QrCode
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useUser, useOrganization } from '@clerk/clerk-react';
@@ -41,7 +45,16 @@ export function Settings() {
   const { user } = useUser();
   const { organization } = useOrganization();
   const { startTour } = useTour();
-  const { accounts, autoLockMinutes, updateProfilesConfig, saveAssistantProfile } = useProfile();
+  const { 
+    currentProfile, 
+    accounts, 
+    autoLockMinutes, 
+    updateProfilesConfig, 
+    saveAssistantProfile,
+    assistantSubSettings,
+    updateAssistantSubSettings
+  } = useProfile();
+  const isAssistant = currentProfile === 'assistant';
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [assistantModalOpen, setAssistantModalOpen] = useState(false);
   const [tempAssistantName, setTempAssistantName] = useState(accounts.assistant?.name || 'فريق المساعدين');
@@ -224,7 +237,102 @@ export function Settings() {
           </div>
         </section>
 
-        {/* Profiles & PIN Security Section (حماية الملفات والرموز السرية) */}
+        {/* Assistant Scanner & Operational Preferences */}
+        <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-lg">
+              <QrCode className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                تفضيلات وإعدادات المساعدين (ماسح QR والتنبيهات)
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                تخصيص صوت وأصوات الكاميرا عند مسح الباركود، وفتح ملف الطالب تلقائياً
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            {/* Sound Toggle */}
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    صوت تنبيه الماسح (Beep)
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={assistantSubSettings.scannerSoundEnabled}
+                  onChange={(e) => {
+                    updateAssistantSubSettings({ scannerSoundEnabled: e.target.checked });
+                    toast.info(e.target.checked ? 'تم تفعيل صوت الماسح' : 'تم كتم صوت الماسح');
+                  }}
+                  className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500">
+                إصدار صوت تأكيد عند القراءة الناجحة لكارت QR الخاص بالطالب.
+              </p>
+            </div>
+
+            {/* Camera Facing Mode */}
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    الكاميرا الافتراضية للماسح
+                  </span>
+                </div>
+                <select
+                  value={assistantSubSettings.cameraFacingMode || 'environment'}
+                  onChange={(e) => {
+                    updateAssistantSubSettings({ cameraFacingMode: e.target.value as any });
+                    toast.success('تم حفظ اختيار الكاميرا');
+                  }}
+                  className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold"
+                >
+                  <option value="environment">الكاميرا الخلفية</option>
+                  <option value="user">الكاميرا الأمامية</option>
+                </select>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                اختيار الكاميرا المستخدمة تلقائياً عند فتح قراءة الباركود.
+              </p>
+            </div>
+
+            {/* Auto Open Student Info */}
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2 sm:col-span-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserIcon className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    عرض بطاقة الطالب السريعة فور المسح
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={assistantSubSettings.autoOpenStudentInfoOnScan}
+                  onChange={(e) => {
+                    updateAssistantSubSettings({ autoOpenStudentInfoOnScan: e.target.checked });
+                    toast.info(e.target.checked ? 'تم تفعيل البطاقة السريعة' : 'تم إيقاف البطاقة السريعة');
+                  }}
+                  className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500">
+                إظهار نافذة منبثقة ملخصة لبيانات الطالب وموقفه المالي والاشتراك فور تحضيره.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {!isAssistant && (
+          <>
+            {/* Profiles & PIN Security Section (حماية الملفات والرموز السرية) */}
         <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2.5">
@@ -683,6 +791,8 @@ export function Settings() {
             </div>
           )}
         </section>
+          </>
+        )}
 
         {/* 4. Interactive Platform Tour Section (الجولة التعريفية التفاعلية للمنصة) */}
         <section className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-4">

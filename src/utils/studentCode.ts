@@ -177,9 +177,9 @@ export function buildStudentLookupUrl(lookupCode: string | undefined | null, cus
  * Extracts the clean student code or ID from any scanned input or QR data.
  * Handles:
  * - Direct codes: '1001', '#1001', ' 1001 '
- * - Full URLs: 'https://masar.app/s/1001' -> '1001'
+ * - Full URLs: 'https://app.masar.top/p/s/1001' -> '1001'
  * - Query params: 'https://.../lookup?code=1001' -> '1001'
- * - Relative URLs: '/s/1001' -> '1001'
+ * - Relative URLs: '/p/s/1001' -> '1001'
  * - Arabic digits: '١٠٠١' -> '1001'
  */
 export function extractStudentCodeFromScanned(scannedText: string | undefined | null): string {
