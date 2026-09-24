@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useUser, useOrganization } from '@clerk/clerk-react';
+import { useUser, useOrganization, useClerk } from '@clerk/clerk-react';
 import { Shield, Lock, Unlock, Check, X, UserCheck, AlertCircle, ArrowLeft, UserPlus, KeyRound } from 'lucide-react';
 import { useProfile, DEFAULT_FORMAL_AVATARS } from '../context/ProfileContext';
 import { ProfileMode } from '../types';
 import { MasarLogo } from './MasarLogo';
-import { verifyPin, isLockedOut } from '../services/pinService';
+import { verifyPin, isLockedOut, deletePin, clearFailedAttempts } from '../services/pinService';
 
 export function ProfileSelectorModal() {
   const { user } = useUser();
   const { organization } = useOrganization();
+  const { signOut } = useClerk();
   const orgId = organization?.id || 'default_org';
   const {
     currentProfile,
@@ -18,7 +19,8 @@ export function ProfileSelectorModal() {
     unlockWithPin,
     switchProfileDirect,
     closeProfileSelector,
-    saveAssistantProfile
+    saveAssistantProfile,
+    setForcePinChange
   } = useProfile();
 
   // Active target profile for PIN entry
@@ -26,6 +28,10 @@ export function ProfileSelectorModal() {
   const [pinDigits, setPinDigits] = useState<string[]>(['', '', '', '']);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
+
+  // In-app PIN reset confirmation state
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState<boolean>(false);
+  const [isResetting, setIsResetting] = useState<boolean>(false);
 
   // Assistant management / creation state
   const [isAddingAssistant, setIsAddingAssistant] = useState<boolean>(false);
@@ -141,6 +147,31 @@ export function ProfileSelectorModal() {
       setPinDigits(['', '', '', '']);
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const handleForgotPin = () => {
+    setShowResetConfirmModal(true);
+  };
+
+  const executePinReset = async () => {
+    setIsResetting(true);
+    try {
+      await deletePin(orgId, 'admin');
+      if (accounts.assistant) {
+        await deletePin(orgId, 'assistant');
+      }
+      clearFailedAttempts(orgId, 'admin');
+      clearFailedAttempts(orgId, 'assistant');
+      sessionStorage.removeItem(`masar_profile_unlocked_${orgId}`);
+      sessionStorage.removeItem(`masar_active_profile_${orgId}`);
+      setForcePinChange(true);
+      await signOut();
+      window.location.href = '/';
+    } catch (err) {
+      console.error('Failed to reset PIN:', err);
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -371,6 +402,16 @@ export function ProfileSelectorModal() {
                 </button>
               )}
             </div>
+
+            {/* Forgot PIN Link on Main Lock Screen */}
+            <button
+              type="button"
+              onClick={handleForgotPin}
+              className="mt-2 text-xs sm:text-sm text-slate-500 hover:text-blue-600 underline font-medium transition-colors cursor-pointer font-['Cairo'] flex items-center gap-1.5"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>نسيت رمز الدخول (PIN)؟</span>
+            </button>
           </div>
         )}
 
@@ -425,6 +466,13 @@ export function ProfileSelectorModal() {
                 تأكيد الإذن
               </button>
             </form>
+            <button
+              type="button"
+              onClick={handleForgotPin}
+              className="mt-3 text-xs text-slate-500 hover:text-blue-600 underline transition-colors cursor-pointer"
+            >
+              نسيت الرمز؟
+            </button>
           </div>
         )}
 
@@ -516,6 +564,15 @@ export function ProfileSelectorModal() {
                 مسح
               </button>
             </div>
+
+            {/* Forgot PIN Button */}
+            <button
+              type="button"
+              onClick={handleForgotPin}
+              className="mt-6 text-sm text-slate-500 hover:text-blue-600 underline font-medium transition-colors cursor-pointer font-['Cairo']"
+            >
+              نسيت الرمز؟
+            </button>
           </div>
         )}
 
@@ -692,6 +749,50 @@ export function ProfileSelectorModal() {
         </div>
         <span>Masar Identity & Access Control System</span>
       </footer>
+
+      {/* IN-APP PIN RESET CONFIRMATION MODAL */}
+      {showResetConfirmModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 font-['Cairo']" dir="rtl">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 p-6 shadow-2xl space-y-5 text-center animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center mx-auto shadow-xs">
+              <KeyRound className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-slate-900 font-['Readex_Pro']">
+                إعادة تعيين رمز الدخول (PIN)؟
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed px-2">
+                سيتم مسح رمز الدخول الحالي وتسجيل خروجك فوراً لتأكيد هويتك عبر حساب Clerk. عند إعادة تسجيل الدخول بنفس الحساب، سيُطلب منك تعيين رمز جديد مباشرة.
+              </p>
+            </div>
+
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                type="button"
+                disabled={isResetting}
+                onClick={executePinReset}
+                className="flex-1 py-3 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+              >
+                {isResetting ? (
+                  <span>جاري إعادة التعيين...</span>
+                ) : (
+                  <span>تأكيد وتسجيل الخروج</span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={isResetting}
+                onClick={() => setShowResetConfirmModal(false)}
+                className="py-3 px-4 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold cursor-pointer transition-colors"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

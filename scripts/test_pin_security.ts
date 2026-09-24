@@ -381,6 +381,51 @@ async function run() {
   });
 
   // ==========================================
+  // TEST 15: Simple PIN Reset Flow (Clerk Re-Auth + Reset to Default)
+  // ==========================================
+  try {
+    const resetOrgId = 'org_pin_reset_test';
+    setActiveOrgId(resetOrgId);
+
+    // 1. Set admin PIN to '5678'
+    await setPin(resetOrgId, 'admin', '5678');
+    const is5678Active = await verifyPin(resetOrgId, 'admin', '5678');
+    const is1234BeforeReset = await verifyPin(resetOrgId, 'admin', '1234');
+
+    // 2. Simulate reset: deletePin(resetOrgId, 'admin') + simulate signOut (clearing session storage)
+    await deletePin(resetOrgId, 'admin');
+    sessionStorage.removeItem(`masar_profile_unlocked_${resetOrgId}`);
+    sessionStorage.removeItem(`masar_active_profile_${resetOrgId}`);
+
+    // 3. Simulate re-login: forcePinChange should be true because verifyPin(resetOrgId, 'admin', '1234') is true
+    const forcePinChangeOnReLogin = await verifyPin(resetOrgId, 'admin', '1234');
+    const isOldPinRejected = !(await verifyPin(resetOrgId, 'admin', '5678'));
+
+    // 4. Set new PIN '1234' via setPin
+    await setPin(resetOrgId, 'admin', '1234');
+
+    // 5. Check: verifyPin('5678') -> false. verifyPin('1234') -> true.
+    const verify5678AfterNewPin = await verifyPin(resetOrgId, 'admin', '5678');
+    const verify1234AfterNewPin = await verifyPin(resetOrgId, 'admin', '1234');
+
+    const pass = is5678Active === true &&
+                 is1234BeforeReset === false &&
+                 forcePinChangeOnReLogin === true &&
+                 isOldPinRejected === true &&
+                 verify5678AfterNewPin === false &&
+                 verify1234AfterNewPin === true;
+
+    testResults.push({
+      id: 15,
+      name: 'Simple PIN Reset: set admin 5678 -> deletePin + signOut -> forcePinChange is true -> set new PIN 1234 -> 5678 false, 1234 true',
+      status: pass ? 'PASS' : 'FAIL',
+      output: `is5678Active: ${is5678Active}, forcePinChange: ${forcePinChangeOnReLogin}, oldRejected: ${isOldPinRejected}, verify5678After: ${verify5678AfterNewPin}, verify1234After: ${verify1234AfterNewPin}`
+    });
+  } catch (err: any) {
+    testResults.push({ id: 15, name: 'Simple PIN Reset flow', status: 'FAIL', output: err.message });
+  }
+
+  // ==========================================
   // TEST 14: Console -> zero errors, zero logged hashes
   // ==========================================
   try {

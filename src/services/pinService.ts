@@ -75,15 +75,12 @@ export async function verifyPin(
 
   const record = await getPinConfig(orgId, profileType);
 
-  if (record) {
-    if (record.deletedAt !== null) {
-      return false;
-    }
+  if (record && record.deletedAt === null) {
     const hash = await hashPin(enteredPin, record.pinSalt, record.pinIterations);
     return hash === record.pinHash;
   }
 
-  // Uninitialized state: admin defaults to "1234"
+  // Uninitialized or reset state: admin defaults to "1234"
   if (profileType === 'admin') {
     return enteredPin.trim() === '1234';
   }
@@ -117,9 +114,28 @@ export async function deletePin(
   profileType: 'admin' | 'assistant'
 ): Promise<void> {
   const existing = await getPinConfig(orgId, profileType);
-  if (!existing) return;
-
   const now = new Date().toISOString();
+
+  if (!existing) {
+    const dummyRecord: PinConfigRecord = {
+      id: crypto.randomUUID(),
+      orgId,
+      profileType,
+      pinHash: '',
+      pinSalt: '',
+      pinIterations: 210000,
+      pinAlgorithm: 'PBKDF2-SHA256',
+      assistantPinRequired: false,
+      autoLockMinutes: 15,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: now
+    };
+    await db.pinConfigs.put(dummyRecord);
+    pushPinConfig(dummyRecord).catch(() => {});
+    return;
+  }
+
   const updated: PinConfigRecord = {
     ...existing,
     deletedAt: now,

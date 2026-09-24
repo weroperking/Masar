@@ -7,15 +7,19 @@ import { verifyPin } from '../services/pinService';
 export function AdminPinChangeModal({
   isOpen,
   onClose,
-  isForced = false
+  isForced = false,
+  isReset = false
 }: {
   isOpen: boolean;
   onClose: () => void;
   isForced?: boolean;
+  isReset?: boolean;
 }) {
   const { updateAdminPin, setForcePinChange } = useProfile();
   const { organization } = useOrganization();
   const orgId = organization?.id || 'default_org';
+
+  const isForcedMode = isForced || isReset;
 
   const [currentPin, setCurrentPin] = useState<string>('');
   const [newPin, setNewPin] = useState<string>('');
@@ -40,14 +44,14 @@ export function AdminPinChangeModal({
       return;
     }
 
-    if (isForced && newPin === '1234') {
+    if (isForcedMode && newPin === '1234') {
       setErrorMsg('يجب اختيار رمز PIN جديد مختلف عن الرمز الافتراضي 1234');
       return;
     }
 
     setIsLoading(true);
     try {
-      if (currentPin && currentPin.trim() !== '') {
+      if (!isForcedMode && currentPin && currentPin.trim() !== '') {
         const isCurrentValid = await verifyPin(orgId, 'admin', currentPin.trim());
         if (!isCurrentValid) {
           setErrorMsg('رمز PIN الحالي غير صحيح');
@@ -56,12 +60,12 @@ export function AdminPinChangeModal({
         }
       }
 
-      const res = await updateAdminPin(newPin, currentPin || (isForced ? '1234' : undefined));
+      const res = await updateAdminPin(newPin, isForcedMode ? undefined : currentPin);
       if (res.success) {
         if (newPin !== '1234') {
           setForcePinChange(false);
         }
-        setSuccessMsg('تم تحديث رمز PIN للمعلم بنجاح!');
+        setSuccessMsg('تم تعيين رمز PIN الجديد بنجاح!');
         setTimeout(() => {
           onClose();
           setCurrentPin('');
@@ -89,22 +93,22 @@ export function AdminPinChangeModal({
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              isForced ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600' : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600'
+              isForcedMode ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600' : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600'
             }`}>
-              {isForced ? <ShieldAlert className="w-5 h-5" /> : <KeyRound className="w-5 h-5" />}
+              {isForcedMode ? <ShieldAlert className="w-5 h-5" /> : <KeyRound className="w-5 h-5" />}
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 font-['Readex_Pro']">
-                {isForced ? 'إلزام تغيير رمز PIN الافتراضي' : 'تغيير رمز PIN للمعلم (المدير)'}
+                {isForcedMode ? 'عيّن رمزاً جديداً' : 'تغيير رمز PIN للمعلم (المدير)'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {isForced
+                {isForcedMode
                   ? 'لتأمين بياناتك والماليات، يرجى تعيين رمز PIN جديد خاص بك'
                   : 'تعديل رمز الدخول السري المكون من 4 أرقام'}
               </p>
             </div>
           </div>
-          {!isForced && (
+          {!isForcedMode && (
             <button
               type="button"
               onClick={onClose}
@@ -115,10 +119,10 @@ export function AdminPinChangeModal({
           )}
         </div>
 
-        {isForced && (
+        {isForcedMode && (
           <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-300 text-xs rounded-xl flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 shrink-0" />
-            <span>نظام مسار يتطلب تغيير رمز الدخول الافتراضي (1234) للوصول لكافة المعاملات المالية.</span>
+            <span>يرجى تعيين رمز PIN جديد للدخول والوصول لكافة المعاملات المالية.</span>
           </div>
         )}
 
@@ -138,7 +142,7 @@ export function AdminPinChangeModal({
 
         {!successMsg && (
           <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-            {!isForced && (
+            {!isForcedMode && (
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   رمز PIN الحالي
@@ -168,7 +172,7 @@ export function AdminPinChangeModal({
                   onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
                   placeholder="****"
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-sm font-mono tracking-widest focus:outline-none focus:border-blue-600 dark:text-white"
-                  autoFocus={isForced}
+                  autoFocus={isForcedMode}
                 />
               </div>
 
@@ -196,7 +200,7 @@ export function AdminPinChangeModal({
               >
                 {isLoading ? 'جاري الحفظ...' : 'حفظ رمز PIN الجديد'}
               </button>
-              {!isForced && (
+              {!isForcedMode && (
                 <button
                   type="button"
                   onClick={onClose}
