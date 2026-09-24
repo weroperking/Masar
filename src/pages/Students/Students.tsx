@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, X, Trash2, Edit2, BookOpen, Users as UsersIcon, Check, MessageCircle, Eye, DollarSign, Tag, QrCode, Hash } from 'lucide-react';
+import { Search, Plus, X, Trash2, Edit2, BookOpen, Users as UsersIcon, Check, MessageCircle, Eye, DollarSign, Tag, QrCode, Hash, RotateCcw } from 'lucide-react';
 import { Student, Enrollment } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useSubscription } from '../../context/SubscriptionContext';
@@ -429,6 +429,7 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
   const { getToken } = useAuth();
 
   const suggestedNextCode = useMemo(() => getNextStudentCode(allStudents), [allStudents]);
+  const [isEditingCode, setIsEditingCode] = useState(false);
 
   const [formData, setFormData] = useState({
     studentCode: existingStudent?.studentCode || '',
@@ -445,10 +446,15 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
 
   // Automatically synchronize next sequential ID as student database loads
   useEffect(() => {
-    if (!existingStudent) {
-      setFormData(prev => ({ ...prev, studentCode: suggestedNextCode }));
+    if (!existingStudent && !isEditingCode) {
+      setFormData(prev => {
+        if (!prev.studentCode || prev.studentCode === suggestedNextCode) {
+          return { ...prev, studentCode: suggestedNextCode };
+        }
+        return prev;
+      });
     }
-  }, [existingStudent, suggestedNextCode]);
+  }, [existingStudent, suggestedNextCode, isEditingCode]);
 
   interface GroupPricingState {
     pricingMode: 'default' | 'custom' | 'discount' | 'free';
@@ -505,22 +511,17 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      let finalStudentCode = existingStudent 
-        ? (formData.studentCode || existingStudent.studentCode)
-        : (formData.studentCode || suggestedNextCode);
+      let finalStudentCode = (formData.studentCode || '').trim();
+      if (!finalStudentCode) {
+        finalStudentCode = existingStudent ? (existingStudent.studentCode || suggestedNextCode) : suggestedNextCode;
+      }
 
       finalStudentCode = normalizeStudentCode(finalStudentCode || suggestedNextCode);
 
       // Check for code conflict
-      let conflict = findStudentWithCode(finalStudentCode, allStudents, existingStudent?.id);
-      if (conflict && !existingStudent) {
-        // Auto-resolve to next free sequence if default code collided
-        finalStudentCode = getNextStudentCode(allStudents);
-        conflict = undefined;
-      }
-
+      const conflict = findStudentWithCode(finalStudentCode, allStudents, existingStudent?.id);
       if (conflict) {
-        toast.error(`كود الطالب (${finalStudentCode}) مستخدم بالفعل للطالب: ${conflict.name}.`);
+        toast.error(`كود الطالب (${finalStudentCode}) مستخدم بالفعل للطالب: ${conflict.name}. يرجى اختيار كود آخر.`);
         return;
       }
 
@@ -684,7 +685,7 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="p-6 overflow-y-auto flex-1 space-y-4">
           
-          {/* Student ID / Code - Visible Read-Only Auto-Generated */}
+          {/* Student ID / Code - Editable with pen button */}
           <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
             <div className="space-y-0.5">
               <div className="flex items-center gap-1.5">
@@ -693,23 +694,70 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
                   كود الطالب التعريفي (Student ID)
                 </span>
                 <span className="text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800 px-1.5 py-0.5 rounded font-medium">
-                  توليد تلقائي
+                  {isEditingCode ? 'تعديل الكود' : (formData.studentCode && formData.studentCode !== suggestedNextCode && !existingStudent ? 'كود يدوي' : 'توليد تلقائي')}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {existingStudent 
-                  ? 'كود الطالب مسجل بالنظام تلقائياً ولا يمكن تعديله لضمان سلامة السجلات' 
-                  : 'يتم توليد الكود التسلسلي تلقائياً لمنع أي تكرار في الأكواد بالسنتر'}
+                {isEditingCode 
+                  ? 'قم بإدخال الكود المطلوب (أرقام أو حروف) للتحضير وطباعة الـ QR' 
+                  : 'يمكنك تغيير كود الطالب للطباعة والمسح الضوئي بالضغط على زر القلم'}
               </p>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <div 
-                className="px-3.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-blue-600 dark:text-blue-400 shadow-2xs select-all text-center min-w-[76px]"
-                title="كود الطالب التعريفي التسلسلي (تلقائي)"
-              >
-                {existingStudent ? existingStudent.studentCode : (formData.studentCode || suggestedNextCode)}
-              </div>
+              {isEditingCode ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={formData.studentCode}
+                    onChange={(e) => setFormData({ ...formData, studentCode: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setIsEditingCode(false);
+                      }
+                    }}
+                    placeholder="كود الطالب"
+                    className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-blue-500 rounded-lg text-xs font-mono font-bold text-blue-600 dark:text-blue-400 w-32 text-center focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingCode(false)}
+                    className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 rounded-lg cursor-pointer transition-colors border border-emerald-200 dark:border-emerald-800"
+                    title="تأكيد الكود"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  {!existingStudent && formData.studentCode !== suggestedNextCode && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, studentCode: suggestedNextCode })}
+                      className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg cursor-pointer transition-colors border border-slate-200 dark:border-slate-700"
+                      title="إعادة تعيين للتسلسل التلقائي"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1 rounded-lg">
+                  <div 
+                    className="px-2.5 py-0.5 text-xs font-mono font-bold text-blue-600 dark:text-blue-400 select-all text-center min-w-[64px]"
+                    title="كود الطالب التعريفي"
+                  >
+                    #{formData.studentCode || (existingStudent ? existingStudent.studentCode : suggestedNextCode)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingCode(true)}
+                    className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md cursor-pointer transition-colors"
+                    title="تعديل كود الطالب (ID)"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
