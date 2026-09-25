@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { SignIn, OrganizationList, useAuth, useOrganization, useClerk } from '@clerk/clerk-react';
 import { seedDatabaseIfEmpty, sanitizeNumericCodes } from './db/seed';
+import { STUDENT_LOOKUP_PATH_PREFIX } from './utils/studentCode';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Students } from './pages/Students/Students';
@@ -39,8 +40,6 @@ import { Settings } from './pages/Admin/Settings';
 import { QrCards } from './pages/Admin/QrCards';
 import { Upgrade } from './pages/Upgrade/Upgrade';
 
-import { PublicStudentLookup } from './pages/PublicStudentLookup';
-
 import { CustomAuth } from './pages/Auth/CustomAuth';
 import { CustomOrganizationList } from './pages/Auth/CustomOrganizationList';
 import { HydrationGate } from './components/HydrationGate';
@@ -49,7 +48,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './config/queryClient';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { performHandshake } from './services/syncService';
-import { syncAllStudentsToLookupServer } from './services/lookupSyncService';
 import { TourProvider } from './context/TourContext';
 import { TourOverlay } from './components/Tour/TourOverlay';
 
@@ -140,7 +138,7 @@ function AuthGate() {
     }
   }, [clerk.loaded, clerk.session, clerk.client?.sessions]);
 
-  // Perform local-first encryption handshake and public lookup sync once authenticated
+  // Perform local-first encryption handshake once authenticated
   const { getToken } = useAuth();
   useEffect(() => {
     if (hasSession) {
@@ -149,7 +147,6 @@ function AuthGate() {
           console.warn('Crypto handshake deferred or running offline:', err);
         });
       }
-      syncAllStudentsToLookupServer().catch(() => {});
     }
   }, [hasSession, organization?.id, organization?.slug, getToken]);
 
@@ -263,16 +260,11 @@ function AuthGate() {
   );
 }
 
-import { STUDENT_LOOKUP_PATH_PREFIX } from './utils/studentCode';
-
 export default function App() {
   useEffect(() => {
-    // Standalone public routes must NOT trigger any Dexie/IndexedDB operations
-    if (!window.location.pathname.startsWith(STUDENT_LOOKUP_PATH_PREFIX)) {
-      seedDatabaseIfEmpty().then(() => {
-        sanitizeNumericCodes();
-      });
-    }
+    seedDatabaseIfEmpty().then(() => {
+      sanitizeNumericCodes();
+    });
   }, []);
 
   return (
@@ -282,7 +274,9 @@ export default function App() {
           <QueryClientProvider client={queryClient}>
             <BrowserRouter>
                <Routes>
-                 <Route path={`${STUDENT_LOOKUP_PATH_PREFIX}:code`} element={<PublicStudentLookup />} />
+                 <Route path={`${STUDENT_LOOKUP_PATH_PREFIX}:code`} element={<Navigate to="/" replace />} />
+                 <Route path="/lookup/:code" element={<Navigate to="/" replace />} />
+                 <Route path="/s/:code" element={<Navigate to="/" replace />} />
                  <Route path="/book" element={<Navigate to="/" replace />} />
                  <Route path="*" element={<AuthGate />} />
                </Routes>

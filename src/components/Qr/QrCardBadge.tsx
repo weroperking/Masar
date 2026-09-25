@@ -156,7 +156,7 @@ export function QrCardBadge({
     if (isQrCode) {
       const qrTargetUrl = (qrCodeData && (qrCodeData.startsWith('http://') || qrCodeData.startsWith('https://')))
         ? qrCodeData
-        : buildStudentLookupUrl(lookupCode); // STRICT: NO FALLBACK TO cleanCode
+        : (buildStudentLookupUrl(lookupCode) || cleanCode);
 
       if (qrTargetUrl) {
         QRCode.toDataURL(

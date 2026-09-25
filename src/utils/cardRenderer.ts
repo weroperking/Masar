@@ -194,10 +194,9 @@ async function drawCodeOverlayOnBack(
   ctx.scale(codeScale, codeScale);
 
   if (isQrCode) {
-    // Render QR Code onto temp canvas with full student lookup URL
+    // Render QR Code onto temp canvas
     const qrCanvas = document.createElement('canvas');
-    const qrPayload = buildStudentLookupUrl(lookupCode);
-    if (!qrPayload) return; // Skip if no lookup code yet
+    const qrPayload = buildStudentLookupUrl(lookupCode) || code || '0001';
     
     await QRCode.toCanvas(qrCanvas, qrPayload, {
       margin: 1,

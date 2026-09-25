@@ -12,7 +12,6 @@ import { syncStudentMonthlySubscriptions } from '../../utils/pricing';
 import { getNextStudentCode, findStudentWithCode, normalizeStudentCode } from '../../utils/studentCode';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { useAuth } from '@clerk/clerk-react';
-import { requestStudentLookupToken } from '../../services/lookupSyncService';
 
 export function Students() {
   const navigate = useNavigate();
@@ -607,9 +606,6 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
           }
         }));
 
-        // Request / refresh lookup token for updated student
-        requestStudentLookupToken(existingStudent.id, undefined, token).catch(() => {});
-
         toast.success(`تم تحديث بيانات الطالب (${formData.name}) والرسوم بنجاح!`);
       } else {
         const newStudent = await createStudent.mutateAsync(normalizedFormData);
@@ -652,9 +648,6 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
             await syncStudentMonthlySubscriptions(newStudent.id, grp.courseId, effectiveFee, token);
           }
         }));
-
-        // Generate initial canonical lookup token for the newly created student
-        requestStudentLookupToken(newStudent.id, undefined, token).catch(() => {});
 
         toast.success(`تم تسجيل الطالب (${formData.name}) في المجموعات وتحديد رسومه بنجاح!`);
       }

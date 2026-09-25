@@ -160,27 +160,11 @@ export function matchStudent(student: Student, query: string): boolean {
 export const STUDENT_LOOKUP_PATH_PREFIX = '/p/s/';
 
 /**
- * Builds the canonical public student lookup URL encoded in the card's QR code.
- * When scanned by any smartphone camera, opens the dedicated student profile page.
- * Uses the new opaque org-scoped format: /p/s/{token}
+ * Student lookup is hidden from the platform.
+ * Returns empty string so cards and components do not render external lookup URLs.
  */
-export function buildStudentLookupUrl(token: string | undefined | null, customOrigin?: string): string {
-  const clean = String(token || '').trim();
-  if (!clean) return '';
-  // If already an absolute URL (returned by requestStudentLookupToken), return verbatim
-  if (clean.startsWith('http://') || clean.startsWith('https://')) {
-    return clean;
-  }
-  // Strictly prevent constructing lookup URLs from student UUIDs or numeric student codes
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
-  const isNumericCode = /^\d{1,6}$/.test(clean);
-  if (isUuid || isNumericCode) {
-    return '';
-  }
-
-  // Canonical base64url token returned by server
-  const origin = customOrigin || 'https://app.masar.top';
-  return `${origin}${STUDENT_LOOKUP_PATH_PREFIX}${clean}`;
+export function buildStudentLookupUrl(_token: string | undefined | null, _customOrigin?: string): string {
+  return '';
 }
 
 /**

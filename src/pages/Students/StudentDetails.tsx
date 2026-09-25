@@ -1,10 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import QRCode from 'qrcode';
 import { 
   ArrowRight, User, BookOpen, Clock, Calendar, Wallet, 
   QrCode, RefreshCw, CheckCircle2, Link2,
-  GraduationCap, Edit2, Check, X, MessageCircle, Globe, Copy, ExternalLink,
+  GraduationCap, Edit2, Check, X, MessageCircle, Copy, ExternalLink,
   AlertTriangle, DollarSign, List, FileText, ArrowLeftRight, Activity, Users
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -21,18 +20,13 @@ import { API_BASE_URL } from '../../config/api';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { useAuth } from '@clerk/clerk-react';
 import { triggerPennyDrop } from '../../components/PennyDropAnimation';
-import { requestStudentLookupToken } from '../../services/lookupSyncService';
 
 export function StudentDetails() {
   const { id } = useParams<{ id: string }>();
-  const [activeTab, setActiveTab] = useState<"overview" | "info" | "attendance" | "bills" | "payments" | "grades" | "history" | "lookup">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "info" | "attendance" | "bills" | "payments" | "grades" | "history">("overview");
   const toast = useToast();
   const { confirm } = useConfirm();
   const { getToken } = useAuth();
-
-  const [loadingSync, setLoadingSync] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
-  const [copied, setCopied] = useState(false);
 
   const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
   const student = allStudents.find(s => s.id === id);
@@ -40,58 +34,6 @@ export function StudentDetails() {
 
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
-
-  const [lookupError, setLookupError] = useState<string | null>(null);
-
-  // The exact canonical opaque URL returned verbatim by the backend.
-  // NEVER reconstructed locally from lookup_code. If the backend has not
-  // supplied lookup_url, there is no link to show.
-  const shortLookupUrl = student?.lookup_url || '';
-  const hasLookupUrl = Boolean(shortLookupUrl);
-
-  // Generate the simple, low-density QR code identical to the card back
-  useEffect(() => {
-    if (shortLookupUrl) {
-      QRCode.toDataURL(
-        shortLookupUrl,
-        { margin: 1, width: 220, color: { dark: '#000000', light: '#ffffff' } },
-        (err, url) => {
-          if (!err && url) {
-            setQrCodeUrl(url);
-          }
-        }
-      );
-    } else {
-      setQrCodeUrl('');
-    }
-  }, [shortLookupUrl]);
-
-  // Auto-request lookup token from server if missing or invalid (e.g. UUID) on student record
-  useEffect(() => {
-    const isInvalidOrMissing = !student?.lookup_code || !student?.lookup_url || student.lookup_code.includes('-') || student.lookup_code === id;
-    if (student && isInvalidOrMissing && id) {
-      getToken().then(tok => {
-        requestStudentLookupToken(id, undefined, tok).then(res => {
-          if (res?.token && res?.url) {
-            setLookupError(null);
-            updateStudent.mutate({ id, data: { lookup_code: res.token, lookup_url: res.url } });
-          } else {
-            setLookupError('تعذر إنشاء الرابط');
-          }
-        }).catch(() => {
-          setLookupError('تعذر إنشاء الرابط');
-        });
-      });
-    }
-  }, [student?.id, student?.lookup_code, student?.lookup_url, id, getToken]);
-
-  const handleCopyLink = () => {
-    if (!shortLookupUrl) return;
-    navigator.clipboard.writeText(shortLookupUrl);
-    setCopied(true);
-    toast.success('تم نسخ رابط المتابعة بنجاح!');
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   // Roster / Enrollments
   const { data: allEnrollments = [] } = useApiQuery<Enrollment>('enrollments', 2 * 60 * 1000);
@@ -122,142 +64,6 @@ export function StudentDetails() {
   // System Settings (Teacher name, academy name, branch)
   const { data: allSettings = [] } = useApiQuery<Settings>('settings', 60 * 1000);
   const currentSettings = allSettings[0];
-
-  // Background server sync for the canonical student lookup profile
-  const handleSyncLookup = async (showToast = true) => {
-    if (!student || !id) return;
-
-    try {
-      setLoadingSync(true);
-
-      const attended = attendanceRecords.filter((r: any) => r.status === 'present' || r.status === 'compensation').length;
-      const missed = attendanceRecords.filter((r: any) => r.status === 'absent').length;
-      const total = attended + missed;
-      const rate = total > 0 ? Math.round((attended / total) * 100) : 100;
-
-      const currentSub = monthlySubscriptions?.find((s: any) => s.month === currentMonth && s.year === currentYear) || null;
-
-      // Active group and branch
-      const activeEnrollment = enrollments.find(e => e.status === 'active');
-      const activeGroup = groups.find((g: any) => g.id === activeEnrollment?.groupId);
-      const studentBranch = student.branch || activeGroup?.branch || currentSettings?.branch || 'الفرع الرئيسي';
-      const teacherName = currentSettings?.teacherName || localStorage.getItem('masar_teacher_name') || '';
-      const academyName = currentSettings?.academyName || localStorage.getItem('masar_academy_name') || '';
-
-      // Detailed lessons list
-      const sessionsList = attendanceRecords
-        .slice()
-        .sort((a: any, b: any) => (b.markedAt || 0) - (a.markedAt || 0))
-        .slice(0, 20)
-        .map((rec: any) => {
-          const sess = attendanceSessions?.find((s: any) => s.id === rec.sessionId);
-          const grp = groups?.find((g: any) => g.id === (rec.groupId || sess?.groupId));
-          const crs = courses?.find((c: any) => c.id === (sess?.courseId || grp?.courseId));
-          const dateStr = sess?.startedAt
-            ? new Date(sess.startedAt).toISOString().split('T')[0]
-            : rec.markedAt
-            ? new Date(rec.markedAt).toISOString().split('T')[0]
-            : '';
-          return {
-            id: rec.id,
-            date: dateStr,
-            status: rec.status,
-            courseName: crs?.name || '',
-            groupName: grp?.name || '',
-            room: sess?.room || grp?.room || '',
-            branch: grp?.branch || studentBranch
-          };
-        });
-
-      const examsSnapshot = studentGrades.map((grade: any) => {
-        const assessment = allAssessments?.find((a: any) => a.id === grade.assessmentId);
-        const numericGrade = typeof grade.grade === 'number' ? grade.grade : parseFloat(grade.grade as string) || 0;
-        const maxGrade = assessment?.maxGrade || 100;
-        const percentage = maxGrade > 0 ? Math.round((numericGrade / maxGrade) * 100) : 0;
-        return {
-          id: grade.id,
-          name: assessment?.name || 'اختبار',
-          grade: numericGrade,
-          maxGrade: maxGrade,
-          date: assessment?.date || (grade.gradedAt ? new Date(grade.gradedAt).toISOString().split('T')[0] : ''),
-          type: assessment?.type || 'exam',
-          percentage
-        };
-      });
-
-      const payload = {
-        student: {
-          id,
-          name: student.name,
-          studentCode: student.studentCode || normalizeStudentCode(student.studentCode),
-          lookup_code: student.lookup_code,
-          gradeLevel: student.gradeLevel,
-          school: student.school,
-          phone: student.phone,
-          parentPhone: student.parentPhone,
-          parentName: student.parentName,
-          branch: studentBranch
-        },
-        teacherName,
-        academyName,
-        centerName: academyName,
-        branch: studentBranch,
-        attendance: {
-          attended,
-          missed,
-          total,
-          rate,
-          sessions: sessionsList
-        },
-        exams: examsSnapshot,
-        subscription: {
-          status: currentSub?.status || 'no_record',
-          month: currentMonth,
-          year: currentYear,
-          amountTotal: currentSub?.amountTotal || 0,
-          amountPaid: currentSub?.amountPaid || 0
-        }
-      };
-
-      setLookupError(null);
-      let res: { token: string; url: string } | null = null;
-      try {
-        const sessionToken = await getToken();
-        res = await requestStudentLookupToken(id, undefined, sessionToken);
-      } catch (srvErr) {
-        console.warn('[Sync lookup] Server lookup request failed:', srvErr);
-      }
-
-      if (res?.token && res?.url) {
-        setLookupError(null);
-        await updateStudent.mutateAsync({
-          id: student.id,
-          data: { lookup_code: res.token, lookup_url: res.url }
-        });
-        if (showToast) {
-          toast.success('تمت مزامنة وتحديث بيانات متابعة الطالب بنجاح!');
-        }
-      } else {
-        setLookupError('تعذر إنشاء الرابط');
-        if (showToast) {
-          toast.error('تعذر إنشاء رابط المتابعة للطالب');
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      if (showToast) {
-        toast.error('حدث خطأ أثناء مزامنة البيانات');
-      }
-    } finally {
-      setLoadingSync(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'lookup' && student) {
-      handleSyncLookup(false);
-    }
-  }, [activeTab, id, student?.id]);
 
   const [isEditStudentModalOpen, setIsEditStudentModalOpen] = useState(false);
   const [isEditPricingModalOpen, setIsEditPricingModalOpen] = useState(false);
@@ -389,7 +195,6 @@ export function StudentDetails() {
           { id: 'grades', label: 'الامتحانات', icon: GraduationCap },
           { id: 'history', label: 'تاريخ التسجيل', icon: Activity },
           { id: 'info', label: 'البيانات الشخصية', icon: User },
-          { id: 'lookup', label: 'رابط متابعة ولي الأمر', icon: Globe },
         ].map(tab => (
           <button
             key={tab.id}
@@ -923,116 +728,6 @@ export function StudentDetails() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-
-        {/* PUBLIC LOOKUP TAB */}
-        {activeTab === 'lookup' && (
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">رابط المتابعة العام لولي الأمر والطالب</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  رابط مختصر ورمز الـ QR يمكن للطالب وولي الأمر استخدامه لمتابعة الحضور والدرجات والاشتراكات مباشرة.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleSyncLookup(true)}
-                disabled={loadingSync}
-                className="px-4 py-2 text-xs font-bold text-white bg-slate-900 dark:bg-slate-800 rounded-lg hover:bg-slate-850 dark:hover:bg-slate-700 transition-colors cursor-pointer inline-flex items-center gap-1.5 shrink-0"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingSync ? 'animate-spin' : ''}`} />
-                <span>تحديث وتزامن البيانات المباشرة</span>
-              </button>
-            </div>
-
-            {!hasLookupUrl ? (
-              <div className="p-8 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 rounded-xl flex flex-col items-center justify-center text-center space-y-4">
-                <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-full flex items-center justify-center border border-slate-200 dark:border-slate-800 shadow-sm">
-                  {lookupError ? <AlertTriangle className="w-8 h-8 text-red-500" /> : <Globe className="w-8 h-8 text-slate-300 dark:text-slate-600" />}
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">
-                    {lookupError ? 'تعذر إنشاء الرابط' : 'لم يتم إنشاء رابط المتابعة لهذا الطالب بعد'}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-                    {lookupError 
-                      ? 'حدث خطأ أثناء التواصل مع خادم مسار لاستخراج رمز المتابعة المشفر. يرجى الضغط على الزر أدناه لإعادة المحاولة.'
-                      : 'رابط المتابعة يسمح لولي الأمر بالاطلاع على مستوى الطالب وحضوره ودرجاته في أي وقت عبر رابط آمن وخاص.'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleSyncLookup(true)}
-                  disabled={loadingSync}
-                  className="px-6 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-xl transition-all shadow-lg shadow-blue-500/20 cursor-pointer flex items-center gap-2"
-                >
-                  {loadingSync ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-                  <span>{lookupError ? 'إعادة محاولة إنشاء الرابط' : 'إنشاء رابط المتابعة وتفعيل الخدمة الآن'}</span>
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <div className="md:col-span-2 space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">رابط المشاركة المباشر:</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={shortLookupUrl}
-                        dir="ltr"
-                        className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono font-bold text-slate-700 dark:text-slate-300 outline-none select-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleCopyLink}
-                        className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                          copied
-                            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400'
-                        }`}
-                        title="نسخ الرابط"
-                      >
-                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                      <a
-                        href={shortLookupUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-lg transition-colors animate-none"
-                        title="فتح الرابط في نافذة جديدة"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 rounded-xl space-y-2">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      <span>رمز ورابط موحد لكارت الطالب وصفحة المتابعة</span>
-                    </h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      هذا الرابط يمكن للطالب وولي الأمر استخدامه لمتابعة الحضور والدرجات والاشتراكات مباشرة. عند فتح الرابط يتم عرض البيانات المحدثة.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800 rounded-xl">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3 font-semibold">رمز الـ QR المباشر (المطابق للكارت):</span>
-                  {qrCodeUrl ? (
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
-                      <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" />
-                    </div>
-                  ) : (
-                    <div className="w-40 h-40 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
-                  )}
-                  <span className="text-[10px] text-slate-400 mt-2 text-center font-medium">نفس رمز الـ QR الموجود على ظهر كارت الطالب</span>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

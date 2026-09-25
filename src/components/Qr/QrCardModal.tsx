@@ -9,7 +9,6 @@ import { Student, QrCard, CardCustomDesign } from '../../types';
 import { useApiMutation } from '../../config/queryHooks';
 import { QrCardBadge, CardThemeColor } from './QrCardBadge';
 import { matchStudent, normalizeStudentCode } from '../../utils/studentCode';
-import { requestStudentLookupToken } from '../../services/lookupSyncService';
 
 interface QrCardModalProps {
   isOpen: boolean;
@@ -156,10 +155,6 @@ export function QrCardModal({
           });
         }
 
-        if (selectedStudentId) {
-          requestStudentLookupToken(selectedStudentId).catch(() => {});
-        }
-
         const id = uuidv4();
         generatedCards.push({
           id,
@@ -213,7 +208,6 @@ export function QrCardModal({
         }
       } else if (mode === 'batch_unassigned_students') {
         for (const stu of unassignedStudents) {
-          requestStudentLookupToken(stu.id).catch(() => {});
           const id = uuidv4();
           let serial = stu.studentCode ? stu.studentCode.replace(/\D/g, '') : '';
           if (!serial) {

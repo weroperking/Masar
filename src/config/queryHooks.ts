@@ -3,7 +3,6 @@ import { db } from '../db/db';
 import { useAuth } from '@clerk/clerk-react';
 import { processSyncQueue } from '../services/syncService';
 import { decryptRecord, encryptRecord, Envelope } from '../services/cryptoService';
-import { syncAllStudentsToLookupServer } from '../services/lookupSyncService';
 import { useState, useEffect } from 'react';
 
 /**
@@ -98,10 +97,8 @@ export function useApiQuery<T extends { id?: string; deleted_at?: number | null;
   };
 }
 
-function triggerPublicSync(resource: string) {
-  if (['students', 'attendanceRecords', 'attendanceSessions', 'assessments', 'assessmentGrades', 'monthlySubscriptions', 'enrollments', 'courses', 'groups', 'settings'].includes(resource)) {
-    syncAllStudentsToLookupServer().catch(() => {});
-  }
+function triggerPublicSync(_resource: string) {
+  // Public student lookup sync disabled
 }
 
 export function useApiMutation<T extends { id?: string }>(resource: string) {

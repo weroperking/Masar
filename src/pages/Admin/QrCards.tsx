@@ -18,7 +18,6 @@ import { QrCardViewModal } from '../../components/Qr/QrCardViewModal';
 import { QrPrintSheetModal } from '../../components/Qr/QrPrintSheetModal';
 import { QrCardBadge } from '../../components/Qr/QrCardBadge';
 import { SimplifiedCardDesigner } from '../../components/Qr/SimplifiedCardDesigner';
-import { requestStudentLookupToken } from '../../services/lookupSyncService';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -162,8 +161,6 @@ export function QrCards() {
         printStatus: 'available'
       }
     });
-
-    requestStudentLookupToken(studentId).catch(() => {});
 
     if (selectedCardForView?.id === cardId) {
       setSelectedCardForView(prev => prev ? { ...prev, cardNumber: finalCode, qrCodeData: finalCode, studentId, linkedAt: now } : null);
