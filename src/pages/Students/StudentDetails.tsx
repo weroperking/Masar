@@ -16,7 +16,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import { Enrollment, MonthlySubscription, Student, Settings } from '../../types';
 import { StudentFormModal } from './Students';
 import { calculateEnrollmentFee, syncStudentMonthlySubscriptions, recordLedgerRevenue } from '../../utils/pricing';
-import { buildStudentLookupUrl, normalizeStudentCode } from '../../utils/studentCode';
+import { normalizeStudentCode } from '../../utils/studentCode';
 import { API_BASE_URL } from '../../config/api';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { useAuth } from '@clerk/clerk-react';
@@ -43,14 +43,10 @@ export function StudentDetails() {
 
   const [lookupError, setLookupError] = useState<string | null>(null);
 
-  // The exact canonical opaque URL returned by requestStudentLookupToken()
-  const shortLookupUrl = useMemo(() => {
-    if (student?.lookup_url) return student.lookup_url;
-    if (student?.lookup_code) {
-      return buildStudentLookupUrl(student.lookup_code);
-    }
-    return '';
-  }, [student?.lookup_url, student?.lookup_code]);
+  // The exact canonical opaque URL returned verbatim by the backend.
+  // NEVER reconstructed locally from lookup_code. If the backend has not
+  // supplied lookup_url, there is no link to show.
+  const shortLookupUrl = student?.lookup_url || '';
   const hasLookupUrl = Boolean(shortLookupUrl);
 
   // Generate the simple, low-density QR code identical to the card back

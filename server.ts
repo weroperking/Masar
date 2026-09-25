@@ -490,81 +490,12 @@ async function startServer() {
   app.get('/api/students/:id', handleGetStudent);
   app.get('/students/:id', handleGetStudent);
 
-  // Generate / Regenerate Lookup Token for a Student
-  const handleGenerateLookupToken = (req: express.Request, res: express.Response) => {
-    const { id } = req.params;
-    const body = req.body || {};
-
-    // Invalidate and remove old token if it exists
-    const existingToken = studentToTokenMap.get(id);
-    if (existingToken) {
-      lookupTokensMap.delete(existingToken);
-      studentToTokenMap.delete(id);
-    }
-
-    // Generate fresh canonical base64url token (<prefix>:<id>)
-    const newToken = Buffer.from(`std:${id}`).toString('base64url');
-
-    const studentInfo = body.student || {
-      id,
-      name: body.name || 'طالب مسار',
-      studentCode: body.studentCode || '',
-      gradeLevel: body.gradeLevel || '',
-      school: body.school || ''
-    };
-
-    const attendanceInfo = body.attendance || {
-      attended: 0,
-      missed: 0,
-      total: 0,
-      rate: 100
-    };
-
-    const examsInfo = Array.isArray(body.exams) ? body.exams : [];
-    const subscriptionInfo = body.subscription || {
-      status: 'no_record',
-      month: new Date().getMonth() + 1,
-      year: new Date().getFullYear(),
-      amountTotal: 0,
-      amountPaid: 0
-    };
-
-    const record: LookupData = {
-      student: {
-        id,
-        name: studentInfo.name,
-        studentCode: studentInfo.studentCode,
-        gradeLevel: studentInfo.gradeLevel,
-        school: studentInfo.school,
-        phone: studentInfo.phone || body.phone || '',
-        parentPhone: studentInfo.parentPhone || body.parentPhone || '',
-        parentName: studentInfo.parentName || body.parentName || '',
-        branch: studentInfo.branch || body.branch || ''
-      },
-      teacherName: body.teacherName || undefined,
-      academyName: body.academyName || undefined,
-      centerName: body.centerName || body.academyName || undefined,
-      branch: body.branch || studentInfo.branch || undefined,
-      attendance: attendanceInfo,
-      exams: examsInfo,
-      subscription: subscriptionInfo
-    };
-
-    indexLookupRecord(record, newToken);
-    savePersistedLookupData();
-
-    console.log(`[API] Generated and persisted new public lookup token for student ${id} (${studentInfo.name}): ${newToken}`);
-
-    res.status(200).json({
-      success: true,
-      token: newToken,
-      public_lookup_token: newToken,
-      url: `https://app.masar.top/p/s/${newToken}`
-    });
-  };
-
-  app.post('/api/students/:id/lookup-token', handleGenerateLookupToken);
-  app.post('/students/:id/lookup-token', handleGenerateLookupToken);
+  // NOTE: Lookup token minting is intentionally ABSENT from this server.
+  // Lookup codes are minted exclusively by the authoritative backend
+  // (Cloudflare Worker e56f9d58-9f3b-4339-871e-3000d5737cb1) as
+  // base64url("<org.lookup_prefix>:<student.id>"). This origin must never
+  // generate, guess, or reconstruct a lookup token or a /p/s/ URL, otherwise
+  // locally-synthesized tokens mask a failing real backend.
 
   // Sync / Update Live Data for Student Lookup Token
   const handleUpdateLookupData = (req: express.Request, res: express.Response) => {

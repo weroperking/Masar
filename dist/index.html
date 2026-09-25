@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>مسار — حصصك من غير دوشة</title>
+    <meta name="description" content="مسار — حصصك من غير دوشة" />
+    <meta property="og:title" content="مسار — حصصك من غير دوشة" />
+    <meta property="og:description" content="مسار — حصصك من غير دوشة" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2563eb" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Readex+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script type="module" crossorigin src="/assets/index-CmgFo9Mb.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-9s92qVlK.css">
+  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // Dev-only: unregister any stale service worker that is serving the built
+      // bundle instead of live Vite modules. Plain <script> on purpose — no import.meta,
+      // no module context. Hostname-gated so production is unaffected.
+      if (
+        location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1' ||
+        location.hostname.includes('run.app')
+      ) {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (rs) {
+            rs.forEach(function (r) { r.unregister(); });
+          });
+        }
+        if (window.caches) {
+          caches.keys().then(function (ks) {
+            ks.forEach(function (k) { caches.delete(k); });
+          });
+        }
+      }
+    </script>
+  </body>
+</html>
+

@@ -38,18 +38,97 @@ export function getActiveOrgId(): string {
   return currentActiveOrgId;
 }
 
+/**
+ * Diagnostics helper: reports whether a token getter was ever registered via
+ * registerAuthTokenGetter(), and whether window.Clerk is loaded with an active session.
+ * Used by the lookup-token call path to explain a falsy getClerkToken() result.
+ */
+export function getClerkTokenDiagnostics() {
+  const clerk = typeof window !== 'undefined' ? (window as any).Clerk : undefined;
+  return {
+    hasGlobalTokenGetter: Boolean(globalTokenGetter),
+    hasWindowClerk: Boolean(clerk),
+    clerkLoaded: Boolean(clerk?.loaded),
+    hasClerkSession: Boolean(clerk?.session)
+  };
+}
+
+/**
+ * Waits (bounded) for a condition to become true.
+ */
+async function waitFor(predicate: () => boolean, timeoutMs: number, intervalMs = 100): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return true;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return predicate();
+}
+
+/**
+ * Resolves a Clerk session token.
+ *
+ * The app treats itself as "has a session" when `clerk.client.sessions.length > 0`,
+ * even while `clerk.session` (the ACTIVE session) is still null — activation happens
+ * in a separate async effect. `useAuth().getToken()` binds to the ACTIVE session, so
+ * during that window it resolves to `null`. Previously we returned that null straight
+ * to the caller, which then issued an unauthenticated request.
+ *
+ * We now wait for Clerk to load and for an active session (activating one if needed)
+ * before concluding the token is genuinely absent.
+ */
 export async function getClerkToken(): Promise<string | null> {
+  // 1. Registered getter (useAuth().getToken). Retry across the activation window.
   if (globalTokenGetter) {
-    try {
-      const t = await globalTokenGetter();
-      if (t) return t;
-    } catch {}
+    const deadline = Date.now() + 8_000;
+    for (;;) {
+      try {
+        const t = await globalTokenGetter();
+        if (t) return t;
+      } catch (err) {
+        console.warn('[getClerkToken] registered getter threw:', err);
+      }
+      if (Date.now() >= deadline) break;
+      const clerk = typeof window !== 'undefined' ? (window as any).Clerk : undefined;
+      // Nothing to wait for if Clerk is loaded and already has an active session.
+      if (clerk?.loaded && clerk.session && Date.now() >= deadline - 7_000) break;
+      await new Promise((r) => setTimeout(r, 150));
+    }
   }
-  if (typeof window !== 'undefined' && (window as any).Clerk?.session) {
-    try {
-      return await (window as any).Clerk.session.getToken();
-    } catch {}
+
+  // 2. Fallback: wait for Clerk to finish loading, then for an active session.
+  if (typeof window !== 'undefined') {
+    const clerk = (window as any).Clerk;
+    if (clerk) {
+      await waitFor(() => Boolean(clerk.loaded), 5_000).catch(() => false);
+
+      if (!clerk.session) {
+        const sessions = clerk.client?.sessions ?? [];
+        const candidate = sessions.find((s: any) => s?.status === 'active') || sessions[0];
+        if (candidate?.id) {
+          try {
+            console.log('[getClerkToken] no active session yet, activating', candidate.id);
+            await clerk.setActive({ session: candidate.id });
+          } catch (err) {
+            console.warn('[getClerkToken] setActive failed:', err);
+          }
+        }
+      }
+
+      await waitFor(() => Boolean(clerk.session), 5_000).catch(() => false);
+
+      if (clerk.session) {
+        try {
+          const t = await clerk.session.getToken();
+          if (t) return t;
+        } catch (err) {
+          console.warn('[getClerkToken] session.getToken() threw:', err);
+        }
+      }
+    }
   }
+
+  console.warn('[getClerkToken] no Clerk session token available after waiting.', getClerkTokenDiagnostics());
   return null;
 }
 

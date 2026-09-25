@@ -1,9 +1,9 @@
 import { db } from '../db/db';
 import { decryptRecord, Envelope } from './cryptoService';
 import { isNotDeleted } from '../config/queryHooks';
-import { normalizeStudentCode, STUDENT_LOOKUP_PATH_PREFIX } from '../utils/studentCode';
+import { normalizeStudentCode } from '../utils/studentCode';
 import { API_BASE_URL } from '../config/api';
-import { getClerkToken } from './syncService';
+import { getClerkToken, getClerkTokenDiagnostics } from './syncService';
 import { Student, Course, Group, Enrollment, AttendanceRecord, AttendanceSession, Assessment, AssessmentGrade, MonthlySubscription, Settings } from '../types';
 
 async function getDecryptedTable<T extends { id?: string; envelope?: any; deleted_at?: number | null; deletedAt?: number | null }>(tableName: string): Promise<T[]> {
@@ -213,11 +213,33 @@ export async function requestStudentLookupToken(
   if (!studentId) return null;
   try {
     const token = sessionToken || (await getClerkToken());
+    console.log('[lookup-token] token:', token);
+
+    // TEMPORARY DIAGNOSTIC (Task 1a): proves where a falsy token comes from.
+    console.log('[lookup-token] diagnostics', {
+      studentId,
+      hasSessionToken: Boolean(sessionToken),
+      sessionTokenType: typeof sessionToken,
+      resolvedTokenType: typeof token,
+      resolvedTokenLength: typeof token === 'string' ? token.length : -1,
+      ...getClerkTokenDiagnostics()
+    });
+
+    // A missing session token is a client-side state error, not a server request.
+    // Sending an unauthenticated POST only produces a 401/404 and hides the real bug.
+    if (!token) {
+      console.warn(
+        '[lookupSyncService] Refusing to POST lookup-token: no Clerk session token available. No request sent.',
+        { studentId, ...getClerkTokenDiagnostics() }
+      );
+      return null;
+    }
+
     const primaryUrl = `https://masar-api.weroperking.workers.dev/api/students/${studentId}/lookup-token`;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      'Authorization': `Bearer ${token}`
     };
 
     const res = await fetch(primaryUrl, {
@@ -228,8 +250,10 @@ export async function requestStudentLookupToken(
     if (res.ok) {
       const data = await res.json();
       const lookupToken = data.public_lookup_token || data.token || data.lookup_code;
-      const lookupUrl = data.url || (lookupToken ? `https://app.masar.top/p/s/${lookupToken}` : '');
-      if (lookupToken) {
+      // The URL is opaque. It MUST come from the backend verbatim.
+      // Never parse it, never reconstruct it, never substitute any part of it.
+      const lookupUrl: unknown = data.url;
+      if (lookupToken && typeof lookupUrl === 'string' && lookupUrl.length > 0) {
         try {
           const student = await db.students.get(studentId);
           if (student) {
@@ -242,14 +266,9 @@ export async function requestStudentLookupToken(
         } catch (dbErr) {
           console.warn('[lookupSyncService] Could not update local Dexie student lookup_code/url:', dbErr);
         }
-        const result = {
-          token: lookupToken,
-          url: lookupUrl,
-          toString() { return this.token; },
-          valueOf() { return this.token; }
-        };
-        return result;
+        return { token: lookupToken, url: lookupUrl };
       }
+      console.warn('[lookupSyncService] Backend response missing a canonical url; refusing to synthesize one.', { hasToken: Boolean(lookupToken), hasUrl: typeof lookupUrl === 'string' });
     } else {
       console.warn(`[lookupSyncService] Primary target ${primaryUrl} returned ${res.status}:`, await res.text().catch(() => ''));
     }
