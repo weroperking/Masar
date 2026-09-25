@@ -29,7 +29,7 @@ export function ExportCardOrderModal({
   const [toId, setToId] = useState<string>(
     totalStudents > 0 ? String(1000 + totalStudents) : '1100'
   );
-  const [notes, setNotes] = useState<string>('طباعة كروت بلاستيكية PVC صلبة عالية الجودة مع تغليف لامع مقاوم للماء والتلف.');
+  const [notes, setNotes] = useState<string>('طباعة كروت وهوية بلاستيكية صلبة عالية الجودة مع تغليف لامع مقاوم للماء والتلف.');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   // Process: Download both HD images and automatically trigger WhatsApp in the background
@@ -168,7 +168,7 @@ export function ExportCardOrderModal({
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <Hash className="w-3.5 h-3.5 text-blue-500" />
-                    <span>من كود الطالب (From ID):</span>
+                    <span>من كود الطالب:</span>
                   </label>
                   <input
                     type="text"
@@ -182,7 +182,7 @@ export function ExportCardOrderModal({
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <Hash className="w-3.5 h-3.5 text-blue-500" />
-                    <span>إلى كود الطالب (To ID):</span>
+                    <span>إلى كود الطالب:</span>
                   </label>
                   <input
                     type="text"

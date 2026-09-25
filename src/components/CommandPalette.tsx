@@ -74,7 +74,7 @@ export function CommandPalette({
     { id: 'nav-reports', title: 'التقارير والتحليلات', subtitle: 'تصدير التقارير ومؤشرات الأداء', category: 'صفحات', icon: BarChart3, action: () => navigate('/reports') },
     { id: 'nav-users', title: 'المستخدمين والصلاحيات', subtitle: 'إدارة طاقم العمل', category: 'صفحات', icon: UserCog, action: () => navigate('/users') },
     { id: 'nav-settings', title: 'الإعدادات العامة', subtitle: 'تخصيص السنتر والعملة', category: 'صفحات', icon: Settings, action: () => navigate('/settings') },
-    { id: 'nav-qrcards', title: 'بطاقات QR للطلاب', subtitle: 'طباعة كروت الباركود', category: 'صفحات', icon: QrCode, action: () => navigate('/qrcards') },
+    { id: 'nav-qrcards', title: 'بطاقات وكروت الباركود', subtitle: 'تصميم وطباعة كروت الطلاب', category: 'صفحات', icon: QrCode, action: () => navigate('/qrcards') },
   ];
 
   // Quick actions

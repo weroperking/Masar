@@ -21,7 +21,7 @@ export const ADMIN_TOUR_STEPS: TourStep[] = [
     preferredPosition: 'center',
     whatIsIt: 'تم تفعيل حساب السنتر بنجاح وتم منحك 25% كرصيد تقدم فوري في إعداد المنصة! دعنا نكمل الخطوات المتبقية معاً.',
     howToUse: 'ستأخذك هذه الجولة التفاعلية خطوة بخطوة للتعرف على كل أركان المنصة وكيفية إدارة الكورسات، المجموعات، الطلاب، والماليات بأسهل طريقة.',
-    whyItMatters: 'صُممت مسار لتعمل محلياً (Offline-First) بسرعة استجابة لحظية مع مزامنة سحابية آمنة لحماية بيانات طلابك وحساباتك.'
+    whyItMatters: 'صُممت مسار لتعمل حتى دون الحاجة للإنترنت وبسرعة استجابة فائقة مع حفظ سحابي آمن لحماية بيانات طلابك وحساباتك.'
   },
   {
     id: 'header-search',
@@ -36,23 +36,23 @@ export const ADMIN_TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'header-sync',
-    title: 'مؤشر المزامنة والحفظ المحلي (Offline-First) 🔄',
+    title: 'مؤشر حفظ البيانات والاتصال 🔄',
     badge: 'الأمان والسرعة',
     selector: '#tour-header-sync',
     route: '/',
     preferredPosition: 'bottom',
-    whatIsIt: 'نظام مراقبة حالة الاتصال والمزامنة التلقائية مع السحابة وقاعدة البيانات المحلية.',
+    whatIsIt: 'نظام مراقبة حالة الاتصال والحفظ التلقائي للبيانات لحمايتها وضمان عملها دون انقطاع.',
     howToUse: 'يعرض المؤشر حالة اتصالك بالإنترنت تلقائياً. وفي حال انقطاع الشبكة، تستمر المنصة بالعمل بكامل وظائفها، وتتم مزامنة أي تعديلات فور عودة الاتصال بنقرة واحدة.',
     whyItMatters: 'يضمن استمرار عمل السنتر أو الأكاديمية أثناء انقطاع الإنترنت دون توقف تسجيل الحضور أو الدفعات.'
   },
   {
     id: 'header-user',
-    title: 'الملف الشخصي وقفل الحساب (PIN & Profiles) 👤',
+    title: 'الملف الشخصي وقفل الأمان 👤',
     badge: 'الأمان والملفات',
     selector: '#tour-header-user',
     route: '/',
     preferredPosition: 'bottom',
-    whatIsIt: 'نظام إدارة ملف المعلم (المدير) وملف المساعدين المستقل، مع قفل الشاشة السريع بـ PIN.',
+    whatIsIt: 'نظام إدارة حساب المعلم (المدير) وحساب المساعدين، مع إمكانية قفل الشاشة السريع برمز سري.',
     howToUse: 'انقر على صورتك للتبديل بين ملف المعلم وملف المساعدين، أو قفل الشاشة فوراً عند مغادرة المكتب. كما يقفل النظام تلقائياً بعد 15 دقيقة خمول لحماية بياناتك.',
     whyItMatters: 'يضمن سرية تامة لأرباحك وخزينتك؛ حيث يتم حجب كل التقارير والماليات والإعدادات تلقائياً عند تفعيل ملف المساعدين.'
   },
@@ -71,7 +71,7 @@ export const ADMIN_TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'courses-add',
-    title: 'إضافة مادة دراسية جديدة (Add Course) ➕',
+    title: 'إضافة مادة دراسية جديدة ➕',
     badge: 'إعداد المنهج',
     selector: '#tour-courses-add-btn',
     route: '/courses',
@@ -139,7 +139,7 @@ export const ADMIN_TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'nav-attendance',
-    title: 'الحضور والغياب والتحضير السريع (QR Scanner) 📷',
+    title: 'الحضور والغياب والتحضير السريع (مسح الباركود) 📷',
     badge: 'العمليات اليومية',
     selector: '#tour-nav-attendance',
     route: '/qrcards',
@@ -196,7 +196,7 @@ export const ADMIN_TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'nav-sessionPayments',
-    title: 'مدفوعات الحصص (Pay-as-you-go) 🪙',
+    title: 'مدفوعات الحصص (الدفع بالحصة) 🪙',
     badge: 'سداد الحصص',
     selector: '#tour-nav-sessionPayments',
     route: '/payments',
@@ -207,7 +207,7 @@ export const ADMIN_TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'nav-ledgers',
-    title: 'السجلات المالية والخزينة (Ledger) 📊',
+    title: 'السجلات المالية والخزينة العامة 📊',
     badge: 'الخزينة والمصروفات',
     selector: '#tour-nav-ledgers',
     route: '/sessionPayments',
@@ -345,7 +345,7 @@ export const ASSISTANT_TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'assistant-sessionPayments',
-    title: 'تحصيل مدفوعات الحصص (Pay-as-you-go) 🪙',
+    title: 'تحصيل مدفوعات الحصص (الدفع بالحصة) 🪙',
     badge: 'التحصيل الميداني',
     selector: '#tour-nav-sessionPayments',
     route: '/schedule',

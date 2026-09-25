@@ -198,3 +198,45 @@ export async function syncAllStudentsToLookupServer(): Promise<void> {
     }
   }, 1000);
 }
+
+/**
+ * Calls POST /api/students/:id/lookup-token on the server to generate/fetch the canonical lookup token
+ * for a student, updating the local database record and returning the token details.
+ */
+export async function requestStudentLookupToken(
+  studentId: string,
+  payload?: any,
+  sessionToken?: string | null
+): Promise<{ token: string; url: string } | null> {
+  if (!studentId) return null;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/students/${studentId}/lookup-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {})
+      },
+      body: JSON.stringify(payload || {})
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const token = data.public_lookup_token || data.token || data.lookup_code;
+      if (token) {
+        try {
+          const student = await db.students.get(studentId);
+          if (student) {
+            await db.students.update(studentId, { lookup_code: token, updated_at: Date.now() });
+          }
+        } catch (dbErr) {
+          console.warn('[lookupSyncService] Could not update local Dexie student lookup_code:', dbErr);
+        }
+        return { token, url: data.url || `/p/s/${token}` };
+      }
+    }
+  } catch (err) {
+    console.warn('[lookupSyncService] Failed calling POST /api/students/:id/lookup-token:', err);
+  }
+  return null;
+}
+

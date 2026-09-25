@@ -137,7 +137,7 @@ export function CustomAuth() {
         });
         setView('verify_signin_otp');
       } else {
-        setError('لا يمكن إرسال رمز OTP لهذا الحساب.');
+        setError('لا يمكن إرسال رمز التحقق لهذا الحساب.');
       }
     } catch (err: any) {
       const errCode = err.errors?.[0]?.code;
@@ -428,8 +428,8 @@ export function CustomAuth() {
               <p className="text-slate-500 dark:text-slate-400 text-sm mt-3 leading-relaxed">
                 {view === 'signin' && 'أهلاً بك مجدداً! قم بتسجيل الدخول للبدء.'}
                 {view === 'signup' && 'ابدأ الآن في إدارة حصصك، طلابك، ومصروفاتك في مكان واحد.'}
-                {view === 'verify_signup' && 'أدخل رمز التحقق (OTP) المكوّن من 6 أرقام لتأكيد حسابك.'}
-                {(view === 'verify_signin' || view === 'verify_signin_otp') && 'أدخل رمز التحقق (OTP) المرسل إلى بريدك لتسجيل الدخول.'}
+                {view === 'verify_signup' && 'أدخل رمز التحقق المكوّن من 6 أرقام لتأكيد حسابك.'}
+                {(view === 'verify_signin' || view === 'verify_signin_otp') && 'أدخل رمز التحقق المرسل إلى بريدك لتسجيل الدخول.'}
               </p>
 
               {isVerifyView && email && (
@@ -717,7 +717,7 @@ export function CustomAuth() {
                 className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span>تفريغ الجلسات السابقة وتحديث الصفحة</span>
+                <span>تسجيل الخروج والبدء من جديد</span>
               </button>
             </div>
 

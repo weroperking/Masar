@@ -18,6 +18,7 @@ import { QrCardViewModal } from '../../components/Qr/QrCardViewModal';
 import { QrPrintSheetModal } from '../../components/Qr/QrPrintSheetModal';
 import { QrCardBadge } from '../../components/Qr/QrCardBadge';
 import { SimplifiedCardDesigner } from '../../components/Qr/SimplifiedCardDesigner';
+import { requestStudentLookupToken } from '../../services/lookupSyncService';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -94,9 +95,7 @@ export function QrCards() {
       }
     } catch (err: any) {
       console.error('Failed to save cards', err);
-      const errorMessage = err?.message || err?.toString() || 'Internal Server Error';
-      const statusCode = err?.response?.status || err?.status || '500';
-      toast.error(`حدث خطأ أثناء حفظ البطاقات: ${statusCode} - ${errorMessage}`);
+      toast.error('حدث خطأ أثناء حفظ البطاقات، يرجى المحاولة مرة أخرى.');
     }
   };
 
@@ -163,6 +162,8 @@ export function QrCards() {
         printStatus: 'available'
       }
     });
+
+    requestStudentLookupToken(studentId, { student: { id: studentId, studentCode: finalCode, name: student?.name } }).catch(() => {});
 
     if (selectedCardForView?.id === cardId) {
       setSelectedCardForView(prev => prev ? { ...prev, cardNumber: finalCode, qrCodeData: finalCode, studentId, linkedAt: now } : null);
@@ -518,7 +519,7 @@ export function QrCards() {
         throw new Error('تعذر التقاط صورة المعاينة للكارت، يرجى المحاولة لاحقاً.');
       }
 
-      setOrderStatus('📊 جاري تجميع كود الطلاب وتحويل البيانات الأساسية لملف Excel...');
+      setOrderStatus('📊 جاري تجهيز بيانات الطلاب وتصديرها لملف إكسيل...');
 
       // 2. Dispatch to backend API
       const payload = {
@@ -551,7 +552,7 @@ export function QrCards() {
         });
         toast.success('تم إرسال تصميم الكارت وكشف الطلاب للمطبعة بنجاح!');
       } else {
-        throw new Error(data.error || 'Unknown backend error');
+        throw new Error(data.error || 'تعذر إتمام الطلب، يرجى المحاولة لاحقاً');
       }
     } catch (err: any) {
       console.error('[Order PVC] Physical cards dispatch failed:', err);
@@ -572,7 +573,7 @@ export function QrCards() {
             <span>بطاقات الحضور الذكية (QR)</span>
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            إصدار كروت الحضور ومسح الباركود، تصميم هويتك الأكاديمية وطلب الكروت البلاستيكية (PVC)
+            إصدار كروت الحضور ومسح الباركود، تصميم هويتك الأكاديمية وطلب الكروت البلاستيكية المطبوعة
           </p>
         </div>
 

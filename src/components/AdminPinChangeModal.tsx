@@ -35,17 +35,17 @@ export function AdminPinChangeModal({
     setErrorMsg('');
 
     if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
-      setErrorMsg('رمز PIN الجديد يجب أن يتكون من 4 أرقام بالضبط');
+      setErrorMsg('رمز الدخول الجديد يجب أن يتكون من 4 أرقام بالضبط');
       return;
     }
 
     if (newPin !== confirmPin) {
-      setErrorMsg('رمز PIN الجديد وتأكيده غير متطابقين');
+      setErrorMsg('رمز الدخول الجديد وتأكيده غير متطابقين');
       return;
     }
 
     if (isForcedMode && newPin === '1234') {
-      setErrorMsg('يجب اختيار رمز PIN جديد مختلف عن الرمز الافتراضي 1234');
+      setErrorMsg('يجب اختيار رمز دخول جديد مختلف عن الرمز الافتراضي 1234');
       return;
     }
 
@@ -54,7 +54,7 @@ export function AdminPinChangeModal({
       if (!isForcedMode && currentPin && currentPin.trim() !== '') {
         const isCurrentValid = await verifyPin(orgId, 'admin', currentPin.trim());
         if (!isCurrentValid) {
-          setErrorMsg('رمز PIN الحالي غير صحيح');
+          setErrorMsg('رمز الدخول الحالي غير صحيح');
           setIsLoading(false);
           return;
         }
@@ -65,7 +65,7 @@ export function AdminPinChangeModal({
         if (newPin !== '1234') {
           setForcePinChange(false);
         }
-        setSuccessMsg('تم تعيين رمز PIN الجديد بنجاح!');
+        setSuccessMsg('تم تعيين رمز الدخول الجديد بنجاح!');
         setTimeout(() => {
           onClose();
           setCurrentPin('');
@@ -74,7 +74,7 @@ export function AdminPinChangeModal({
           setSuccessMsg('');
         }, 1200);
       } else {
-        setErrorMsg(res.error || 'فشل تحديث رمز PIN');
+        setErrorMsg(res.error || 'تعذر تحديث رمز الدخول');
       }
     } catch (e: any) {
       setErrorMsg(e.message || 'حدث خطأ غير متوقع');
@@ -99,11 +99,11 @@ export function AdminPinChangeModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 font-['Readex_Pro']">
-                {isForcedMode ? 'عيّن رمزاً جديداً' : 'تغيير رمز PIN للمعلم (المدير)'}
+                {isForcedMode ? 'تعيين رمز دخول جديد' : 'تغيير رمز الدخول السري'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isForcedMode
-                  ? 'لتأمين بياناتك والماليات، يرجى تعيين رمز PIN جديد خاص بك'
+                  ? 'لتأمين بيانات الطلاب والماليات، يرجى تعيين رمز دخول سري خاص بك'
                   : 'تعديل رمز الدخول السري المكون من 4 أرقام'}
               </p>
             </div>
@@ -122,7 +122,7 @@ export function AdminPinChangeModal({
         {isForcedMode && (
           <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-300 text-xs rounded-xl flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 shrink-0" />
-            <span>يرجى تعيين رمز PIN جديد للدخول والوصول لكافة المعاملات المالية.</span>
+            <span>يرجى تعيين رمز دخول جديد لحماية حسابك والوصول لكافة المعاملات المالية.</span>
           </div>
         )}
 
@@ -145,7 +145,7 @@ export function AdminPinChangeModal({
             {!isForcedMode && (
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  رمز PIN الحالي
+                  رمز الدخول الحالي
                 </label>
                 <input
                   type="password"
@@ -162,7 +162,7 @@ export function AdminPinChangeModal({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  رمز PIN الجديد (4 أرقام)
+                  رمز الدخول الجديد (4 أرقام)
                 </label>
                 <input
                   type="password"
@@ -198,7 +198,7 @@ export function AdminPinChangeModal({
                 disabled={isLoading || newPin.length !== 4 || confirmPin.length !== 4}
                 className="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm cursor-pointer disabled:opacity-50"
               >
-                {isLoading ? 'جاري الحفظ...' : 'حفظ رمز PIN الجديد'}
+                {isLoading ? 'جاري الحفظ...' : 'حفظ رمز الدخول الجديد'}
               </button>
               {!isForcedMode && (
                 <button

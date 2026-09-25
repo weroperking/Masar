@@ -21,7 +21,7 @@ export function Courses() {
     const isConfirmed = await confirm({
       title: 'حذف المادة التعليمية',
       message: `هل أنت متأكد من حذف كورس (${name})؟`,
-      description: 'سيتم إزالة الكورس نهائياً من قاعدة البيانات.',
+      description: 'سيتم حذف الكورس وجميع بياناته المرتبطة نهائياً من المنصة.',
       confirmText: 'نعم، احذف الكورس',
       cancelText: 'إلغاء',
       variant: 'danger',

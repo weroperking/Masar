@@ -21,6 +21,7 @@ import { API_BASE_URL } from '../../config/api';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { useAuth } from '@clerk/clerk-react';
 import { triggerPennyDrop } from '../../components/PennyDropAnimation';
+import { requestStudentLookupToken } from '../../services/lookupSyncService';
 
 export function StudentDetails() {
   const { id } = useParams<{ id: string }>();
@@ -66,6 +67,23 @@ export function StudentDetails() {
       setQrCodeUrl('');
     }
   }, [shortLookupUrl]);
+
+  // Auto-request lookup token from server if missing on student record
+  useEffect(() => {
+    if (student && !student.lookup_code && id) {
+      getToken().then(tok => {
+        requestStudentLookupToken(
+          id,
+          { student: { id, name: student.name, studentCode: student.studentCode, phone: student.phone } },
+          tok
+        ).then(res => {
+          if (res?.token) {
+            updateStudent.mutate({ id, data: { lookup_code: res.token } });
+          }
+        }).catch(() => {});
+      });
+    }
+  }, [student?.id, student?.lookup_code, id, getToken]);
 
   const handleCopyLink = () => {
     if (!shortLookupUrl || !hasLookupCode) return;

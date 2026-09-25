@@ -30,7 +30,7 @@ export function QuickNewModal({
     {
       num: '1',
       title: 'إضافة طالب جديد',
-      desc: 'تسجيل طالب وبيانات ولي الأمر في قاعدة البيانات',
+      desc: 'تسجيل طالب جديد وبيانات ولي الأمر في المنصة',
       icon: Users,
       color: 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400',
       action: () => {

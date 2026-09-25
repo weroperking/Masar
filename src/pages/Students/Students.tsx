@@ -12,6 +12,7 @@ import { syncStudentMonthlySubscriptions } from '../../utils/pricing';
 import { getNextStudentCode, findStudentWithCode, normalizeStudentCode } from '../../utils/studentCode';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
 import { useAuth } from '@clerk/clerk-react';
+import { requestStudentLookupToken } from '../../services/lookupSyncService';
 
 export function Students() {
   const navigate = useNavigate();
@@ -103,10 +104,10 @@ export function Students() {
           <Link
             to="/qrcards"
             className="flex items-center px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 text-xs font-semibold"
-            title="طباعة وإدارة بطاقات وكروت الباركود والـ QR للطلاب"
+            title="طباعة وإدارة كروت وبطاقات الباركود للطلاب"
           >
             <QrCode className="w-3.5 h-3.5 ml-1.5 text-blue-600 dark:text-blue-400" />
-            <span>بطاقات وكروت الـ QR</span>
+            <span>بطاقات وكروت الباركود</span>
           </Link>
 
           {subscription?.limits?.max_students !== undefined && (students?.length || 0) >= subscription.limits.max_students ? (
@@ -283,7 +284,7 @@ export function Students() {
                             type="button"
                             onClick={() => navigate(`/qrcards?studentId=${student.id}`)}
                             className="p-1.5 text-slate-400 hover:text-blue-600 cursor-pointer dark:hover:text-blue-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="بطاقة وكود الـ QR للطالب"
+                            title="بطاقة وكارت الباركود للطالب"
                           >
                             <QrCode className="w-3.5 h-3.5" />
                           </button>
@@ -606,6 +607,9 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
           }
         }));
 
+        // Request / refresh lookup token for updated student
+        requestStudentLookupToken(existingStudent.id, { student: normalizedFormData }, token).catch(() => {});
+
         toast.success(`تم تحديث بيانات الطالب (${formData.name}) والرسوم بنجاح!`);
       } else {
         const newStudent = await createStudent.mutateAsync(normalizedFormData);
@@ -649,6 +653,9 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
           }
         }));
 
+        // Generate initial canonical lookup token for the newly created student
+        requestStudentLookupToken(newStudent.id, { student: normalizedFormData }, token).catch(() => {});
+
         toast.success(`تم تسجيل الطالب (${formData.name}) في المجموعات وتحديد رسومه بنجاح!`);
       }
       
@@ -691,7 +698,7 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
               <div className="flex items-center gap-1.5">
                 <Hash className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  كود الطالب التعريفي (Student ID)
+                  كود الطالب التعريفي
                 </span>
                 <span className="text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800 px-1.5 py-0.5 rounded font-medium">
                   {isEditingCode ? 'تعديل الكود' : (formData.studentCode && formData.studentCode !== suggestedNextCode && !existingStudent ? 'كود يدوي' : 'توليد تلقائي')}
@@ -699,7 +706,7 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {isEditingCode 
-                  ? 'قم بإدخال الكود المطلوب (أرقام أو حروف) للتحضير وطباعة الـ QR' 
+                  ? 'قم بإدخال الكود المطلوب للتحضير وطباعة كروت الباركود' 
                   : 'يمكنك تغيير كود الطالب للطباعة والمسح الضوئي بالضغط على زر القلم'}
               </p>
             </div>
@@ -752,7 +759,7 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
                     type="button"
                     onClick={() => setIsEditingCode(true)}
                     className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md cursor-pointer transition-colors"
-                    title="تعديل كود الطالب (ID)"
+                    title="تعديل كود الطالب"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>

@@ -67,7 +67,7 @@ const PLANS: Plan[] = [
     features: [
       'فروع غير محدودة',
       'عدد طلاب غير محدود',
-      'ربط API مخصص للأنظمة',
+      'ربط وتكامل مخصص مع أنظمتكم',
       'جميع ميزات وإمكانيات النظام',
       'مدير حساب مخصص',
       'تدريب واستيراد بيانات مجاني',
@@ -121,7 +121,7 @@ const COMPARISON_CATEGORIES: FeatureCategory[] = [
     features: [
       { name: 'تقارير الحضور والنسب المالية', starter: 'أساسية', growth: 'متقدمة', pro: 'شاملة وتصدير' },
       { name: 'قوالب رسائل واتساب التلقائية', starter: true, growth: true, pro: true },
-      { name: 'ربط API مخصص والأنظمة الخارجية', starter: false, growth: false, pro: true },
+      { name: 'ربط وتكامل مخصص مع الأنظمة الخارجية', starter: false, growth: false, pro: true },
       { name: 'نوع الدعم الفني والتوجيه', starter: 'قياسي', growth: 'أولوية 24/7', pro: 'مدير حساب مخصص' },
     ]
   }
@@ -455,7 +455,7 @@ export function Upgrade() {
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">هل أنت مؤسسة تعليمية أو مجمع أكاديمي كبير؟</h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                تحتاج خطة مخصصة لعدة فروع، ربط أنظمة مخصصة عبر API، أو استيعاب آلاف الطلاب مع مدير حساب متابع؟
+                تحتاج خطة مخصصة لعدة فروع، ربط أنظمة إلكترونية مخصصة، أو استيعاب آلاف الطلاب مع مدير حساب متابع؟
               </p>
             </div>
           </div>

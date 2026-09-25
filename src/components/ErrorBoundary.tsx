@@ -65,7 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
             {this.state.error && (
               <details className="mb-6 text-right bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
                 <summary className="cursor-pointer font-medium text-slate-600 dark:text-slate-400 select-none">
-                  تفاصيل الخطأ الفني (Debug Info)
+                  تفاصيل إضافية للمساعدة
                 </summary>
                 <pre className="mt-2 text-[11px] font-mono text-red-600 dark:text-red-400 overflow-x-auto whitespace-pre-wrap text-left" dir="ltr">
                   {this.state.error.toString()}

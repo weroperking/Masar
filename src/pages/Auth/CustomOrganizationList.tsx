@@ -122,12 +122,12 @@ export function CustomOrganizationList() {
 
       if (enableAssistant && assistantPinRequired) {
         if (!assistantPin || assistantPin.length !== 4) {
-          setError('رمز PIN للمساعد يجب أن يتكون من 4 أرقام');
+          setError('رمز الدخول للمساعد يجب أن يتكون من 4 أرقام');
           setLoading(false);
           return;
         }
         if (assistantPin === adminPin) {
-          setError('لا يمكن أن يكون رمز PIN الخاص بالمساعد مطابقاً لرمز المعلم (المدير). يرجى اختيار رمزين مختلفين.');
+          setError('لا يمكن أن يكون رمز الدخول الخاص بالمساعد مطابقاً لرمز المعلم (المدير). يرجى اختيار رمزين مختلفين.');
           setLoading(false);
           return;
         }
@@ -462,7 +462,7 @@ export function CustomOrganizationList() {
             <form onSubmit={handleCreate} className="space-y-4 font-['Cairo']">
               <div className="p-3 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 rounded-xl text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2">
                 <KeyRound className="w-4 h-4 shrink-0 text-blue-600" />
-                <span>قم بتعيين رمز PIN لملف المعلم، ويمكنك إضافة ملف للمساعدين الآن أو لاحقاً.</span>
+                <span>قم بتعيين رمز دخول سري لحساب المعلم، ويمكنك تفعيل حساب للمساعدين الآن أو لاحقاً.</span>
               </div>
 
               {/* Admin PIN */}
@@ -470,7 +470,7 @@ export function CustomOrganizationList() {
                 <div className="flex items-center gap-2">
                   <Lock className="w-4 h-4 text-blue-600" />
                   <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                    رمز PIN الخاص بحساب المعلم (المدير)
+                    رمز الدخول السري لحساب المعلم (المدير)
                   </label>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -523,7 +523,7 @@ export function CustomOrganizationList() {
 
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
-                        طلب رمز PIN للمساعدين أيضاً؟
+                        طلب رمز دخول سري للمساعدين أيضاً؟
                       </span>
                       <input
                         type="checkbox"
@@ -536,7 +536,7 @@ export function CustomOrganizationList() {
                     {assistantPinRequired && (
                       <div className="space-y-1">
                         <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                          رمز PIN للمساعد (4 أرقام)
+                          رمز الدخول للمساعد (4 أرقام)
                         </label>
                         <input
                           type="password"

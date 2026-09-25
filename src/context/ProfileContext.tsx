@@ -328,7 +328,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (isNowLocked > 0) {
         return { success: false, error: 'تم قفل الإدخال مؤقتاً' };
       }
-      return { success: false, error: 'رمز PIN غير صحيح' };
+      return { success: false, error: 'رمز الدخول غير صحيح' };
     }
   }, [assistantAccount, orgId]);
 
@@ -340,13 +340,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     try {
       const cleanNewPin = newPin.trim();
       if (!isValidPinFormat(cleanNewPin)) {
-        return { success: false, error: 'يجب أن يتكون رمز PIN الجديد من 4 أرقام' };
+        return { success: false, error: 'يجب أن يتكون رمز الدخول الجديد من 4 أرقام' };
       }
 
       if (currentPin !== undefined && currentPin.trim() !== '') {
         const ok = await verifyPin(orgId, 'admin', currentPin.trim());
         if (!ok) {
-          return { success: false, error: 'رمز PIN الحالي غير صحيح' };
+          return { success: false, error: 'رمز الدخول الحالي غير صحيح' };
         }
       }
 
@@ -373,7 +373,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
       return { success: true };
     } catch (e: any) {
-      return { success: false, error: e.message || 'فشل تحديث رمز PIN' };
+      return { success: false, error: e.message || 'تعذر تحديث رمز الدخول' };
     }
   }, [orgId]);
 
@@ -385,18 +385,18 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     try {
       if (assistantAccount?.pinRequired) {
         if (!currentPin) {
-          return { success: false, error: 'رمز PIN الحالي للمساعد غير صحيح' };
+          return { success: false, error: 'رمز الدخول الحالي للمساعد غير صحيح' };
         }
         const isAssistantOk = await verifyPin(orgId, 'assistant', currentPin.trim());
         const isAdminOk = await verifyPin(orgId, 'admin', currentPin.trim());
         if (!isAssistantOk && !isAdminOk) {
-          return { success: false, error: 'رمز PIN الحالي للمساعد غير صحيح' };
+          return { success: false, error: 'رمز الدخول الحالي للمساعد غير صحيح' };
         }
       }
 
       const cleanNewPin = newPin.trim();
       if (!isValidPinFormat(cleanNewPin)) {
-        return { success: false, error: 'يجب أن يتكون رمز PIN الجديد من 4 أرقام' };
+        return { success: false, error: 'يجب أن يتكون رمز الدخول الجديد من 4 أرقام' };
       }
 
       await setPin(orgId, 'assistant', cleanNewPin, { assistantPinRequired: true });
@@ -424,7 +424,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
       return { success: true };
     } catch (e: any) {
-      return { success: false, error: e.message || 'فشل تحديث رمز PIN للمساعد' };
+      return { success: false, error: e.message || 'تعذر تحديث رمز الدخول للمساعد' };
     }
   }, [assistantAccount, orgId]);
 
@@ -432,7 +432,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     return {
       success: true,
       previewCode: '123456',
-      message: 'يمكنك الآن تغيير رمز PIN مباشرة'
+      message: 'يمكنك الآن تغيير رمز الدخول مباشرة'
     };
   }, []);
 
@@ -456,12 +456,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     // If assistant currently exists and has a PIN required, enforce current PIN verification
     if (assistantAccount?.pinRequired) {
       if (!currentPinToVerify) {
-        return { success: false, error: 'رمز PIN الحالي غير صحيح، يرجى إدخال الرمز الصحيح للمتابعة' };
+        return { success: false, error: 'رمز الدخول الحالي غير صحيح، يرجى إدخال الرمز الصحيح للمتابعة' };
       }
       const isAssistantOk = await verifyPin(orgId, 'assistant', currentPinToVerify.trim());
       const isAdminOk = await verifyPin(orgId, 'admin', currentPinToVerify.trim());
       if (!isAssistantOk && !isAdminOk) {
-        return { success: false, error: 'رمز PIN الحالي غير صحيح، يرجى إدخال الرمز الصحيح للمتابعة' };
+        return { success: false, error: 'رمز الدخول الحالي غير صحيح، يرجى إدخال الرمز الصحيح للمتابعة' };
       }
     }
 

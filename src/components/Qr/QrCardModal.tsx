@@ -9,6 +9,7 @@ import { Student, QrCard, CardCustomDesign } from '../../types';
 import { useApiMutation } from '../../config/queryHooks';
 import { QrCardBadge, CardThemeColor } from './QrCardBadge';
 import { matchStudent, normalizeStudentCode } from '../../utils/studentCode';
+import { requestStudentLookupToken } from '../../services/lookupSyncService';
 
 interface QrCardModalProps {
   isOpen: boolean;
@@ -155,6 +156,10 @@ export function QrCardModal({
           });
         }
 
+        if (selectedStudentId) {
+          requestStudentLookupToken(selectedStudentId, { student: { id: selectedStudentId, studentCode: serial } }).catch(() => {});
+        }
+
         const id = uuidv4();
         generatedCards.push({
           id,
@@ -208,6 +213,7 @@ export function QrCardModal({
         }
       } else if (mode === 'batch_unassigned_students') {
         for (const stu of unassignedStudents) {
+          requestStudentLookupToken(stu.id, { student: { id: stu.id, studentCode: stu.studentCode } }).catch(() => {});
           const id = uuidv4();
           let serial = stu.studentCode ? stu.studentCode.replace(/\D/g, '') : '';
           if (!serial) {
@@ -760,7 +766,7 @@ export function QrCardModal({
             </div>
 
             <p className="text-[11px] text-slate-400 text-center mt-4 leading-relaxed">
-              المقاسات متوافقة مع بطاقات PVC القياسية (ISO ID-1) وأوراق الطباعة اللاصقة A4
+              المقاسات متوافقة مع بطاقات الهوية البلاستيكية القياسية وأوراق الطباعة والملصقات A4
             </p>
           </div>
         </div>

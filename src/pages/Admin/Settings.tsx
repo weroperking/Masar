@@ -341,10 +341,10 @@ export function Settings() {
               </div>
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-['Readex_Pro']">
-                  الملفات الشخصية والأمان (PIN)
+                  الحسابات والأمان ورمز الدخول
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  إدارة رمز PIN للمدير، وتخصيص حساب المساعدين وحجب البيانات المالية
+                  إدارة رمز الأمان للمعلم، وتخصيص حساب المساعدين وحجب البيانات المالية
                 </p>
               </div>
             </div>
@@ -361,7 +361,7 @@ export function Settings() {
                   <div className="flex items-center gap-2">
                     <KeyRound className="w-4 h-4 text-blue-600" />
                     <span className="text-xs font-bold text-slate-900 dark:text-slate-100 font-['Readex_Pro']">
-                      رمز PIN الخاص بالمعلم (المدير)
+                      رمز الدخول السري للمعلم (المدير)
                     </span>
                   </div>
                   <span className="text-[11px] font-mono bg-blue-50 dark:bg-blue-950/60 text-blue-700 px-2 py-0.5 rounded font-bold">
@@ -379,7 +379,7 @@ export function Settings() {
                 className="w-full py-2.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <KeyRound className="w-3.5 h-3.5" />
-                <span>تغيير رمز PIN</span>
+                <span>تغيير رمز الدخول السري</span>
               </button>
             </div>
 
@@ -401,7 +401,7 @@ export function Settings() {
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
                   {accounts.assistant
-                    ? `متاح باسم "${accounts.assistant.name}" (${accounts.assistant.pinRequired ? 'محمي برمز PIN' : 'دخول مباشر حر'}).`
+                    ? `متاح باسم "${accounts.assistant.name}" (${accounts.assistant.pinRequired ? 'محمي برمز سري' : 'دخول مباشر دون رمز'}).`
                     : 'يمكنك تفعيل ملف إضافي للمساعدين لحجب كل الشاشات والتقارير المالية عنهم.'}
                 </p>
               </div>
@@ -462,7 +462,7 @@ export function Settings() {
 
                 <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50">
                   <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    حماية ملف المساعد برمز PIN؟
+                    حماية ملف المساعد برمز سري؟
                   </span>
                   <input
                     type="checkbox"
@@ -476,7 +476,7 @@ export function Settings() {
                 {accounts.assistant?.pinRequired && (
                   <div className="space-y-1">
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      رمز PIN الحالي للمساعد (مطلوب للتأكيد)
+                      رمز الدخول الحالي للمساعد (مطلوب للتأكيد)
                     </label>
                     <input
                       type="password"
@@ -492,7 +492,7 @@ export function Settings() {
                 {tempAssistantPinReq && (
                   <div className="space-y-1">
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      {accounts.assistant?.pinRequired ? 'رمز PIN الجديد (اتركه فارغاً للإبقاء على الرمز الحالي)' : 'رمز PIN للمساعد (4 أرقام)'}
+                      {accounts.assistant?.pinRequired ? 'رمز الدخول الجديد (اتركه فارغاً للإبقاء على الرمز الحالي)' : 'رمز الدخول للمساعد (4 أرقام)'}
                     </label>
                     <input
                       type="password"
@@ -511,12 +511,12 @@ export function Settings() {
                   type="button"
                   onClick={async () => {
                     if (accounts.assistant?.pinRequired && !tempAssistantCurrentPin) {
-                      toast.error('يجب إدخال رمز PIN الحالي للمساعد للمتابعة');
+                      toast.error('يجب إدخال رمز الدخول الحالي للمساعد للمتابعة');
                       return;
                     }
 
                     if (tempAssistantPinReq && tempAssistantPin && tempAssistantPin.length !== 4) {
-                      toast.error('يجب أن يتكون رمز PIN من 4 أرقام');
+                      toast.error('يجب أن يتكون رمز الدخول من 4 أرقام');
                       return;
                     }
 
@@ -545,7 +545,7 @@ export function Settings() {
                     type="button"
                     onClick={async () => {
                       if (accounts.assistant?.pinRequired && !tempAssistantCurrentPin) {
-                        toast.error('يجب إدخال رمز PIN الحالي الصحيح لتعطيل الملف');
+                        toast.error('يجب إدخال رمز الدخول الحالي الصحيح لتعطيل الحساب');
                         return;
                       }
                       const res = await saveAssistantProfile({
@@ -909,24 +909,24 @@ export function Settings() {
               <RefreshCw className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">تحديث ملفات النظام المؤقتة</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">إصلاح المشاكل الفنية ومسح الكاش لجلب التحديثات الجديدة</p>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">تحديث وتحسين التطبيق</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">تحديث التطبيق لضمان عمل أحدث الميزات واستقرار الأداء</p>
             </div>
           </div>
 
           <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-0.5">
-              <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100">مسح الكاش وفرض التحديث</h3>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100">تحديث التطبيق وإعادة التحميل</h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                إفراغ ذاكرة التخزين المؤقت للمتصفح دون المساس ببيانات الطلاب أو المجموعات
+                إعادة تحميل أحدث نسخة من التطبيق دون المساس ببيانات الطلاب أو المجموعات
               </p>
             </div>
             <button
               type="button"
               onClick={async () => {
                 const ok = await confirm({
-                  title: 'تأكيد فرض التحديث',
-                  message: 'هل ترغب في مسح الكاش وملفات تعريف الارتباط الخاصة بالمنصة وإعادة تحميل الصفحة؟ (لن تتأثر بياناتك).',
+                  title: 'تأكيد تحديث التطبيق',
+                  message: 'هل ترغب في إعادة تحميل التطبيق بأحدث التحديثات الآن؟ (لن تتأثر أي من بياناتك المحفوظة).',
                   confirmText: 'نعم، قم بالتحديث',
                   cancelText: 'إلغاء'
                 });
@@ -960,7 +960,7 @@ export function Settings() {
               className="shrink-0 px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>تحديث ملفات الكاش</span>
+              <span>تحديث التطبيق الآن</span>
             </button>
           </div>
         </section>

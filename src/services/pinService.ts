@@ -28,7 +28,7 @@ export async function setPin(
   opts?: { assistantPinRequired?: boolean; autoLockMinutes?: number }
 ): Promise<PinConfigRecord> {
   if (!isValidPinFormat(pin)) {
-    throw new Error('رمز PIN يجب أن يتكون من 4 أرقام بالضبط');
+    throw new Error('رمز الدخول يجب أن يتكون من 4 أرقام بالضبط');
   }
 
   const salt = generateSalt();

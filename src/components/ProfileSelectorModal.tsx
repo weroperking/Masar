@@ -139,7 +139,7 @@ export function ProfileSelectorModal() {
         setSelectedTarget(null);
         setPinDigits(['', '', '', '']);
       } else {
-        setErrorMsg(res.error || 'رمز PIN غير صحيح');
+        setErrorMsg(res.error || 'رمز الدخول غير صحيح');
         setPinDigits(['', '', '', '']);
       }
     } catch (e: any) {
@@ -199,7 +199,7 @@ export function ProfileSelectorModal() {
     const cleanPin = adminAuthPin.trim();
     const ok = await verifyPin(orgId, 'admin', cleanPin);
     if (!ok) {
-      setErrorMsg('رمز PIN الخاص بالمعلم (المدير) غير صحيح');
+      setErrorMsg('رمز الدخول الخاص بالمعلم (المدير) غير صحيح');
       return;
     }
     setAuthAdminForAssistant(false);
@@ -222,13 +222,13 @@ export function ProfileSelectorModal() {
     if (accounts.assistant?.pinRequired) {
       const cleanCurrent = currentAssistantPin.trim();
       if (!cleanCurrent) {
-        setErrorMsg('يجب إدخال رمز PIN الحالي للمساعد للمتابعة');
+        setErrorMsg('يجب إدخال رمز الدخول الحالي للمساعد للمتابعة');
         return;
       }
       const isAssistantOk = await verifyPin(orgId, 'assistant', cleanCurrent);
       const isAdminOk = await verifyPin(orgId, 'admin', cleanCurrent);
       if (!isAssistantOk && !isAdminOk) {
-        setErrorMsg('رمز PIN الحالي للمساعد غير صحيح - لا يمكن تعديل الرمز إلا بعد إدخال الرمز الحالي الصحيح');
+        setErrorMsg('رمز الدخول الحالي للمساعد غير صحيح، يرجى كتابة الرمز الحالي الصحيح للتعديل');
         return;
       }
     }
@@ -238,11 +238,11 @@ export function ProfileSelectorModal() {
     if (assistantPinRequired) {
       if (assistantNewPin || !accounts.assistant?.pinRequired) {
         if (assistantNewPin.length !== 4 || !/^\d{4}$/.test(assistantNewPin)) {
-          setErrorMsg('رمز PIN الجديد للمساعد يجب أن يتكون من 4 أرقام بالضبط');
+          setErrorMsg('رمز الدخول الجديد للمساعد يجب أن يتكون من 4 أرقام بالضبط');
           return;
         }
         if (assistantNewPin !== assistantConfirmPin) {
-          setErrorMsg('رمز PIN الجديد وتأكيده غير متطابقين');
+          setErrorMsg('رمز الدخول الجديد وتأكيده غير متطابقين');
           return;
         }
         targetPin = assistantNewPin;
@@ -305,7 +305,7 @@ export function ProfileSelectorModal() {
               من يستخدم مسار الآن؟
             </h1>
             <p className="text-slate-600 text-sm sm:text-base mt-3 max-w-lg font-['Cairo']">
-              اختر ملف العمل المناسب للمتابعة. ملف المعلم الرئيسي محمي برمز PIN لمنع التعديل والاطلاع على الخزينة والتقارير.
+              اختر الحساب المناسب للمتابعة. حساب المعلم محمي برمز أمان سري لمنع الاطلاع على الخزينة والتقارير والبيانات المالية.
             </p>
 
             {/* Profiles Container */}
@@ -410,7 +410,7 @@ export function ProfileSelectorModal() {
               className="mt-2 text-xs sm:text-sm text-slate-500 hover:text-blue-600 underline font-medium transition-colors cursor-pointer font-['Cairo'] flex items-center gap-1.5"
             >
               <KeyRound className="w-4 h-4" />
-              <span>نسيت رمز الدخول (PIN)؟</span>
+              <span>نسيت رمز الدخول السري؟</span>
             </button>
           </div>
         )}
@@ -439,7 +439,7 @@ export function ProfileSelectorModal() {
               التحقق من إذن المعلم (المدير)
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              أدخل رمز PIN الخاص بالمعلم للترخيص بإعداد وإضافة ملف المساعدين.
+              أدخل رمز الدخول السري الخاص بالمعلم للمتابعة وإعداد حساب المساعدين.
             </p>
 
             {errorMsg && (
@@ -501,7 +501,7 @@ export function ProfileSelectorModal() {
             </div>
 
             <h2 className="text-2xl font-bold text-slate-900 font-['Readex_Pro']">
-              أدخل رمز PIN للدخول
+              أدخل رمز الدخول السري
             </h2>
             <p className="text-xs text-slate-500 mt-1.5 font-['Cairo']">
               {selectedTarget === 'admin'
@@ -633,7 +633,7 @@ export function ProfileSelectorModal() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="block text-xs font-bold text-slate-800">
-                      حماية ملف المساعد برمز PIN؟
+                      حماية ملف المساعد برمز سري؟
                     </span>
                     <span className="text-[11px] text-slate-500">
                       إذا تم التعطيل، سيكون الدخول فورياً ومباشراً بدون طلب رمز.
@@ -651,7 +651,7 @@ export function ProfileSelectorModal() {
                 {accounts.assistant?.pinRequired && (
                   <div className="pt-3 border-t border-slate-200 space-y-1.5">
                     <label className="block text-xs font-semibold text-slate-700 flex items-center justify-between">
-                      <span>رمز PIN الحالي للمساعد (مطلوب للتأكيد)</span>
+                      <span>رمز الدخول الحالي للمساعد (مطلوب للتأكيد)</span>
                       <span className="text-[11px] text-red-500 font-normal">* إلزامي</span>
                     </label>
                     <input
@@ -660,7 +660,7 @@ export function ProfileSelectorModal() {
                       required
                       value={currentAssistantPin}
                       onChange={(e) => setCurrentAssistantPin(e.target.value.replace(/\D/g, ''))}
-                      placeholder="أدخل رمز PIN الحالي"
+                      placeholder="أدخل رمز الدخول الحالي"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-mono tracking-widest text-center text-slate-900 focus:outline-none focus:border-blue-600"
                     />
                   </div>
@@ -671,7 +671,7 @@ export function ProfileSelectorModal() {
                   <div className="pt-3 border-t border-slate-200 space-y-3">
                     <div className="space-y-1.5">
                       <label className="block text-xs font-semibold text-slate-700">
-                        {accounts.assistant?.pinRequired ? 'رمز PIN الجديد (4 أرقام - اتركه فارغاً للإبقاء على الرمز الحالي)' : 'رمز PIN الخاص بالمساعد (4 أرقام)'}
+                        {accounts.assistant?.pinRequired ? 'رمز الدخول الجديد (4 أرقام - اتركه فارغاً للإبقاء على الرمز الحالي)' : 'رمز الدخول الخاص بالمساعد (4 أرقام)'}
                       </label>
                       <input
                         type="password"
@@ -687,7 +687,7 @@ export function ProfileSelectorModal() {
                     {assistantNewPin && (
                       <div className="space-y-1.5">
                         <label className="block text-xs font-semibold text-slate-700">
-                          تأكيد رمز PIN الجديد
+                          تأكيد رمز الدخول الجديد
                         </label>
                         <input
                           type="password"
@@ -720,7 +720,7 @@ export function ProfileSelectorModal() {
                         const isAssistantOk = await verifyPin(orgId, 'assistant', clean);
                         const isAdminOk = await verifyPin(orgId, 'admin', clean);
                         if (!isAssistantOk && !isAdminOk) {
-                          setErrorMsg('يجب إدخال رمز PIN الحالي للمساعد لحذف أو تعطيل الملف');
+                          setErrorMsg('يجب إدخال رمز الدخول الحالي للمساعد لحذف أو تعطيل الملف');
                           return;
                         }
                       }
@@ -747,7 +747,7 @@ export function ProfileSelectorModal() {
         <div className="flex items-center gap-2">
           <span>منظومة حماية مسار — قفل أمان تلقائي بعد 15 دقيقة من عدم النشاط</span>
         </div>
-        <span>Masar Identity & Access Control System</span>
+        <span>نظام حماية وإدارة صلاحيات مسار</span>
       </footer>
 
       {/* IN-APP PIN RESET CONFIRMATION MODAL */}
@@ -760,10 +760,10 @@ export function ProfileSelectorModal() {
 
             <div className="space-y-2">
               <h3 className="text-lg font-bold text-slate-900 font-['Readex_Pro']">
-                إعادة تعيين رمز الدخول (PIN)؟
+                إعادة تعيين رمز الدخول السري؟
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed px-2">
-                سيتم مسح رمز الدخول الحالي وتسجيل خروجك فوراً لتأكيد هويتك عبر حساب Clerk. عند إعادة تسجيل الدخول بنفس الحساب، سيُطلب منك تعيين رمز جديد مباشرة.
+                سيتم مسح رمز الدخول الحالي وتسجيل خروجك فوراً لتأكيد هويتك عبر حسابك الأساسي المسجل. عند إعادة تسجيل الدخول بنفس الحساب، ستتمكن من تعيين رمز دخول جديد مباشرة.
               </p>
             </div>
 
