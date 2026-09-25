@@ -163,7 +163,7 @@ export function QrCards() {
       }
     });
 
-    requestStudentLookupToken(studentId, { student: { id: studentId, studentCode: finalCode, name: student?.name } }).catch(() => {});
+    requestStudentLookupToken(studentId).catch(() => {});
 
     if (selectedCardForView?.id === cardId) {
       setSelectedCardForView(prev => prev ? { ...prev, cardNumber: finalCode, qrCodeData: finalCode, studentId, linkedAt: now } : null);

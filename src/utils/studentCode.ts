@@ -167,11 +167,19 @@ export const STUDENT_LOOKUP_PATH_PREFIX = '/p/s/';
 export function buildStudentLookupUrl(token: string | undefined | null, customOrigin?: string): string {
   const clean = String(token || '').trim();
   if (!clean) return '';
+  // If already an absolute URL (returned by requestStudentLookupToken), return verbatim
   if (clean.startsWith('http://') || clean.startsWith('https://')) {
     return clean;
   }
+  // Strictly prevent constructing lookup URLs from student UUIDs or numeric student codes
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
+  const isNumericCode = /^\d{1,6}$/.test(clean);
+  if (isUuid || isNumericCode) {
+    return '';
+  }
 
-  const origin = customOrigin || (typeof window !== 'undefined' && window.location.origin ? window.location.origin : '');
+  // Canonical base64url token returned by server
+  const origin = customOrigin || 'https://app.masar.top';
   return `${origin}${STUDENT_LOOKUP_PATH_PREFIX}${clean}`;
 }
 

@@ -125,7 +125,7 @@ export function QrCardViewModal({
               size="large"
               face={activeFace}
               customDesign={customDesign}
-              lookupCode={student?.lookup_code}
+              lookupCode={student?.lookup_url || student?.lookup_code}
             />
           </div>
 

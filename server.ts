@@ -502,8 +502,8 @@ async function startServer() {
       studentToTokenMap.delete(id);
     }
 
-    // Generate fresh cryptographic UUID token
-    const newToken = crypto.randomUUID();
+    // Generate fresh canonical base64url token (<prefix>:<id>)
+    const newToken = Buffer.from(`std:${id}`).toString('base64url');
 
     const studentInfo = body.student || {
       id,
@@ -559,7 +559,7 @@ async function startServer() {
       success: true,
       token: newToken,
       public_lookup_token: newToken,
-      url: `/p/s/${newToken}`
+      url: `https://app.masar.top/p/s/${newToken}`
     });
   };
 

@@ -3,6 +3,7 @@ import { decryptRecord, Envelope } from './cryptoService';
 import { isNotDeleted } from '../config/queryHooks';
 import { normalizeStudentCode, STUDENT_LOOKUP_PATH_PREFIX } from '../utils/studentCode';
 import { API_BASE_URL } from '../config/api';
+import { getClerkToken } from './syncService';
 import { Student, Course, Group, Enrollment, AttendanceRecord, AttendanceSession, Assessment, AssessmentGrade, MonthlySubscription, Settings } from '../types';
 
 async function getDecryptedTable<T extends { id?: string; envelope?: any; deleted_at?: number | null; deletedAt?: number | null }>(tableName: string): Promise<T[]> {
@@ -200,44 +201,67 @@ export async function syncAllStudentsToLookupServer(): Promise<void> {
 }
 
 /**
- * Calls POST /api/students/:id/lookup-token on the server to generate/fetch the canonical lookup token
- * for a student, updating the local database record and returning the token details.
+ * Calls POST https://masar-api.weroperking.workers.dev/api/students/:id/lookup-token on the Cloudflare
+ * Worker to generate/fetch the canonical lookup token for a student, updating the local database record
+ * and returning the token details.
  */
 export async function requestStudentLookupToken(
   studentId: string,
-  payload?: any,
+  _payload?: any,
   sessionToken?: string | null
 ): Promise<{ token: string; url: string } | null> {
   if (!studentId) return null;
   try {
-    const url = `/api/students/${studentId}/lookup-token`;
-    const res = await fetch(url, {
+    const token = sessionToken || (await getClerkToken());
+    const primaryUrl = `https://masar-api.weroperking.workers.dev/api/students/${studentId}/lookup-token`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const res = await fetch(primaryUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {})
-      },
-      body: JSON.stringify(payload || {})
+      headers
     });
 
     if (res.ok) {
       const data = await res.json();
-      const token = data.public_lookup_token || data.token || data.lookup_code;
-      if (token) {
+      const lookupToken = data.public_lookup_token || data.token || data.lookup_code;
+      const lookupUrl = data.url || (lookupToken ? `https://app.masar.top/p/s/${lookupToken}` : '');
+      if (lookupToken) {
         try {
           const student = await db.students.get(studentId);
           if (student) {
-            await db.students.update(studentId, { lookup_code: token, updated_at: Date.now() });
+            await db.students.update(studentId, {
+              lookup_code: lookupToken,
+              lookup_url: lookupUrl,
+              updated_at: Date.now()
+            });
           }
         } catch (dbErr) {
-          console.warn('[lookupSyncService] Could not update local Dexie student lookup_code:', dbErr);
+          console.warn('[lookupSyncService] Could not update local Dexie student lookup_code/url:', dbErr);
         }
-        return { token, url: data.url || `${STUDENT_LOOKUP_PATH_PREFIX}${token}` };
+        const result = {
+          token: lookupToken,
+          url: lookupUrl,
+          toString() { return this.token; },
+          valueOf() { return this.token; }
+        };
+        return result;
       }
+    } else {
+      console.warn(`[lookupSyncService] Primary target ${primaryUrl} returned ${res.status}:`, await res.text().catch(() => ''));
     }
   } catch (err) {
-    console.warn('[lookupSyncService] Failed calling POST /api/students/:id/lookup-token:', err);
+    console.warn('[lookupSyncService] Failed calling POST lookup-token:', err);
   }
   return null;
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).requestStudentLookupToken = async (studentId: string, sessionToken?: string | null) => {
+    return requestStudentLookupToken(studentId, undefined, sessionToken);
+  };
 }
 

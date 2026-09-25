@@ -41,15 +41,17 @@ export function StudentDetails() {
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
-  // The lookup code: strictly uses opaque lookup_code from server
-  const lookupCode = student?.lookup_code;
-  const hasLookupCode = Boolean(lookupCode);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
-  // The exact canonical short URL matching the back of the student card (/p/s/:lookup_code)
+  // The exact canonical opaque URL returned by requestStudentLookupToken()
   const shortLookupUrl = useMemo(() => {
-    if (!lookupCode) return '';
-    return buildStudentLookupUrl(lookupCode);
-  }, [lookupCode]);
+    if (student?.lookup_url) return student.lookup_url;
+    if (student?.lookup_code) {
+      return buildStudentLookupUrl(student.lookup_code);
+    }
+    return '';
+  }, [student?.lookup_url, student?.lookup_code]);
+  const hasLookupUrl = Boolean(shortLookupUrl);
 
   // Generate the simple, low-density QR code identical to the card back
   useEffect(() => {
@@ -68,28 +70,30 @@ export function StudentDetails() {
     }
   }, [shortLookupUrl]);
 
-  // Auto-request lookup token from server if missing on student record
+  // Auto-request lookup token from server if missing or invalid (e.g. UUID) on student record
   useEffect(() => {
-    if (student && !student.lookup_code && id) {
+    const isInvalidOrMissing = !student?.lookup_code || !student?.lookup_url || student.lookup_code.includes('-') || student.lookup_code === id;
+    if (student && isInvalidOrMissing && id) {
       getToken().then(tok => {
-        requestStudentLookupToken(
-          id,
-          { student: { id, name: student.name, studentCode: student.studentCode, phone: student.phone } },
-          tok
-        ).then(res => {
-          if (res?.token) {
-            updateStudent.mutate({ id, data: { lookup_code: res.token } });
+        requestStudentLookupToken(id, undefined, tok).then(res => {
+          if (res?.token && res?.url) {
+            setLookupError(null);
+            updateStudent.mutate({ id, data: { lookup_code: res.token, lookup_url: res.url } });
+          } else {
+            setLookupError('تعذر إنشاء الرابط');
           }
-        }).catch(() => {});
+        }).catch(() => {
+          setLookupError('تعذر إنشاء الرابط');
+        });
       });
     }
-  }, [student?.id, student?.lookup_code, id, getToken]);
+  }, [student?.id, student?.lookup_code, student?.lookup_url, id, getToken]);
 
   const handleCopyLink = () => {
-    if (!shortLookupUrl || !hasLookupCode) return;
+    if (!shortLookupUrl) return;
     navigator.clipboard.writeText(shortLookupUrl);
     setCopied(true);
-    toast.success('تم نسخ رابط المتابعة المختصر بنجاح!');
+    toast.success('تم نسخ رابط المتابعة بنجاح!');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -219,39 +223,29 @@ export function StudentDetails() {
         }
       };
 
-      let tokenToPersist: string | null = student.lookup_code || null;
+      setLookupError(null);
+      let res: { token: string; url: string } | null = null;
       try {
         const sessionToken = await getToken();
-        const url = `/api/students/${id}/lookup-token`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': sessionToken ? `Bearer ${sessionToken}` : ''
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          const resData = await res.json().catch(() => null);
-          const newCode = resData?.lookup_code || resData?.token || resData?.public_lookup_token;
-          if (newCode) {
-            tokenToPersist = newCode;
-          }
-        }
+        res = await requestStudentLookupToken(id, undefined, sessionToken);
       } catch (srvErr) {
-        console.warn('[Sync lookup background] Server lookup storage was deferred:', srvErr);
+        console.warn('[Sync lookup] Server lookup request failed:', srvErr);
       }
 
-      if (tokenToPersist && tokenToPersist !== student.lookup_code) {
+      if (res?.token && res?.url) {
+        setLookupError(null);
         await updateStudent.mutateAsync({
           id: student.id,
-          data: { lookup_code: tokenToPersist }
+          data: { lookup_code: res.token, lookup_url: res.url }
         });
-      }
-
-      if (showToast) {
-        toast.success('تمت مزامنة وتحديث بيانات متابعة الطالب بنجاح!');
+        if (showToast) {
+          toast.success('تمت مزامنة وتحديث بيانات متابعة الطالب بنجاح!');
+        }
+      } else {
+        setLookupError('تعذر إنشاء الرابط');
+        if (showToast) {
+          toast.error('تعذر إنشاء رابط المتابعة للطالب');
+        }
       }
     } catch (err) {
       console.error(err);
@@ -957,17 +951,19 @@ export function StudentDetails() {
               </button>
             </div>
 
-            {!hasLookupCode ? (
+            {!hasLookupUrl ? (
               <div className="p-8 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 rounded-xl flex flex-col items-center justify-center text-center space-y-4">
                 <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-full flex items-center justify-center border border-slate-200 dark:border-slate-800 shadow-sm">
-                  <Globe className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                  {lookupError ? <AlertTriangle className="w-8 h-8 text-red-500" /> : <Globe className="w-8 h-8 text-slate-300 dark:text-slate-600" />}
                 </div>
                 <div>
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">
-                    لم يتم إنشاء رابط المتابعة لهذا الطالب بعد
+                    {lookupError ? 'تعذر إنشاء الرابط' : 'لم يتم إنشاء رابط المتابعة لهذا الطالب بعد'}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-                    رابط المتابعة يسمح لولي الأمر بالاطلاع على مستوى الطالب وحضوره ودرجاته في أي وقت عبر رابط آمن وخاص.
+                    {lookupError 
+                      ? 'حدث خطأ أثناء التواصل مع خادم مسار لاستخراج رمز المتابعة المشفر. يرجى الضغط على الزر أدناه لإعادة المحاولة.'
+                      : 'رابط المتابعة يسمح لولي الأمر بالاطلاع على مستوى الطالب وحضوره ودرجاته في أي وقت عبر رابط آمن وخاص.'}
                   </p>
                 </div>
                 <button
@@ -977,7 +973,7 @@ export function StudentDetails() {
                   className="px-6 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-xl transition-all shadow-lg shadow-blue-500/20 cursor-pointer flex items-center gap-2"
                 >
                   {loadingSync ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-                  <span>إنشاء رابط المتابعة وتفعيل الخدمة الآن</span>
+                  <span>{lookupError ? 'إعادة محاولة إنشاء الرابط' : 'إنشاء رابط المتابعة وتفعيل الخدمة الآن'}</span>
                 </button>
               </div>
             ) : (

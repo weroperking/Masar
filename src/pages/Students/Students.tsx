@@ -608,7 +608,7 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
         }));
 
         // Request / refresh lookup token for updated student
-        requestStudentLookupToken(existingStudent.id, { student: normalizedFormData }, token).catch(() => {});
+        requestStudentLookupToken(existingStudent.id, undefined, token).catch(() => {});
 
         toast.success(`تم تحديث بيانات الطالب (${formData.name}) والرسوم بنجاح!`);
       } else {
@@ -654,7 +654,7 @@ export function StudentFormModal({ onClose, existingStudent }: { onClose: () => 
         }));
 
         // Generate initial canonical lookup token for the newly created student
-        requestStudentLookupToken(newStudent.id, { student: normalizedFormData }, token).catch(() => {});
+        requestStudentLookupToken(newStudent.id, undefined, token).catch(() => {});
 
         toast.success(`تم تسجيل الطالب (${formData.name}) في المجموعات وتحديد رسومه بنجاح!`);
       }

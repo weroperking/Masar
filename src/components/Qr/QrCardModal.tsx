@@ -157,7 +157,7 @@ export function QrCardModal({
         }
 
         if (selectedStudentId) {
-          requestStudentLookupToken(selectedStudentId, { student: { id: selectedStudentId, studentCode: serial } }).catch(() => {});
+          requestStudentLookupToken(selectedStudentId).catch(() => {});
         }
 
         const id = uuidv4();
@@ -213,7 +213,7 @@ export function QrCardModal({
         }
       } else if (mode === 'batch_unassigned_students') {
         for (const stu of unassignedStudents) {
-          requestStudentLookupToken(stu.id, { student: { id: stu.id, studentCode: stu.studentCode } }).catch(() => {});
+          requestStudentLookupToken(stu.id).catch(() => {});
           const id = uuidv4();
           let serial = stu.studentCode ? stu.studentCode.replace(/\D/g, '') : '';
           if (!serial) {

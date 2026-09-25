@@ -163,7 +163,7 @@ export function QrPrintSheetModal({
                     status={card.status}
                     size="print"
                     customDesign={customDesign}
-                    lookupCode={student?.lookup_code}
+                    lookupCode={student?.lookup_url || student?.lookup_code}
                   />
                   {/* Subtle cut indicators */}
                   <div className="text-[9px] text-slate-400 font-mono text-center mt-1 print:block hidden">
