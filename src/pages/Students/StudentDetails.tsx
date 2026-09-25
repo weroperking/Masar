@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { 
   ArrowRight, User, BookOpen, Clock, Calendar, Wallet, 
-  QrCode, RefreshCw, CheckCircle2, 
+  QrCode, RefreshCw, CheckCircle2, Link2,
   GraduationCap, Edit2, Check, X, MessageCircle, Globe, Copy, ExternalLink,
   AlertTriangle, DollarSign, List, FileText, ArrowLeftRight, Activity, Users
 } from 'lucide-react';
@@ -41,15 +41,15 @@ export function StudentDetails() {
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
-  // The lookup code: uses opaque lookup_code, falling back to studentCode or student ID
-  const lookupCode = student?.lookup_code || student?.studentCode || student?.id;
+  // The lookup code: strictly uses opaque lookup_code from server
+  const lookupCode = student?.lookup_code;
   const hasLookupCode = Boolean(lookupCode);
 
   // The exact canonical short URL matching the back of the student card (/p/s/:lookup_code)
   const shortLookupUrl = useMemo(() => {
-    if (!hasLookupCode) return '';
+    if (!lookupCode) return '';
     return buildStudentLookupUrl(lookupCode);
-  }, [lookupCode, hasLookupCode]);
+  }, [lookupCode]);
 
   // Generate the simple, low-density QR code identical to the card back
   useEffect(() => {
@@ -222,7 +222,8 @@ export function StudentDetails() {
       let tokenToPersist: string | null = student.lookup_code || null;
       try {
         const sessionToken = await getToken();
-        const res = await fetch(`${API_BASE_URL}/api/students/${id}/lookup-token`, {
+        const url = `/api/students/${id}/lookup-token`;
+        const res = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -957,10 +958,27 @@ export function StudentDetails() {
             </div>
 
             {!hasLookupCode ? (
-              <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 rounded-xl space-y-2">
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  لم يتم إنشاء رابط المتابعة لهذا الطالب بعد. يرجى تحديث بيانات الطالب أو مزامنة البيانات لإنشاء الرابط.
-                </p>
+              <div className="p-8 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 rounded-xl flex flex-col items-center justify-center text-center space-y-4">
+                <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-full flex items-center justify-center border border-slate-200 dark:border-slate-800 shadow-sm">
+                  <Globe className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">
+                    لم يتم إنشاء رابط المتابعة لهذا الطالب بعد
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+                    رابط المتابعة يسمح لولي الأمر بالاطلاع على مستوى الطالب وحضوره ودرجاته في أي وقت عبر رابط آمن وخاص.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSyncLookup(true)}
+                  disabled={loadingSync}
+                  className="px-6 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-xl transition-all shadow-lg shadow-blue-500/20 cursor-pointer flex items-center gap-2"
+                >
+                  {loadingSync ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                  <span>إنشاء رابط المتابعة وتفعيل الخدمة الآن</span>
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">

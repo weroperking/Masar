@@ -263,10 +263,12 @@ function AuthGate() {
   );
 }
 
+import { STUDENT_LOOKUP_PATH_PREFIX } from './utils/studentCode';
+
 export default function App() {
   useEffect(() => {
     // Standalone public routes must NOT trigger any Dexie/IndexedDB operations
-    if (!window.location.pathname.startsWith('/p/s/')) {
+    if (!window.location.pathname.startsWith(STUDENT_LOOKUP_PATH_PREFIX)) {
       seedDatabaseIfEmpty().then(() => {
         sanitizeNumericCodes();
       });
@@ -280,7 +282,7 @@ export default function App() {
           <QueryClientProvider client={queryClient}>
             <BrowserRouter>
                <Routes>
-                 <Route path="/p/s/:code" element={<PublicStudentLookup />} />
+                 <Route path={`${STUDENT_LOOKUP_PATH_PREFIX}:code`} element={<PublicStudentLookup />} />
                  <Route path="/book" element={<Navigate to="/" replace />} />
                  <Route path="*" element={<AuthGate />} />
                </Routes>

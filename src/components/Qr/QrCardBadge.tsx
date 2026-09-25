@@ -156,17 +156,21 @@ export function QrCardBadge({
     if (isQrCode) {
       const qrTargetUrl = (qrCodeData && (qrCodeData.startsWith('http://') || qrCodeData.startsWith('https://')))
         ? qrCodeData
-        : buildStudentLookupUrl(lookupCode || cleanCode);
+        : buildStudentLookupUrl(lookupCode); // STRICT: NO FALLBACK TO cleanCode
 
-      QRCode.toDataURL(
-        qrTargetUrl,
-        { margin: 1, width: 140, color: { dark: '#000000', light: '#ffffff' } },
-        (err, url) => {
-          if (!err && url) {
-            setQrCodeUrl(url);
+      if (qrTargetUrl) {
+        QRCode.toDataURL(
+          qrTargetUrl,
+          { margin: 1, width: 140, color: { dark: '#000000', light: '#ffffff' } },
+          (err, url) => {
+            if (!err && url) {
+              setQrCodeUrl(url);
+            }
           }
-        }
-      );
+        );
+      } else {
+        setQrCodeUrl('');
+      }
     }
   }, [cleanCode, isQrCode, qrCodeData, lookupCode]);
 

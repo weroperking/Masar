@@ -1,7 +1,7 @@
 import { db } from '../db/db';
 import { decryptRecord, Envelope } from './cryptoService';
 import { isNotDeleted } from '../config/queryHooks';
-import { normalizeStudentCode } from '../utils/studentCode';
+import { normalizeStudentCode, STUDENT_LOOKUP_PATH_PREFIX } from '../utils/studentCode';
 import { API_BASE_URL } from '../config/api';
 import { Student, Course, Group, Enrollment, AttendanceRecord, AttendanceSession, Assessment, AssessmentGrade, MonthlySubscription, Settings } from '../types';
 
@@ -210,7 +210,8 @@ export async function requestStudentLookupToken(
 ): Promise<{ token: string; url: string } | null> {
   if (!studentId) return null;
   try {
-    const res = await fetch(`${API_BASE_URL}/api/students/${studentId}/lookup-token`, {
+    const url = `/api/students/${studentId}/lookup-token`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -231,7 +232,7 @@ export async function requestStudentLookupToken(
         } catch (dbErr) {
           console.warn('[lookupSyncService] Could not update local Dexie student lookup_code:', dbErr);
         }
-        return { token, url: data.url || `/p/s/${token}` };
+        return { token, url: data.url || `${STUDENT_LOOKUP_PATH_PREFIX}${token}` };
       }
     }
   } catch (err) {

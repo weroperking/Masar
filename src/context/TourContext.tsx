@@ -6,6 +6,8 @@ import { useProfile } from './ProfileContext';
 
 export type TourType = 'admin' | 'assistant';
 
+import { STUDENT_LOOKUP_PATH_PREFIX } from '../utils/studentCode';
+
 interface TourContextType {
   isActive: boolean;
   tourType: TourType;
@@ -71,7 +73,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   // First-time auto-trigger for current profile tour if not completed and profile is selected/unlocked
   useEffect(() => {
-    if (!isSignedIn || hasCompletedTour || isLocked || showProfileSelector || window.location.pathname.startsWith('/p/s/')) {
+    if (!isSignedIn || hasCompletedTour || isLocked || showProfileSelector || window.location.pathname.startsWith(STUDENT_LOOKUP_PATH_PREFIX)) {
       return;
     }
 

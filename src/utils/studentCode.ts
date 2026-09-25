@@ -157,20 +157,22 @@ export function matchStudent(student: Student, query: string): boolean {
   return false;
 }
 
+export const STUDENT_LOOKUP_PATH_PREFIX = '/p/s/';
+
 /**
  * Builds the canonical public student lookup URL encoded in the card's QR code.
  * When scanned by any smartphone camera, opens the dedicated student profile page.
- * Uses the new opaque org-scoped format: /p/s/{lookup_code}
+ * Uses the new opaque org-scoped format: /p/s/{token}
  */
-export function buildStudentLookupUrl(lookupCode: string | undefined | null, customOrigin?: string): string {
-  const clean = String(lookupCode || '').trim();
+export function buildStudentLookupUrl(token: string | undefined | null, customOrigin?: string): string {
+  const clean = String(token || '').trim();
   if (!clean) return '';
   if (clean.startsWith('http://') || clean.startsWith('https://')) {
     return clean;
   }
 
   const origin = customOrigin || (typeof window !== 'undefined' && window.location.origin ? window.location.origin : '');
-  return `${origin}/p/s/${clean}`;
+  return `${origin}${STUDENT_LOOKUP_PATH_PREFIX}${clean}`;
 }
 
 /**
