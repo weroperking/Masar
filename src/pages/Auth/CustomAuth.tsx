@@ -16,9 +16,118 @@ export function CustomAuth() {
   const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
+  const [hasSessionConflict, setHasSessionConflict] = useState(false);
+  const [shakePasswordRequirements, setShakePasswordRequirements] = useState(false);
+  const [pwnedPasswordError, setPwnedPasswordError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSuccess, setResendSuccess] = useState('');
+
+  // Password validation & strength calculation for signup
+  const passwordRequirements = [
+    {
+      id: 'length',
+      label: '15 حرفاً على الأقل',
+      met: password.length >= 15,
+      required: true,
+      badge: `${Math.min(password.length, 15)}/15`,
+    },
+    {
+      id: 'case',
+      label: 'أحرف إنجليزية كبيرة وصغيرة (A-z)',
+      met: /[a-z]/.test(password) && /[A-Z]/.test(password),
+      required: false,
+    },
+    {
+      id: 'number',
+      label: 'رقم واحد على الأقل (0-9)',
+      met: /\d/.test(password),
+      required: false,
+    },
+    {
+      id: 'special',
+      label: 'رمز خاص واحد على الأقل (!@#$%)',
+      met: /[^A-Za-z0-9]/.test(password),
+      required: false,
+    },
+  ];
+
+  const isPasswordMinLengthMet = password.length >= 15;
+  const bonusRequirementsMet = passwordRequirements.filter((r) => !r.required && r.met).length;
+
+  const getPasswordStrength = () => {
+    if (!password) {
+      return {
+        percent: 0,
+        label: '',
+        colorClass: 'bg-transparent',
+        textClass: 'text-slate-400',
+        borderFocusClass: 'focus-within:border-blue-600 focus-within:ring-blue-600/15',
+      };
+    }
+
+    if (pwnedPasswordError) {
+      return {
+        percent: 25,
+        label: 'مسربة سابقاً - اختر كلمة أخرى',
+        colorClass: 'bg-red-500',
+        textClass: 'text-red-600 dark:text-red-400',
+        borderFocusClass: 'border-red-400 dark:border-red-500/80 focus-within:border-red-500 focus-within:ring-red-500/15',
+      };
+    }
+
+    const lengthRatio = Math.min(password.length / 15, 1);
+
+    if (!isPasswordMinLengthMet) {
+      const partialPercent = Math.max(12, Math.round(lengthRatio * 55 + bonusRequirementsMet * 5));
+      if (password.length < 8) {
+        return {
+          percent: partialPercent,
+          label: 'قصيرة جداً (الحد الأدنى 15 حرفاً)',
+          colorClass: 'bg-red-500',
+          textClass: 'text-red-600 dark:text-red-400',
+          borderFocusClass: 'focus-within:border-red-500 focus-within:ring-red-500/15',
+        };
+      }
+      return {
+        percent: partialPercent,
+        label: `باقي ${15 - password.length} أحرف للحد الأدنى`,
+        colorClass: 'bg-amber-500',
+        textClass: 'text-amber-600 dark:text-amber-400',
+        borderFocusClass: 'focus-within:border-amber-500 focus-within:ring-amber-500/15',
+      };
+    }
+
+    if (bonusRequirementsMet >= 2 || password.length >= 20) {
+      return {
+        percent: 100,
+        label: 'قوية جداً',
+        colorClass: 'bg-emerald-500',
+        textClass: 'text-emerald-600 dark:text-emerald-400',
+        borderFocusClass: 'border-emerald-500/50 dark:border-emerald-500/40 focus-within:border-emerald-600 focus-within:ring-emerald-600/15',
+      };
+    }
+
+    if (bonusRequirementsMet === 1 || password.length >= 17) {
+      return {
+        percent: 85,
+        label: 'جيدة',
+        colorClass: 'bg-blue-600',
+        textClass: 'text-blue-600 dark:text-blue-400',
+        borderFocusClass: 'focus-within:border-blue-600 focus-within:ring-blue-600/15',
+      };
+    }
+
+    return {
+      percent: 75,
+      label: 'مقبولة',
+      colorClass: 'bg-emerald-500',
+      textClass: 'text-emerald-600 dark:text-emerald-400',
+      borderFocusClass: 'focus-within:border-emerald-600 focus-within:ring-emerald-600/15',
+    };
+  };
+
+  const passwordStrength = getPasswordStrength();
 
   // If a session exists in Clerk's cache, auto-activate it
   useEffect(() => {
@@ -281,8 +390,17 @@ export function CustomAuth() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSignUpLoaded) return;
-    setLoading(true);
+
     setError('');
+    setHasSessionConflict(false);
+
+    if (password.length < 15) {
+      setShakePasswordRequirements(true);
+      setTimeout(() => setShakePasswordRequirements(false), 600);
+      return;
+    }
+
+    setLoading(true);
     
     try {
       await signUp.create({
@@ -294,16 +412,62 @@ export function CustomAuth() {
       setLoading(false);
     } catch (err: any) {
       const errCode = err.errors?.[0]?.code;
-      if (errCode === 'session_exists') {
+      const rawMsg = err.errors?.[0]?.longMessage || err.errors?.[0]?.message || '';
+      const lowerMsg = rawMsg.toLowerCase();
+
+      if (errCode === 'session_exists' || lowerMsg.includes('already signed in')) {
         const sessions = clerk.client?.sessions;
         const targetSession = sessions?.find((s) => s.status === 'active') || sessions?.[0];
         if (targetSession) {
           await clerk.setActive({ session: targetSession.id });
           return;
         }
+        setHasSessionConflict(true);
+        setError('توجد جلسة نشطة بالفعل. يرجى تفريغ الجلسات للمتابعة.');
+        setLoading(false);
+        return;
       }
-      const msg = err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'حدث خطأ في إنشاء الحساب. تأكد من صحة البيانات.';
-      setError(msg);
+
+      if (
+        errCode === 'form_password_length_too_short' ||
+        lowerMsg.includes('15 characters') ||
+        lowerMsg.includes('password is too short')
+      ) {
+        setShakePasswordRequirements(true);
+        setTimeout(() => setShakePasswordRequirements(false), 600);
+        setLoading(false);
+        return;
+      }
+
+      if (
+        errCode === 'form_password_pwned' ||
+        lowerMsg.includes('data breach') ||
+        lowerMsg.includes('pwned')
+      ) {
+        setPwnedPasswordError(true);
+        setShakePasswordRequirements(true);
+        setTimeout(() => setShakePasswordRequirements(false), 600);
+        setLoading(false);
+        return;
+      }
+
+      if (
+        errCode === 'form_password_not_strong_enough' ||
+        errCode === 'form_password_validation_failed'
+      ) {
+        setShakePasswordRequirements(true);
+        setTimeout(() => setShakePasswordRequirements(false), 600);
+        setLoading(false);
+        return;
+      }
+
+      if (errCode === 'form_identifier_exists' || lowerMsg.includes('already exists') || lowerMsg.includes('is taken')) {
+        setError('هذا البريد الإلكتروني مسجل بالفعل. يمكنك تسجيل الدخول بدلاً من ذلك.');
+      } else if (errCode === 'form_param_format_invalid') {
+        setError('يرجى التأكد من إدخال بريد إلكتروني صحيح.');
+      } else {
+        setError('حدث خطأ أثناء إنشاء الحساب. يرجى التحقق من البيانات والمحاولة مرة أخرى.');
+      }
       setLoading(false);
     }
   };
@@ -444,13 +608,15 @@ export function CustomAuth() {
             {error && (
               <div className="mb-6 p-4 bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-400 text-sm rounded-xl space-y-2">
                 <p className="leading-relaxed">{error}</p>
-                <button
-                  type="button"
-                  onClick={() => clerk.signOut()}
-                  className="text-xs text-red-600 dark:text-red-300 font-medium hover:underline block text-right"
-                >
-                  هل واجهت تعارض في الجلسة؟ اضغط هنا لتفريغ الجلسات
-                </button>
+                {hasSessionConflict && (
+                  <button
+                    type="button"
+                    onClick={() => clerk.signOut()}
+                    className="text-xs text-red-600 dark:text-red-300 font-medium hover:underline block text-right"
+                  >
+                    هل واجهت تعارض في الجلسة؟ اضغط هنا لتفريغ الجلسات
+                  </button>
+                )}
               </div>
             )}
 
@@ -579,11 +745,22 @@ export function CustomAuth() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    كلمة المرور
-                  </label>
-                  <div className="relative">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      كلمة المرور
+                    </label>
+                    {password.length > 0 && (
+                      <span className={`text-xs font-medium transition-colors duration-200 ${passwordStrength.textClass}`}>
+                        {passwordStrength.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Password Input with Bottom-Border Strength Indicator */}
+                  <div
+                    className={`relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus-within:ring-2 transition-all duration-200 ${passwordStrength.borderFocusClass}`}
+                  >
                     <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
                       <Lock className="h-5 w-5" />
                     </div>
@@ -591,9 +768,12 @@ export function CustomAuth() {
                       type={showPassword ? 'text' : 'password'}
                       required
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="block w-full pr-11 pl-11 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all sm:text-sm"
-                      placeholder="••••••••"
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (pwnedPasswordError) setPwnedPasswordError(false);
+                      }}
+                      className="block w-full pr-11 pl-11 py-3 bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none sm:text-sm"
+                      placeholder="•••••••••••••••"
                       dir="ltr"
                     />
                     <button
@@ -605,6 +785,98 @@ export function CustomAuth() {
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
+
+                    {/* Bottom Border Strength Track & Animated Fill */}
+                    <div className="absolute bottom-0 inset-x-0 h-1 bg-slate-100 dark:bg-slate-800/90" dir="ltr">
+                      <div
+                        className={`h-full transition-all duration-300 ease-out ${passwordStrength.colorClass}`}
+                        style={{ width: `${passwordStrength.percent}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Auto-completing Password Requirements Checklist */}
+                  <div
+                    className={`rounded-xl border p-3.5 transition-all duration-300 ${
+                      shakePasswordRequirements
+                        ? 'bg-red-50/70 dark:bg-red-950/20 border-red-300 dark:border-red-800/70 ring-2 ring-red-500/15'
+                        : 'bg-slate-50/80 dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2.5">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        متطلبات كلمة المرور
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
+                          isPasswordMinLengthMet
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                            : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        {passwordRequirements.filter((r) => r.met).length}/{passwordRequirements.length} مكتمل
+                      </span>
+                    </div>
+
+                    <ul className="space-y-2">
+                      {passwordRequirements.map((req) => (
+                        <li
+                          key={req.id}
+                          className="flex items-center justify-between text-xs transition-all duration-200"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 ${
+                                req.met
+                                  ? 'bg-emerald-500 text-white shadow-xs'
+                                  : req.required && shakePasswordRequirements
+                                  ? 'border-2 border-red-400 dark:border-red-500 bg-red-50 dark:bg-red-950/40'
+                                  : 'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
+                              }`}
+                            >
+                              {req.met ? (
+                                <Check className="w-2.5 h-2.5 stroke-[3]" />
+                              ) : (
+                                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
+                              )}
+                            </span>
+                            <span
+                              className={`transition-colors duration-200 ${
+                                req.met
+                                  ? 'text-emerald-700 dark:text-emerald-400 font-medium'
+                                  : req.required && shakePasswordRequirements
+                                  ? 'text-red-600 dark:text-red-400 font-semibold'
+                                  : 'text-slate-600 dark:text-slate-400'
+                              }`}
+                            >
+                              {req.label}
+                            </span>
+                          </div>
+
+                          {req.badge && (
+                            <span
+                              dir="ltr"
+                              className={`font-mono text-[11px] px-1.5 py-0.5 rounded-full transition-colors ${
+                                req.met
+                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold'
+                                  : 'text-slate-400 dark:text-slate-500'
+                              }`}
+                            >
+                              {req.badge}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+
+                      {pwnedPasswordError && (
+                        <li className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 font-medium pt-1 border-t border-red-200/60 dark:border-red-900/40">
+                          <span className="w-4 h-4 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0 text-[10px] font-bold">
+                            !
+                          </span>
+                          <span>كلمة المرور هذه ظهرت في تسريبات بيانات سابقة، يرجى اختيار كلمة مرور أخرى لحماية حسابك.</span>
+                        </li>
+                      )}
+                    </ul>
                   </div>
                 </div>
 
