@@ -5,6 +5,7 @@ import { useProfile, DEFAULT_FORMAL_AVATARS } from '../context/ProfileContext';
 import { ProfileMode } from '../types';
 import { MasarLogo } from './MasarLogo';
 import { verifyPin, isLockedOut, deletePin, clearFailedAttempts } from '../services/pinService';
+import { flushPendingPinPushes } from '../services/syncService';
 
 export function ProfileSelectorModal() {
   const { user } = useUser();
@@ -161,6 +162,10 @@ export function ProfileSelectorModal() {
       if (accounts.assistant) {
         await deletePin(orgId, 'assistant');
       }
+
+      // Flush NOW so the DELETE reaches the backend before we lose the token.
+      await flushPendingPinPushes().catch(() => {});
+
       clearFailedAttempts(orgId, 'admin');
       clearFailedAttempts(orgId, 'assistant');
       sessionStorage.removeItem(`masar_profile_unlocked_${orgId}`);

@@ -141,7 +141,8 @@ export async function pushPinConfig(record: PinConfigRecord): Promise<void> {
         id: record.id,
         orgId: record.orgId,
         profileType: record.profileType,
-        queuedAt: Date.now()
+        queuedAt: Date.now(),
+        operation: record.deletedAt ? 'delete' : 'put'
       });
       return;
     }
@@ -165,7 +166,8 @@ export async function pushPinConfig(record: PinConfigRecord): Promise<void> {
           id: record.id,
           orgId: record.orgId,
           profileType: record.profileType,
-          queuedAt: Date.now()
+          queuedAt: Date.now(),
+          operation: 'delete'
         });
       }
     } else {
@@ -185,7 +187,8 @@ export async function pushPinConfig(record: PinConfigRecord): Promise<void> {
           id: record.id,
           orgId: record.orgId,
           profileType: record.profileType,
-          queuedAt: Date.now()
+          queuedAt: Date.now(),
+          operation: 'put'
         });
       }
     }
@@ -196,7 +199,8 @@ export async function pushPinConfig(record: PinConfigRecord): Promise<void> {
         id: record.id,
         orgId: record.orgId,
         profileType: record.profileType,
-        queuedAt: Date.now()
+        queuedAt: Date.now(),
+        operation: record.deletedAt ? 'delete' : 'put'
       });
     } catch {}
     console.warn('[syncService] pushPinConfig network error:', err);
@@ -213,16 +217,21 @@ export async function flushPendingPinPushes(): Promise<void> {
 
     const pending = await db.pendingPinPushes.toArray();
     for (const item of pending) {
-      const rec = await db.pinConfigs.where('[orgId+profileType]').equals([item.orgId, item.profileType]).first();
-      if (!rec) {
+      const latest = await db.pinConfigs.where('[orgId+profileType]').equals([item.orgId, item.profileType]).first();
+      if (!latest) {
         await db.pendingPinPushes.delete(item.id);
         continue;
       }
 
-      const { orgId, ...bodyWithoutOrgId } = rec;
-      const url = `${API_BASE_URL}/api/pin-configs/${rec.profileType}`;
+      if (item.operation === 'delete' && !latest.deletedAt) {
+        await db.pendingPinPushes.delete(item.id);
+        continue;
+      }
 
-      if (rec.deletedAt) {
+      const { orgId, ...bodyWithoutOrgId } = latest;
+      const url = `${API_BASE_URL}/api/pin-configs/${latest.profileType}`;
+
+      if (latest.deletedAt) {
         const res = await fetch(url, {
           method: 'DELETE',
           headers: {

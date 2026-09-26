@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useOrganization, useUser, useAuth } from '@clerk/clerk-react';
+import { useOrganization, useUser, useAuth, useSession } from '@clerk/clerk-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { ProfileMode, ProfileAccount, AssistantSubSettings } from '../types';
@@ -73,13 +73,16 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const { organization } = useOrganization();
   const { user } = useUser();
   const { getToken } = useAuth();
+  const { session } = useSession();
   const orgId = organization?.id || 'default_org';
 
   // Register token getter and active org for sync
   useEffect(() => {
-    registerAuthTokenGetter(getToken);
+    if (session?.id) {
+      registerAuthTokenGetter(getToken);
+    }
     setActiveOrgId(orgId);
-  }, [getToken, orgId]);
+  }, [session?.id, getToken, orgId]);
 
   const [currentProfile, setCurrentProfile] = useState<ProfileMode>(() => {
     return (sessionStorage.getItem(`masar_active_profile_${orgId}`) as ProfileMode) || 'admin';

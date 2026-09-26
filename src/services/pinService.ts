@@ -31,6 +31,14 @@ export async function setPin(
     throw new Error('رمز الدخول يجب أن يتكون من 4 أرقام بالضبط');
   }
 
+  // Cancel any stale queued DELETE for this profile.
+  // A new PIN supersedes a pending reset.
+  await db.pendingPinPushes
+    .where('[orgId+profileType]')
+    .equals([orgId, profileType])
+    .delete()
+    .catch(() => {});
+
   const salt = generateSalt();
   const iterations = 210000;
   const hash = await hashPin(pin, salt, iterations);

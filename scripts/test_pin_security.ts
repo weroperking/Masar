@@ -18,7 +18,7 @@ import {
   clearFailedAttempts
 } from '../src/services/pinService';
 import { migrateLegacyPins } from '../src/services/pinMigration';
-import { pushPinConfig, pullPinConfigs, setActiveOrgId, registerAuthTokenGetter } from '../src/services/syncService';
+import { pushPinConfig, pullPinConfigs, flushPendingPinPushes, setActiveOrgId, registerAuthTokenGetter } from '../src/services/syncService';
 import { API_BASE_URL } from '../src/config/api';
 
 // Setup Mock Browser Storage Environment for unit tests
@@ -381,48 +381,119 @@ async function run() {
   });
 
   // ==========================================
-  // TEST 15: Simple PIN Reset Flow (Clerk Re-Auth + Reset to Default)
+  // TEST 15 — PIN reset + re-set syncs correctly
   // ==========================================
   try {
-    const resetOrgId = 'org_pin_reset_test';
+    const resetOrgId = 'org_pin_reset_sync_test';
     setActiveOrgId(resetOrgId);
 
-    // 1. Set admin PIN to '5678'
-    await setPin(resetOrgId, 'admin', '5678');
-    const is5678Active = await verifyPin(resetOrgId, 'admin', '5678');
-    const is1234BeforeReset = await verifyPin(resetOrgId, 'admin', '1234');
+    // Track remote API state in memory for mock fetch
+    const remoteApiStore = new Map<string, any>();
+    let tokenVersion = 'token_v1';
 
-    // 2. Simulate reset: deletePin(resetOrgId, 'admin') + simulate signOut (clearing session storage)
-    await deletePin(resetOrgId, 'admin');
-    sessionStorage.removeItem(`masar_profile_unlocked_${resetOrgId}`);
-    sessionStorage.removeItem(`masar_active_profile_${resetOrgId}`);
+    registerAuthTokenGetter(async () => tokenVersion);
 
-    // 3. Simulate re-login: forcePinChange should be true because verifyPin(resetOrgId, 'admin', '1234') is true
-    const forcePinChangeOnReLogin = await verifyPin(resetOrgId, 'admin', '1234');
-    const isOldPinRejected = !(await verifyPin(resetOrgId, 'admin', '5678'));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const urlStr = String(url);
+      const method = (init?.method || 'GET').toUpperCase();
 
-    // 4. Set new PIN '1234' via setPin
-    await setPin(resetOrgId, 'admin', '1234');
+      if (urlStr.includes('/api/pin-configs')) {
+        const authHeader = (init?.headers as any)?.['Authorization'];
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+        }
 
-    // 5. Check: verifyPin('5678') -> false. verifyPin('1234') -> true.
-    const verify5678AfterNewPin = await verifyPin(resetOrgId, 'admin', '5678');
-    const verify1234AfterNewPin = await verifyPin(resetOrgId, 'admin', '1234');
+        if (urlStr.endsWith('/admin')) {
+          if (method === 'DELETE') {
+            const existing = remoteApiStore.get('admin');
+            if (existing) {
+              remoteApiStore.set('admin', { ...existing, deletedAt: new Date().toISOString() });
+            } else {
+              remoteApiStore.set('admin', { orgId: resetOrgId, profileType: 'admin', deletedAt: new Date().toISOString() });
+            }
+            return new Response(JSON.stringify({ ok: true }), { status: 200 });
+          } else if (method === 'PUT') {
+            const body = JSON.parse(String(init?.body || '{}'));
+            remoteApiStore.set('admin', { ...body, orgId: resetOrgId, deletedAt: null });
+            return new Response(JSON.stringify({ ok: true }), { status: 200 });
+          }
+        } else if (method === 'GET') {
+          const rows = Array.from(remoteApiStore.values());
+          return new Response(JSON.stringify(rows), { status: 200 });
+        }
+      }
+      return originalFetch(url, init);
+    }) as typeof fetch;
 
-    const pass = is5678Active === true &&
-                 is1234BeforeReset === false &&
-                 forcePinChangeOnReLogin === true &&
-                 isOldPinRejected === true &&
-                 verify5678AfterNewPin === false &&
-                 verify1234AfterNewPin === true;
+    try {
+      // 1. setPin(resetOrgId, 'admin', '5678')
+      await setPin(resetOrgId, 'admin', '5678');
 
-    testResults.push({
-      id: 15,
-      name: 'Simple PIN Reset: set admin 5678 -> deletePin + signOut -> forcePinChange is true -> set new PIN 1234 -> 5678 false, 1234 true',
-      status: pass ? 'PASS' : 'FAIL',
-      output: `is5678Active: ${is5678Active}, forcePinChange: ${forcePinChangeOnReLogin}, oldRejected: ${isOldPinRejected}, verify5678After: ${verify5678AfterNewPin}, verify1234After: ${verify1234AfterNewPin}`
-    });
+      // 2. Await flushPendingPinPushes()
+      await flushPendingPinPushes();
+
+      // 3. Remote GET -> assert 1 admin row, deletedAt=null
+      const step3Remote = remoteApiStore.get('admin');
+      const step3Ok = Boolean(step3Remote && step3Remote.deletedAt === null);
+
+      // 4. Simulate reset:
+      // - deletePin(resetOrgId, 'admin')
+      // - flushPendingPinPushes() // DELETE reaches backend
+      // - signOut()
+      await deletePin(resetOrgId, 'admin');
+      await flushPendingPinPushes();
+      const step4Remote = remoteApiStore.get('admin');
+      const step4Deleted = Boolean(step4Remote && step4Remote.deletedAt !== null);
+
+      // Simulate signOut (token cleared)
+      tokenVersion = '';
+
+      // 5. Simulate re-login:
+      // - New token (registerAuthTokenGetter with fresh JWT)
+      // - setPin(resetOrgId, 'admin', '1234')
+      // - await flushPendingPinPushes()
+      tokenVersion = 'token_v2_fresh';
+      registerAuthTokenGetter(async () => tokenVersion);
+      await setPin(resetOrgId, 'admin', '1234');
+      await flushPendingPinPushes();
+
+      // 6. Assert remote state:
+      // - Exactly 1 admin row (not 2)
+      // - deletedAt === null
+      // - pinHash matches hash of '1234', not '5678'
+      // - verifyPin(resetOrgId, 'admin', '1234') === true
+      // - verifyPin(resetOrgId, 'admin', '5678') === false
+      const adminRows = Array.from(remoteApiStore.values()).filter(r => r.profileType === 'admin');
+      const step6Remote = remoteApiStore.get('admin');
+
+      const is1AdminRow = adminRows.length === 1;
+      const isNotDeleted = step6Remote?.deletedAt === null;
+
+      const hash5678 = await hashPin('5678', step6Remote?.pinSalt || '', step6Remote?.pinIterations || 210000);
+      const hash1234 = await hashPin('1234', step6Remote?.pinSalt || '', step6Remote?.pinIterations || 210000);
+      const isHash1234 = step6Remote?.pinHash === hash1234 && step6Remote?.pinHash !== hash5678;
+
+      const verify1234Local = await verifyPin(resetOrgId, 'admin', '1234');
+      const verify5678Local = await verifyPin(resetOrgId, 'admin', '5678');
+
+      // 7. Assert db.pendingPinPushes has 0 rows for this profile
+      const pendingPushes = await db.pendingPinPushes.where('[orgId+profileType]').equals([resetOrgId, 'admin']).toArray();
+      const zeroPending = pendingPushes.length === 0;
+
+      const pass = step3Ok && step4Deleted && is1AdminRow && isNotDeleted && isHash1234 && verify1234Local && !verify5678Local && zeroPending;
+
+      testResults.push({
+        id: 15,
+        name: 'Test 15 — PIN reset + re-set syncs correctly (no stale DELETE wiping new PIN)',
+        status: pass ? 'PASS' : 'FAIL',
+        output: `step3Ok: ${step3Ok}, step4Deleted: ${step4Deleted}, 1AdminRow: ${is1AdminRow}, isNotDeleted: ${isNotDeleted}, isHash1234: ${isHash1234}, verify1234: ${verify1234Local}, verify5678: ${verify5678Local}, zeroPending: ${zeroPending}`
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   } catch (err: any) {
-    testResults.push({ id: 15, name: 'Simple PIN Reset flow', status: 'FAIL', output: err.message });
+    testResults.push({ id: 15, name: 'Test 15 — PIN reset + re-set syncs correctly', status: 'FAIL', output: err.message });
   }
 
   // ==========================================

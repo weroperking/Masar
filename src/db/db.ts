@@ -26,6 +26,7 @@ export interface PendingPinPush {
   orgId: string;
   profileType: 'admin' | 'assistant';
   queuedAt: number;
+  operation?: 'put' | 'delete';
 }
 
 export class AppDatabase extends Dexie {
@@ -125,6 +126,11 @@ export class AppDatabase extends Dexie {
     // Version 10 - Offline retry queue for PIN configurations
     this.version(10).stores({
       pendingPinPushes: 'id, orgId, profileType, queuedAt'
+    });
+
+    // Version 11 - Compound index for pendingPinPushes
+    this.version(11).stores({
+      pendingPinPushes: 'id, orgId, profileType, [orgId+profileType], queuedAt'
     });
   }
 }
