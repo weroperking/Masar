@@ -10,7 +10,8 @@ import {
   recordFailedAttempt,
   clearFailedAttempts,
   updatePinFlags,
-  deletePin
+  deletePin,
+  getPinState
 } from '../services/pinService';
 import { migrateLegacyPins } from '../services/pinMigration';
 import { pullPinConfigs, flushPendingPinPushes, registerAuthTokenGetter, setActiveOrgId } from '../services/syncService';
@@ -48,6 +49,10 @@ interface ProfileContextType {
   showProfileSelector: boolean;
   forcePinChange: boolean;
   setForcePinChange: (val: boolean) => void;
+  needsInitialPin: boolean;
+  setNeedsInitialPin: (val: boolean) => void;
+  pinChangeMode: 'set' | 'change' | null;
+  setPinChangeMode: (val: 'set' | 'change' | null) => void;
   lockProfile: () => void;
   unlockWithPin: (profile: ProfileMode, enteredPin?: string) => Promise<{ success: boolean; error?: string }>;
   switchProfileDirect: (profile: ProfileMode) => boolean;
@@ -95,6 +100,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const [showProfileSelector, setShowProfileSelector] = useState<boolean>(false);
   const [forcePinChange, setForcePinChange] = useState<boolean>(false);
+  const [needsInitialPin, setNeedsInitialPin] = useState<boolean>(false);
+  const [pinChangeMode, setPinChangeMode] = useState<'set' | 'change' | null>(null);
 
   // Sync state when org changes
   useEffect(() => {
@@ -134,19 +141,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   // Run migration and pull on startup / org switch
   useEffect(() => {
-    let mounted = true;
     (async () => {
       await migrateLegacyPins(orgId);
       await pullPinConfigs(orgId);
       await flushPendingPinPushes().catch(() => {});
-      if (mounted) {
-        const isDefault = await verifyPin(orgId, 'admin', '1234');
-        setForcePinChange(isDefault);
-      }
     })();
-    return () => {
-      mounted = false;
-    };
   }, [orgId]);
 
   // Sync profile data reactively whenever settings, user metadata, or localStorage changes
@@ -211,18 +210,43 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
   }, [liveSettings, livePinConfigs, orgId, user?.fullName, (user?.unsafeMetadata as any)?.teacherName]);
 
-  // Check if forcePinChange should be updated
+  // Single state-derivation effect: PIN state is the single source of truth
   useEffect(() => {
+    if (!orgId || !session?.id) return;
     let mounted = true;
-    verifyPin(orgId, 'admin', '1234').then(isDefault => {
-      if (mounted) {
-        setForcePinChange(isDefault);
+    (async () => {
+      const resetMarker = sessionStorage.getItem(`masar_pin_reset_pending_${orgId}`);
+      if (resetMarker) {
+        sessionStorage.removeItem(`masar_pin_reset_pending_${orgId}`);
+        if (mounted) {
+          setNeedsInitialPin(true);
+          setPinChangeMode('set');
+          setForcePinChange(false);
+        }
+        return;
       }
-    });
+
+      const state = await getPinState(orgId, 'admin');
+      if (mounted) {
+        if (state === 'NO_PIN') {
+          setNeedsInitialPin(true);
+          setPinChangeMode('set');
+          setForcePinChange(false);
+        } else if (state === 'DEFAULT_PIN') {
+          setNeedsInitialPin(false);
+          setPinChangeMode('change');
+          setForcePinChange(true);
+        } else {
+          setNeedsInitialPin(false);
+          setPinChangeMode(null);
+          setForcePinChange(false);
+        }
+      }
+    })();
     return () => {
       mounted = false;
     };
-  }, [livePinConfigs, orgId]);
+  }, [orgId, session?.id, livePinConfigs]);
 
   // Listen to custom cross-component update events
   useEffect(() => {
@@ -370,9 +394,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (cleanNewPin !== '1234') {
-        setForcePinChange(false);
-      }
+      setForcePinChange(false);
+      setNeedsInitialPin(false);
+      setPinChangeMode(null);
 
       return { success: true };
     } catch (e: any) {
@@ -598,6 +622,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         showProfileSelector,
         forcePinChange,
         setForcePinChange,
+        needsInitialPin,
+        setNeedsInitialPin,
+        pinChangeMode,
+        setPinChangeMode,
         lockProfile,
         unlockWithPin,
         switchProfileDirect,
@@ -613,10 +641,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         autoLockMinutes
       }}
     >
-      {forcePinChange && (
+      {(forcePinChange || needsInitialPin) && (
         <AdminPinChangeModal
           isOpen={true}
           isForced={true}
+          mode={pinChangeMode || 'set'}
           onClose={() => {}}
         />
       )}
@@ -641,6 +670,10 @@ const defaultProfileContextValue: ProfileContextType = {
   showProfileSelector: false,
   forcePinChange: false,
   setForcePinChange: () => {},
+  needsInitialPin: false,
+  setNeedsInitialPin: () => {},
+  pinChangeMode: null,
+  setPinChangeMode: () => {},
   lockProfile: () => {},
   unlockWithPin: async () => ({ success: true }),
   switchProfileDirect: () => true,

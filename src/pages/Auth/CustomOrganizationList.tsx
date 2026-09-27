@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { MasarLogo } from '../../components/MasarLogo';
 import { db } from '../../db/db';
+import { setPin } from '../../services/pinService';
 
 export function CustomOrganizationList() {
   const { userMemberships, isLoaded, setActive, createOrganization } = useOrganizationList({
@@ -38,7 +39,7 @@ export function CustomOrganizationList() {
   const [lastName, setLastName] = useState(user?.lastName || '');
   
   // Profile PIN setup states
-  const [adminPin, setAdminPin] = useState('1234');
+  const [adminPin, setAdminPin] = useState('');
   const [enableAssistant, setEnableAssistant] = useState(false);
   const [assistantName, setAssistantName] = useState('فريق المساعدين');
   const [assistantPinRequired, setAssistantPinRequired] = useState(false);
@@ -120,6 +121,12 @@ export function CustomOrganizationList() {
       setLoading(true);
       setError('');
 
+      if (!adminPin || adminPin.length !== 4 || !/^\d{4}$/.test(adminPin)) {
+        setError('رمز الدخول السري لحساب المعلم يجب أن يتكون من 4 أرقام بالضبط');
+        setLoading(false);
+        return;
+      }
+
       if (enableAssistant && assistantPinRequired) {
         if (!assistantPin || assistantPin.length !== 4) {
           setError('رمز الدخول للمساعد يجب أن يتكون من 4 أرقام');
@@ -171,10 +178,17 @@ export function CustomOrganizationList() {
         localStorage.setItem(`masar_academy_name_${newOrg.id}`, orgName.trim());
       }
 
-      // 4. Save to IndexedDB (Settings & Users)
+      // 4. Save to IndexedDB (Settings, Users, & PinConfigs)
       try {
+        if (newOrg?.id && adminPin) {
+          await setPin(newOrg.id, 'admin', adminPin);
+        }
+        if (newOrg?.id && enableAssistant && assistantPinRequired && assistantPin) {
+          await setPin(newOrg.id, 'assistant', assistantPin, { assistantPinRequired: true });
+        }
+
         const profilesConfig = {
-          adminPin: adminPin || '1234',
+          adminPin: adminPin,
           adminName: teacherFullName,
           adminAvatarUrl: '/avatar-admin.svg',
           assistantEnabled: enableAssistant,

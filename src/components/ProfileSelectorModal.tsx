@@ -170,7 +170,7 @@ export function ProfileSelectorModal() {
       clearFailedAttempts(orgId, 'assistant');
       sessionStorage.removeItem(`masar_profile_unlocked_${orgId}`);
       sessionStorage.removeItem(`masar_active_profile_${orgId}`);
-      setForcePinChange(true);
+      sessionStorage.setItem(`masar_pin_reset_pending_${orgId}`, 'true');
       await signOut();
       window.location.href = '/';
     } catch (err) {

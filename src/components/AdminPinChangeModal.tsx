@@ -8,18 +8,21 @@ export function AdminPinChangeModal({
   isOpen,
   onClose,
   isForced = false,
-  isReset = false
+  isReset = false,
+  mode = 'change'
 }: {
   isOpen: boolean;
   onClose: () => void;
   isForced?: boolean;
   isReset?: boolean;
+  mode?: 'set' | 'change';
 }) {
-  const { updateAdminPin, setForcePinChange } = useProfile();
+  const { updateAdminPin, setForcePinChange, setNeedsInitialPin, setPinChangeMode } = useProfile();
   const { organization } = useOrganization();
   const orgId = organization?.id || 'default_org';
 
   const isForcedMode = isForced || isReset;
+  const activeMode = mode;
 
   const [currentPin, setCurrentPin] = useState<string>('');
   const [newPin, setNewPin] = useState<string>('');
@@ -34,6 +37,13 @@ export function AdminPinChangeModal({
     e.preventDefault();
     setErrorMsg('');
 
+    if (activeMode === 'change') {
+      if (!currentPin || currentPin.trim() === '') {
+        setErrorMsg('يرجى إدخال رمز الدخول الحالي');
+        return;
+      }
+    }
+
     if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
       setErrorMsg('رمز الدخول الجديد يجب أن يتكون من 4 أرقام بالضبط');
       return;
@@ -44,14 +54,14 @@ export function AdminPinChangeModal({
       return;
     }
 
-    if (isForcedMode && newPin === '1234') {
+    if (isForcedMode && activeMode === 'change' && newPin === '1234') {
       setErrorMsg('يجب اختيار رمز دخول جديد مختلف عن الرمز الافتراضي 1234');
       return;
     }
 
     setIsLoading(true);
     try {
-      if (!isForcedMode && currentPin && currentPin.trim() !== '') {
+      if (activeMode === 'change') {
         const isCurrentValid = await verifyPin(orgId, 'admin', currentPin.trim());
         if (!isCurrentValid) {
           setErrorMsg('رمز الدخول الحالي غير صحيح');
@@ -60,11 +70,11 @@ export function AdminPinChangeModal({
         }
       }
 
-      const res = await updateAdminPin(newPin, isForcedMode ? undefined : currentPin);
+      const res = await updateAdminPin(newPin, activeMode === 'change' ? currentPin : undefined);
       if (res.success) {
-        if (newPin !== '1234') {
-          setForcePinChange(false);
-        }
+        setForcePinChange(false);
+        setNeedsInitialPin(false);
+        setPinChangeMode(null);
         setSuccessMsg('تم تعيين رمز الدخول الجديد بنجاح!');
         setTimeout(() => {
           onClose();
@@ -99,10 +109,10 @@ export function AdminPinChangeModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 font-['Readex_Pro']">
-                {isForcedMode ? 'تعيين رمز دخول جديد' : 'تغيير رمز الدخول السري'}
+                {activeMode === 'set' ? 'عيّن رمزاً جديداً' : 'غيّر الرمز'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {isForcedMode
+                {activeMode === 'set'
                   ? 'لتأمين بيانات الطلاب والماليات، يرجى تعيين رمز دخول سري خاص بك'
                   : 'تعديل رمز الدخول السري المكون من 4 أرقام'}
               </p>
@@ -142,7 +152,7 @@ export function AdminPinChangeModal({
 
         {!successMsg && (
           <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-            {!isForcedMode && (
+            {activeMode === 'change' && (
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   رمز الدخول الحالي
@@ -150,6 +160,7 @@ export function AdminPinChangeModal({
                 <input
                   type="password"
                   maxLength={4}
+                  required
                   value={currentPin}
                   onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, ''))}
                   placeholder="****"
@@ -172,7 +183,7 @@ export function AdminPinChangeModal({
                   onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
                   placeholder="****"
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-sm font-mono tracking-widest focus:outline-none focus:border-blue-600 dark:text-white"
-                  autoFocus={isForcedMode}
+                  autoFocus={activeMode === 'set'}
                 />
               </div>
 

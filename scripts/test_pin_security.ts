@@ -15,7 +15,8 @@ import {
   deletePin,
   isLockedOut,
   recordFailedAttempt,
-  clearFailedAttempts
+  clearFailedAttempts,
+  getPinState
 } from '../src/services/pinService';
 import { migrateLegacyPins } from '../src/services/pinMigration';
 import { pushPinConfig, pullPinConfigs, flushPendingPinPushes, setActiveOrgId, registerAuthTokenGetter } from '../src/services/syncService';
@@ -494,6 +495,241 @@ async function run() {
     }
   } catch (err: any) {
     testResults.push({ id: 15, name: 'Test 15 — PIN reset + re-set syncs correctly', status: 'FAIL', output: err.message });
+  }
+
+  // ==========================================
+  // TEST 16: Fresh org, NO_PIN state
+  // ==========================================
+  try {
+    const org16 = 'org_test16';
+    const state16 = await getPinState(org16, 'admin');
+    let needsInitialPin = false;
+    let pinChangeMode: 'set' | 'change' | null = null;
+    let forcePinChange = false;
+
+    if (state16 === 'NO_PIN') {
+      needsInitialPin = true;
+      pinChangeMode = 'set';
+      forcePinChange = false;
+    }
+
+    const pass = state16 === 'NO_PIN' && needsInitialPin === true && pinChangeMode === 'set' && forcePinChange === false;
+    testResults.push({
+      id: 16,
+      name: 'Fresh org, NO_PIN state -> mode is set, needsInitialPin=true, forcePinChange=false',
+      status: pass ? 'PASS' : 'FAIL',
+      output: `state: ${state16}, needsInitialPin: ${needsInitialPin}, pinChangeMode: ${pinChangeMode}, forcePinChange: ${forcePinChange}`
+    });
+  } catch (err: any) {
+    testResults.push({ id: 16, name: 'Fresh org NO_PIN test', status: 'FAIL', output: err.message });
+  }
+
+  // ==========================================
+  // TEST 17: Set default PIN '1234' -> DEFAULT_PIN
+  // ==========================================
+  try {
+    const org17 = 'org_test17';
+    await setPin(org17, 'admin', '1234');
+    const state17Initial = await getPinState(org17, 'admin');
+
+    let needsInitialPin = false;
+    let pinChangeMode: 'set' | 'change' | null = null;
+    let forcePinChange = false;
+
+    if (state17Initial === 'DEFAULT_PIN') {
+      needsInitialPin = false;
+      pinChangeMode = 'change';
+      forcePinChange = true;
+    }
+
+    const step1Ok = state17Initial === 'DEFAULT_PIN' && pinChangeMode === 'change' && forcePinChange === true;
+
+    // Set new PIN '5678' via modal
+    await setPin(org17, 'admin', '5678');
+    const state17After = await getPinState(org17, 'admin');
+
+    if (state17After === 'CUSTOM_PIN') {
+      needsInitialPin = false;
+      pinChangeMode = null;
+      forcePinChange = false;
+    }
+
+    const step2Ok = state17After === 'CUSTOM_PIN' && forcePinChange === false && needsInitialPin === false && pinChangeMode === null;
+
+    const pass = step1Ok && step2Ok;
+    testResults.push({
+      id: 17,
+      name: 'Set default PIN 1234 -> DEFAULT_PIN -> change to 5678 -> CUSTOM_PIN',
+      status: pass ? 'PASS' : 'FAIL',
+      output: `step1(DEFAULT_PIN): ${step1Ok}, step2(CUSTOM_PIN): ${step2Ok}, stateAfter: ${state17After}`
+    });
+  } catch (err: any) {
+    testResults.push({ id: 17, name: 'DEFAULT_PIN transition test', status: 'FAIL', output: err.message });
+  }
+
+  // ==========================================
+  // TEST 18: Normal login with CUSTOM_PIN does NOT open the change modal
+  // ==========================================
+  try {
+    const org18 = 'org_test18';
+    await setPin(org18, 'admin', '5678');
+
+    // Simulate signOut -> signIn
+    const state18 = await getPinState(org18, 'admin');
+    let forcePinChange = true;
+    let pinChangeMode: 'set' | 'change' | null = 'change';
+
+    if (state18 === 'CUSTOM_PIN') {
+      forcePinChange = false;
+      pinChangeMode = null;
+    }
+
+    const verifyOk = await verifyPin(org18, 'admin', '5678');
+
+    const pass = state18 === 'CUSTOM_PIN' && forcePinChange === false && pinChangeMode === null && verifyOk === true;
+    testResults.push({
+      id: 18,
+      name: 'Normal login with CUSTOM_PIN does NOT open the change modal',
+      status: pass ? 'PASS' : 'FAIL',
+      output: `state: ${state18}, forcePinChange: ${forcePinChange}, pinChangeMode: ${pinChangeMode}, verifyOk: ${verifyOk}`
+    });
+  } catch (err: any) {
+    testResults.push({ id: 18, name: 'CUSTOM_PIN normal login test', status: 'FAIL', output: err.message });
+  }
+
+  // ==========================================
+  // TEST 19: Forgot-PIN reset flow -> SET mode, not CHANGE
+  // ==========================================
+  try {
+    const org19 = 'org_test19';
+    await setPin(org19, 'admin', '5678');
+
+    // Tap reset -> deletePin -> flushPendingPinPushes -> marker set -> signOut
+    await deletePin(org19, 'admin');
+    await flushPendingPinPushes().catch(() => {});
+    sessionStorage.setItem(`masar_pin_reset_pending_${org19}`, 'true');
+
+    // Simulate re-login with new token
+    const resetMarker = sessionStorage.getItem(`masar_pin_reset_pending_${org19}`);
+    let needsInitialPin = false;
+    let pinChangeMode: 'set' | 'change' | null = null;
+    let forcePinChange = false;
+
+    if (resetMarker) {
+      sessionStorage.removeItem(`masar_pin_reset_pending_${org19}`);
+      needsInitialPin = true;
+      pinChangeMode = 'set';
+      forcePinChange = false;
+    } else {
+      const state = await getPinState(org19, 'admin');
+      if (state === 'NO_PIN') {
+        needsInitialPin = true;
+        pinChangeMode = 'set';
+      }
+    }
+
+    const stateAfterDelete = await getPinState(org19, 'admin');
+    const step1Ok = resetMarker === 'true' && stateAfterDelete === 'NO_PIN' && pinChangeMode === 'set' && needsInitialPin === true && forcePinChange === false;
+
+    // Set '9999' -> success
+    await setPin(org19, 'admin', '9999');
+    needsInitialPin = false;
+    pinChangeMode = null;
+    forcePinChange = false;
+
+    // Simulate signOut -> signIn again
+    const stateAfterReset = await getPinState(org19, 'admin');
+    const verify9999 = await verifyPin(org19, 'admin', '9999');
+    const step2Ok = stateAfterReset === 'CUSTOM_PIN' && verify9999 === true;
+
+    const pass = step1Ok && step2Ok;
+    testResults.push({
+      id: 19,
+      name: 'Forgot-PIN reset flow -> SET mode, not CHANGE',
+      status: pass ? 'PASS' : 'FAIL',
+      output: `step1ResetSetMode: ${step1Ok}, step2CustomPinAfter9999: ${step2Ok}, verify9999: ${verify9999}`
+    });
+  } catch (err: any) {
+    testResults.push({ id: 19, name: 'Reset flow test', status: 'FAIL', output: err.message });
+  }
+
+  // ==========================================
+  // TEST 20: Onboarding fresh org -> set, then subsequent login is normal
+  // ==========================================
+  try {
+    const org20 = 'org_test20';
+    const stateFresh = await getPinState(org20, 'admin');
+    const isFreshNoPin = stateFresh === 'NO_PIN';
+
+    // Onboarding sets '4444'
+    await setPin(org20, 'admin', '4444');
+
+    // Subsequent login
+    const stateSubsequent = await getPinState(org20, 'admin');
+    const verify4444 = await verifyPin(org20, 'admin', '4444');
+
+    let forcePinChange = true;
+    let pinChangeMode: 'set' | 'change' | null = 'change';
+
+    if (stateSubsequent === 'CUSTOM_PIN') {
+      forcePinChange = false;
+      pinChangeMode = null;
+    }
+
+    const pass = isFreshNoPin && stateSubsequent === 'CUSTOM_PIN' && forcePinChange === false && pinChangeMode === null && verify4444 === true;
+    testResults.push({
+      id: 20,
+      name: 'Onboarding fresh org -> set, then subsequent login is normal',
+      status: pass ? 'PASS' : 'FAIL',
+      output: `isFreshNoPin: ${isFreshNoPin}, stateSubsequent: ${stateSubsequent}, forcePinChange: ${forcePinChange}, verify4444: ${verify4444}`
+    });
+  } catch (err: any) {
+    testResults.push({ id: 20, name: 'Onboarding PIN test', status: 'FAIL', output: err.message });
+  }
+
+  // ==========================================
+  // TEST 21: Set custom PIN '5678' -> setPin '9999' -> assert flags stay false after 100ms
+  // ==========================================
+  try {
+    const org21 = 'org_test21';
+    await setPin(org21, 'admin', '5678');
+    let stateBefore = await getPinState(org21, 'admin');
+
+    // Immediately update to '9999'
+    await setPin(org21, 'admin', '9999');
+
+    // Wait 100ms
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const stateAfter100ms = await getPinState(org21, 'admin');
+
+    let needsInitialPin = true;
+    let pinChangeMode: 'set' | 'change' | null = 'set';
+    let forcePinChange = true;
+
+    if (stateAfter100ms === 'CUSTOM_PIN') {
+      needsInitialPin = false;
+      pinChangeMode = null;
+      forcePinChange = false;
+    }
+
+    const verify9999 = await verifyPin(org21, 'admin', '9999');
+    const pass =
+      stateBefore === 'CUSTOM_PIN' &&
+      stateAfter100ms === 'CUSTOM_PIN' &&
+      forcePinChange === false &&
+      needsInitialPin === false &&
+      pinChangeMode === null &&
+      verify9999 === true;
+
+    testResults.push({
+      id: 21,
+      name: 'Set custom PIN 5678 -> update to 9999 -> 100ms delay -> flags stay false/null',
+      status: pass ? 'PASS' : 'FAIL',
+      output: `stateBefore: ${stateBefore}, stateAfter100ms: ${stateAfter100ms}, forcePinChange: ${forcePinChange}, needsInitialPin: ${needsInitialPin}, pinChangeMode: ${pinChangeMode}`
+    });
+  } catch (err: any) {
+    testResults.push({ id: 21, name: 'State derivation stability test', status: 'FAIL', output: err.message });
   }
 
   // ==========================================

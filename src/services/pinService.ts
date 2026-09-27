@@ -21,6 +21,18 @@ export async function getPinConfig(
     .first();
 }
 
+export type PinState = 'NO_PIN' | 'DEFAULT_PIN' | 'CUSTOM_PIN';
+
+export async function getPinState(
+  orgId: string,
+  profileType: 'admin' | 'assistant'
+): Promise<PinState> {
+  const rec = await getPinConfig(orgId, profileType);
+  if (!rec || rec.deletedAt) return 'NO_PIN';
+  const isDefault = await verifyPin(orgId, profileType, '1234');
+  return isDefault ? 'DEFAULT_PIN' : 'CUSTOM_PIN';
+}
+
 export async function setPin(
   orgId: string,
   profileType: 'admin' | 'assistant',
