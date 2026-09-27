@@ -694,13 +694,15 @@ function AttendanceModal({
       );
 
       setRecordMap((prev) => {
+        let changed = false;
         const map: Record<string, "present" | "absent" | "compensation"> = { ...prev };
         sessionRecords.forEach((r) => {
           if (r.studentId && !map[r.studentId]) {
             map[r.studentId] = r.status;
+            changed = true;
           }
         });
-        return map;
+        return changed ? map : prev;
       });
 
       const guestIds = sessionRecords
@@ -711,17 +713,17 @@ function AttendanceModal({
         );
       if (guestIds.length > 0 && allStudents.length > 0) {
         const guests = allStudents.filter((s) => guestIds.includes(s.id));
-        setExtraGuestStudents((prev) => [
-          ...prev,
-          ...guests.filter((g) => !prev.some((p) => p.id === g.id)),
-        ]);
+        setExtraGuestStudents((prev) => {
+          const added = guests.filter((g) => !prev.some((p) => p.id === g.id));
+          return added.length > 0 ? [...prev, ...added] : prev;
+        });
       }
 
       if (allRecords.length > 0 || sessionRecords.length > 0) {
         initializedSessionIdRef.current = session.id;
       }
     }
-  }, [session?.id, allRecords, rosterStudents, allStudents]);
+  }, [session?.id, allRecords, allStudents]);
 
   // Process code scanning or manual submit
   const processStudentCode = (rawCode: string) => {

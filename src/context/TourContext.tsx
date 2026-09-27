@@ -31,7 +31,7 @@ const TourContext = createContext<TourContextType | undefined>(undefined);
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const { isSignedIn, userId } = useAuth();
   const { organization } = useOrganization();
-  const { currentProfile, isLocked, showProfileSelector } = useProfile();
+  const { currentProfile, isLocked, showProfileSelector, forcePinChange, needsInitialPin } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -73,19 +73,27 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   // First-time auto-trigger for current profile tour if not completed and profile is selected/unlocked
   useEffect(() => {
-    if (!isSignedIn || hasCompletedTour || isLocked || showProfileSelector || window.location.pathname.startsWith(STUDENT_LOOKUP_PATH_PREFIX)) {
+    if (
+      !isSignedIn ||
+      hasCompletedTour ||
+      isLocked ||
+      showProfileSelector ||
+      forcePinChange ||
+      needsInitialPin ||
+      window.location.pathname.startsWith(STUDENT_LOOKUP_PATH_PREFIX)
+    ) {
       return;
     }
 
     const timer = setTimeout(() => {
-      if (!hasCompletedTour && !isActive && !isLocked && !showProfileSelector) {
+      if (!hasCompletedTour && !isActive && !isLocked && !showProfileSelector && !forcePinChange && !needsInitialPin) {
         setIsActive(true);
         setCurrentStepIndex(0);
       }
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [isSignedIn, hasCompletedTour, activeTourType, isLocked, showProfileSelector, isActive]);
+  }, [isSignedIn, hasCompletedTour, activeTourType, isLocked, showProfileSelector, forcePinChange, needsInitialPin, isActive]);
 
   // Route synchronization & Target Element Measurement
   const updateTargetRect = useCallback(() => {
@@ -109,13 +117,13 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
 
   // Navigate when step route differs from current pathname
   useEffect(() => {
-    if (!isActive || !currentStep) return;
+    if (!isActive || !currentStep || forcePinChange || needsInitialPin) return;
 
     if (currentStep.route && location.pathname !== currentStep.route) {
       setIsReady(false);
       navigate(currentStep.route);
     }
-  }, [isActive, currentStepIndex, currentStep?.route, location.pathname, navigate]);
+  }, [isActive, currentStepIndex, currentStep?.route, location.pathname, navigate, forcePinChange, needsInitialPin]);
 
   // Re-measure target element upon route changes, step changes, resize, or scroll
   useEffect(() => {

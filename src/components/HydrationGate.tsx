@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { db } from '../db/db';
 import { performHandshake, hydrateIfNeeded } from '../services/syncService';
@@ -12,6 +12,9 @@ interface HydrationGateProps {
 
 export function HydrationGate({ children }: HydrationGateProps) {
   const { getToken } = useAuth();
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+
   const { organization } = useOrganization();
   const [isHydrated, setIsHydrated] = useState<boolean | null>(null);
   const [isHydrating, setIsHydrating] = useState(false);
@@ -31,12 +34,12 @@ export function HydrationGate({ children }: HydrationGateProps) {
       }
 
       // 2. Perform crypto handshake & migration
-      await performHandshake(getToken);
+      await performHandshake(getTokenRef.current);
       await migratePlaintextRecords();
 
       // 3. Hydrate from server (since=0) if online
       if (navigator.onLine) {
-        await hydrateIfNeeded(getToken);
+        await hydrateIfNeeded(getTokenRef.current);
       } else {
         // If device is completely offline on very first run, record hydration marker
         await db.keystore.put({ id: 'hydrated', at: Date.now() });
@@ -56,7 +59,7 @@ export function HydrationGate({ children }: HydrationGateProps) {
     } finally {
       setIsHydrating(false);
     }
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
     if (organization?.id) {

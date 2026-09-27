@@ -5,6 +5,8 @@ import { processSyncQueue } from '../services/syncService';
 import { decryptRecord, encryptRecord, Envelope } from '../services/cryptoService';
 import { useState, useEffect } from 'react';
 
+const EMPTY_ARRAY: any[] = [];
+
 /**
  * Single shared helper enforcing deleted_at != null filtering across all queries
  */
@@ -20,6 +22,7 @@ export function useApiQuery<T extends { id?: string; deleted_at?: number | null;
 ) {
   const [decryptedData, setDecryptedData] = useState<T[] | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const serializedParams = JSON.stringify(additionalParams || {});
 
   // Live query on local Dexie table for instant reactive updates
   const rawRecords = useLiveQuery(async () => {
@@ -33,7 +36,7 @@ export function useApiQuery<T extends { id?: string; deleted_at?: number | null;
 
     async function processRecords() {
       if (rawRecords === undefined) {
-        setIsLoading(true);
+        setIsLoading((prev) => (prev ? prev : true));
         return;
       }
 
@@ -60,9 +63,10 @@ export function useApiQuery<T extends { id?: string; deleted_at?: number | null;
 
         // Apply additionalParams filtering on decrypted fields
         let filtered = decryptedList;
-        if (additionalParams && Object.keys(additionalParams).length > 0) {
-          filtered = filtered.filter((item: any) => {
-            for (const [key, value] of Object.entries(additionalParams)) {
+        const parsedParams = JSON.parse(serializedParams);
+        if (parsedParams && Object.keys(parsedParams).length > 0) {
+          filtered = decryptedList.filter((item: any) => {
+            for (const [key, value] of Object.entries(parsedParams)) {
               if (item[key] !== value) return false;
             }
             return true;
@@ -86,10 +90,10 @@ export function useApiQuery<T extends { id?: string; deleted_at?: number | null;
     return () => {
       isCancelled = true;
     };
-  }, [rawRecords, resource, JSON.stringify(additionalParams)]);
+  }, [rawRecords, resource, serializedParams]);
 
   return {
-    data: decryptedData ?? [],
+    data: (decryptedData ?? EMPTY_ARRAY) as T[],
     isLoading,
     isSuccess: !isLoading,
     isError: false,

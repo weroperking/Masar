@@ -139,82 +139,17 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     [orgId]
   );
 
-  // Run migration and pull on startup / org switch
+  // Run migration, pull, and single state-derivation on startup / org switch
   useEffect(() => {
+    if (!orgId) return;
+    let mounted = true;
     (async () => {
       await migrateLegacyPins(orgId);
       await pullPinConfigs(orgId);
       await flushPendingPinPushes().catch(() => {});
-    })();
-  }, [orgId]);
 
-  // Sync profile data reactively whenever settings, user metadata, or localStorage changes
-  useEffect(() => {
-    const cur = liveSettings?.[0];
-    const resolvedTeacherName = 
-      cur?.teacherName || 
-      localStorage.getItem(`masar_teacher_name_${orgId}`) || 
-      localStorage.getItem('masar_teacher_name') || 
-      (user?.unsafeMetadata as any)?.teacherName ||
-      cur?.profilesConfig?.adminName ||
-      user?.fullName || 
-      'المعلم (المدير)';
+      if (!session?.id || !mounted) return;
 
-    const storedProfiles = cur?.profilesConfig;
-    const storedAssistantSub = cur?.assistantSubSettings || cur?.profilesConfig?.assistantSubSettings;
-
-    if (storedAssistantSub) {
-      setAssistantSubSettings({
-        ...DEFAULT_ASSISTANT_SUB_SETTINGS,
-        ...storedAssistantSub
-      });
-    }
-
-    const assistantPinRow = livePinConfigs?.find(p => p.profileType === 'assistant' && !p.deletedAt);
-    const adminPinRow = livePinConfigs?.find(p => p.profileType === 'admin' && !p.deletedAt);
-
-    const isAssistantPinReq = assistantPinRow 
-      ? assistantPinRow.assistantPinRequired 
-      : Boolean(storedProfiles?.assistantPinRequired);
-
-    const effectiveAutoLock = adminPinRow?.autoLockMinutes ?? storedProfiles?.autoLockMinutes ?? 15;
-    setAutoLockMinutes(effectiveAutoLock);
-
-    if (storedProfiles) {
-      setAdminAccount({
-        id: 'admin',
-        name: cur?.teacherName || storedProfiles.adminName || resolvedTeacherName,
-        role: 'admin',
-        avatarUrl: DEFAULT_FORMAL_AVATARS.admin,
-        pinRequired: true
-      });
-
-      if (storedProfiles.assistantEnabled) {
-        setAssistantAccount({
-          id: 'assistant',
-          name: storedProfiles.assistantName || 'فريق المساعدين',
-          role: 'assistant',
-          avatarUrl: DEFAULT_FORMAL_AVATARS.assistant,
-          pinRequired: isAssistantPinReq
-        });
-      } else {
-        setAssistantAccount(undefined);
-      }
-    } else {
-      setAdminAccount(prev => ({
-        ...prev,
-        name: cur?.teacherName || resolvedTeacherName,
-        avatarUrl: DEFAULT_FORMAL_AVATARS.admin,
-        pinRequired: true
-      }));
-    }
-  }, [liveSettings, livePinConfigs, orgId, user?.fullName, (user?.unsafeMetadata as any)?.teacherName]);
-
-  // Single state-derivation effect: PIN state is the single source of truth
-  useEffect(() => {
-    if (!orgId || !session?.id) return;
-    let mounted = true;
-    (async () => {
       const resetMarker = sessionStorage.getItem(`masar_pin_reset_pending_${orgId}`);
       if (resetMarker) {
         sessionStorage.removeItem(`masar_pin_reset_pending_${orgId}`);
@@ -246,7 +181,87 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [orgId, session?.id, livePinConfigs]);
+  }, [orgId, session?.id]);
+
+  // Sync profile data reactively whenever settings, user metadata, or localStorage changes
+  useEffect(() => {
+    const cur = liveSettings?.[0];
+    const resolvedTeacherName = 
+      cur?.teacherName || 
+      localStorage.getItem(`masar_teacher_name_${orgId}`) || 
+      localStorage.getItem('masar_teacher_name') || 
+      (user?.unsafeMetadata as any)?.teacherName ||
+      cur?.profilesConfig?.adminName ||
+      user?.fullName || 
+      'المعلم (المدير)';
+
+    const storedProfiles = cur?.profilesConfig;
+    const storedAssistantSub = cur?.assistantSubSettings || cur?.profilesConfig?.assistantSubSettings;
+
+    if (storedAssistantSub) {
+      setAssistantSubSettings(prev => {
+        const next = { ...DEFAULT_ASSISTANT_SUB_SETTINGS, ...storedAssistantSub };
+        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+      });
+    }
+
+    const assistantPinRow = livePinConfigs?.find(p => p.profileType === 'assistant' && !p.deletedAt);
+    const adminPinRow = livePinConfigs?.find(p => p.profileType === 'admin' && !p.deletedAt);
+
+    const isAssistantPinReq = assistantPinRow 
+      ? assistantPinRow.assistantPinRequired 
+      : Boolean(storedProfiles?.assistantPinRequired);
+
+    const effectiveAutoLock = adminPinRow?.autoLockMinutes ?? storedProfiles?.autoLockMinutes ?? 15;
+    setAutoLockMinutes(prev => (prev === effectiveAutoLock ? prev : effectiveAutoLock));
+
+    if (storedProfiles) {
+      const nextAdminName = cur?.teacherName || storedProfiles.adminName || resolvedTeacherName;
+      setAdminAccount(prev =>
+        prev.name === nextAdminName && prev.avatarUrl === DEFAULT_FORMAL_AVATARS.admin && prev.pinRequired === true
+          ? prev
+          : {
+              id: 'admin',
+              name: nextAdminName,
+              role: 'admin',
+              avatarUrl: DEFAULT_FORMAL_AVATARS.admin,
+              pinRequired: true
+            }
+      );
+
+      if (storedProfiles.assistantEnabled) {
+        const nextAssistantName = storedProfiles.assistantName || 'فريق المساعدين';
+        setAssistantAccount(prev =>
+          prev &&
+          prev.name === nextAssistantName &&
+          prev.avatarUrl === DEFAULT_FORMAL_AVATARS.assistant &&
+          prev.pinRequired === isAssistantPinReq
+            ? prev
+            : {
+                id: 'assistant',
+                name: nextAssistantName,
+                role: 'assistant',
+                avatarUrl: DEFAULT_FORMAL_AVATARS.assistant,
+                pinRequired: isAssistantPinReq
+              }
+        );
+      } else {
+        setAssistantAccount(prev => (prev === undefined ? prev : undefined));
+      }
+    } else {
+      const nextAdminName = cur?.teacherName || resolvedTeacherName;
+      setAdminAccount(prev =>
+        prev.name === nextAdminName && prev.avatarUrl === DEFAULT_FORMAL_AVATARS.admin && prev.pinRequired === true
+          ? prev
+          : {
+              ...prev,
+              name: nextAdminName,
+              avatarUrl: DEFAULT_FORMAL_AVATARS.admin,
+              pinRequired: true
+            }
+      );
+    }
+  }, [liveSettings, livePinConfigs, orgId, user?.fullName, (user?.unsafeMetadata as any)?.teacherName]);
 
   // Listen to custom cross-component update events
   useEffect(() => {

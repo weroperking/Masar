@@ -244,7 +244,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [getToken, isSignedIn, organization]);
+  }, [isSignedIn, organization?.id]);
 
   if (isInitializing) {
     return (
