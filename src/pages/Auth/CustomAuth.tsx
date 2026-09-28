@@ -220,50 +220,6 @@ export function CustomAuth() {
     );
   }
 
-  const handleSendOTP = async (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    if (!isSignInLoaded) return;
-    if (!email) {
-      setError('يرجى إدخال البريد الإلكتروني أولاً لإرسال الرمز');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    setResendSuccess('');
-    try {
-      const { supportedFirstFactors } = await signIn.create({
-        identifier: email,
-      });
-
-      const emailCodeFactor = supportedFirstFactors?.find(
-        (factor: any) => factor.strategy === 'email_code'
-      );
-
-      if (emailCodeFactor) {
-        await signIn.prepareFirstFactor({
-          strategy: 'email_code',
-          emailAddressId: (emailCodeFactor as any).emailAddressId,
-        });
-        setView('verify_signin_otp');
-      } else {
-        setError('لا يمكن إرسال رمز التحقق لهذا الحساب.');
-      }
-    } catch (err: any) {
-      const errCode = err.errors?.[0]?.code;
-      if (errCode === 'session_exists') {
-        const sessions = clerk.client?.sessions;
-        const targetSession = sessions?.find((s) => s.status === 'active') || sessions?.[0];
-        if (targetSession) {
-          await clerk.setActive({ session: targetSession.id });
-          return;
-        }
-      }
-      setError(err.errors?.[0]?.longMessage || 'فشل إرسال رمز التحقق. تأكد من صحة البريد الإلكتروني.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleResendCode = async () => {
     if (resendLoading) return;
     setResendLoading(true);
@@ -277,17 +233,22 @@ export function CustomAuth() {
         setResendSuccess('تم إرسال رمز تحقق جديد إلى بريدك الإلكتروني');
       } else {
         if (!isSignInLoaded) return;
-        if (signIn.supportedFirstFactors) {
-          const emailCodeFactor = signIn.supportedFirstFactors.find(
-            (factor: any) => factor.strategy === 'email_code'
-          );
-          if (emailCodeFactor) {
-            await signIn.prepareFirstFactor({
-              strategy: 'email_code',
-              emailAddressId: (emailCodeFactor as any).emailAddressId,
-            });
-            setResendSuccess('تم إرسال رمز تحقق جديد إلى بريدك الإلكتروني');
-          }
+        const emailCodeFactor = signIn.supportedFirstFactors?.find(
+          (factor: any) => factor.strategy === 'email_code'
+        ) as any;
+
+        if (emailCodeFactor?.emailAddressId) {
+          await signIn.prepareFirstFactor({
+            strategy: 'email_code',
+            emailAddressId: emailCodeFactor.emailAddressId,
+          });
+          setResendSuccess('تم إرسال رمز تحقق جديد إلى بريدك الإلكتروني');
+        } else {
+          await signIn.create({
+            identifier: email.trim(),
+            strategy: 'email_code',
+          });
+          setResendSuccess('تم إرسال رمز تحقق جديد إلى بريدك الإلكتروني');
         }
       }
     } catch (err: any) {
@@ -297,47 +258,53 @@ export function CustomAuth() {
     }
   };
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isSignInLoaded) return;
-    setLoading(true);
-    setError('');
-    try {
-      const result = await signIn.attemptFirstFactor({
-        strategy: 'email_code',
-        code: code.trim(),
-      });
-      if (result.status === 'complete') {
-        await setSignInActive({ session: result.createdSessionId });
-      } else {
-        setError('حالة التحقق غير مكتملة. يرجى المحاولة مجدداً.');
-      }
-    } catch (err: any) {
-      setError('رمز غير صحيح أو منتهي الصلاحية');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSignInLoaded) return;
+    if (!email.trim()) {
+      setError('يرجى إدخال البريد الإلكتروني أولاً لإرسال رمز التحقق.');
+      return;
+    }
+
     setLoading(true);
     setError('');
-    
-    try {
-      const result = await signIn.create({
-        identifier: email,
-        password,
+    setResendSuccess('');
+
+    const startOtpFlow = async () => {
+      const signInAttempt = await signIn.create({
+        identifier: email.trim(),
       });
-      if (result.status === 'complete') {
-        await setSignInActive({ session: result.createdSessionId });
-      } else {
-        setError('يجب استكمال خطوات التحقق الإضافية.');
-        setLoading(false);
+
+      if (signInAttempt.status === 'complete') {
+        await setSignInActive({ session: signInAttempt.createdSessionId });
+        return;
       }
+
+      const emailCodeFactor = signInAttempt.supportedFirstFactors?.find(
+        (factor: any) => factor.strategy === 'email_code'
+      ) as any;
+
+      if (emailCodeFactor?.emailAddressId) {
+        await signIn.prepareFirstFactor({
+          strategy: 'email_code',
+          emailAddressId: emailCodeFactor.emailAddressId,
+        });
+      } else {
+        await signIn.create({
+          identifier: email.trim(),
+          strategy: 'email_code',
+        });
+      }
+
+      setCode('');
+      setView('verify_signin');
+      setLoading(false);
+    };
+
+    try {
+      await startOtpFlow();
     } catch (err: any) {
-      console.error('Sign in error:', err);
+      console.error('Sign in OTP error:', err);
       const msg = err.errors?.[0]?.longMessage || err.errors?.[0]?.message || err.message || '';
       const errCode = err.errors?.[0]?.code;
 
@@ -364,25 +331,25 @@ export function CustomAuth() {
           }
         }
 
-        // Clean stale session and recreate
+        // Clean stale session and recreate OTP flow
         try {
           await clerk.signOut();
-          const retryResult = await signIn.create({
-            identifier: email,
-            password,
-          });
-          if (retryResult.status === 'complete') {
-            await setSignInActive({ session: retryResult.createdSessionId });
-            return;
-          }
+          await startOtpFlow();
+          return;
         } catch (retryErr: any) {
-          setError(retryErr.errors?.[0]?.longMessage || retryErr.errors?.[0]?.message || 'تعذر إتمام الدخول.');
+          setError(retryErr.errors?.[0]?.longMessage || retryErr.errors?.[0]?.message || 'تعذر إرسال رمز الدخول.');
           setLoading(false);
           return;
         }
       }
 
-      setError(msg || 'حدث خطأ في تسجيل الدخول. تأكد من صحة البريد الإلكتروني وكلمة المرور.');
+      if (errCode === 'form_identifier_not_found') {
+        setError('لم يتم العثور على حساب مرتبط بهذا البريد الإلكتروني. تأكد من البريد أو أنشئ حساباً جديداً.');
+      } else if (errCode === 'form_param_format_invalid') {
+        setError('يرجى التأكد من إدخال بريد إلكتروني صحيح.');
+      } else {
+        setError(msg || 'فشل إرسال رمز التحقق. تأكد من صحة البريد الإلكتروني.');
+      }
       setLoading(false);
     }
   };
@@ -502,32 +469,6 @@ export function CustomAuth() {
     }
   };
 
-  const handleRequestOTP = async (e: React.MouseEvent | React.FormEvent) => {
-    e.preventDefault();
-    if (!isSignInLoaded) return;
-    
-    if (!email) {
-      setError('يرجى إدخال البريد الإلكتروني أولاً لطلب رمز التحقق.');
-      return;
-    }
-    
-    setLoading(true);
-    setError('');
-    
-    try {
-      await signIn.create({
-        identifier: email,
-        strategy: 'email_code'
-      });
-      setView('verify_signin');
-      setLoading(false);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.errors?.[0]?.longMessage || 'حدث خطأ في طلب رمز التحقق.');
-      setLoading(false);
-    }
-  };
-
   const handleVerifySignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSignInLoaded) return;
@@ -546,7 +487,16 @@ export function CustomAuth() {
         setLoading(false);
       }
     } catch (err: any) {
-      setError(err.errors?.[0]?.longMessage || 'كود التحقق غير صحيح.');
+      const errCode = err.errors?.[0]?.code;
+      if (errCode === 'session_exists') {
+        const sessions = clerk.client?.sessions;
+        const targetSession = sessions?.find((s) => s.status === 'active') || sessions?.[0];
+        if (targetSession) {
+          await clerk.setActive({ session: targetSession.id });
+          return;
+        }
+      }
+      setError(err.errors?.[0]?.longMessage || 'رمز التحقق غير صحيح أو منتهي الصلاحية.');
       setLoading(false);
     }
   };
@@ -590,7 +540,7 @@ export function CustomAuth() {
               </h1>
 
               <p className="text-slate-500 dark:text-slate-400 text-sm mt-3 leading-relaxed">
-                {view === 'signin' && 'أهلاً بك مجدداً! قم بتسجيل الدخول للبدء.'}
+                {view === 'signin' && 'أدخل بريدك الإلكتروني وسنرسل لك رمز تحقق سريع لتسجيل الدخول.'}
                 {view === 'signup' && 'ابدأ الآن في إدارة حصصك، طلابك، ومصروفاتك في مكان واحد.'}
                 {view === 'verify_signup' && 'أدخل رمز التحقق المكوّن من 6 أرقام لتأكيد حسابك.'}
                 {(view === 'verify_signin' || view === 'verify_signin_otp') && 'أدخل رمز التحقق المرسل إلى بريدك لتسجيل الدخول.'}
@@ -627,7 +577,7 @@ export function CustomAuth() {
               </div>
             )}
 
-            {/* 1. SIGN IN FORM */}
+            {/* 1. SIGN IN FORM (OTP BY DEFAULT) */}
             {view === 'signin' && (
               <form onSubmit={handleSignIn} className="space-y-5">
                 <div className="space-y-2">
@@ -650,35 +600,6 @@ export function CustomAuth() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    كلمة المرور
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="h-5 w-5" />
-                    </div>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="block w-full pr-11 pl-11 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 transition-all sm:text-sm"
-                      placeholder="••••••••"
-                      dir="ltr"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                      tabIndex={-1}
-                      aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
-                  </div>
-                </div>
-
                 <div className="pt-2 space-y-4">
                   <button
                     type="submit"
@@ -687,7 +608,7 @@ export function CustomAuth() {
                   >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                       <>
-                        <span>تسجيل الدخول</span>
+                        <span>إرسال رمز الدخول</span>
                         <ArrowRight className="w-4 h-4 rotate-180" />
                       </>
                     )}
@@ -708,15 +629,6 @@ export function CustomAuth() {
                         إنشاء حساب جديد
                       </button>
                     </p>
-                    <div className="mt-3">
-                      <button
-                        type="button"
-                        onClick={handleRequestOTP}
-                        className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                      >
-                        نسيت كلمة المرور؟ الدخول بالرمز
-                      </button>
-                    </div>
                   </div>
                 </div>
               </form>
@@ -920,8 +832,6 @@ export function CustomAuth() {
                 onSubmit={
                   view === 'verify_signup'
                     ? handleVerifySignUp
-                    : view === 'verify_signin_otp'
-                    ? handleVerifyOTP
                     : handleVerifySignIn
                 }
                 className="space-y-6"
