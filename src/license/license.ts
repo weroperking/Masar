@@ -24,7 +24,7 @@ ed.hashes.sha512 = sha512;
  * 
  * NEVER place the private key here. This public key is safe for client bundling.
  */
-export const ED25519_PUBLIC_KEY = '20CMNUVXb3MSusApBc44DBLn-MvpZyxjiv5y0ODc7s8';
+export const ED25519_PUBLIC_KEY = 'jhrvT/baqed1oOy82sIN2Fr0ivXGmnQMq6dLKTR/rL0=';
 
 export interface LicensePayload {
   p: 'basic' | 'pro' | 'lifetime'; // Plan name
