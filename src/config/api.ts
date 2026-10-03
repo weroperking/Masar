@@ -112,9 +112,5 @@ export const API_ENDPOINTS = {
   subscription: {
     status: (orgId?: string) => `/api/me/subscription-status${orgId ? `?orgId=${orgId}` : ''}`,
   },
-  proposals: {
-    status: (orgId: string) => `/api/orgs/${orgId}/upgrade-proposal/status`,
-    submit: (orgId: string) => `/api/orgs/${orgId}/upgrade-proposal`,
-  },
   // We can add specific routes here if needed, but generic REST follows /api/:resource
 };

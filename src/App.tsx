@@ -30,7 +30,6 @@ import { Reports } from './pages/Reports/Reports';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { ConfirmProvider } from './context/ConfirmContext';
-import { SubscriptionProvider } from './context/SubscriptionContext';
 import { ProfileProvider } from './context/ProfileContext';
 import { ProfileSelectorModal } from './components/ProfileSelectorModal';
 
@@ -38,7 +37,6 @@ import { ProfileSelectorModal } from './components/ProfileSelectorModal';
 import { Users } from './pages/Admin/Users';
 import { Settings } from './pages/Admin/Settings';
 import { QrCards } from './pages/Admin/QrCards';
-import { Upgrade } from './pages/Upgrade/Upgrade';
 
 import { CustomAuth } from './pages/Auth/CustomAuth';
 import { CustomOrganizationList } from './pages/Auth/CustomOrganizationList';
@@ -50,6 +48,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { performHandshake } from './services/syncService';
 import { TourProvider } from './context/TourContext';
 import { TourOverlay } from './components/Tour/TourOverlay';
+import { LicenseProvider, useLicense } from './license/LicenseContext';
+import { Activation } from './screens/Activation';
 
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
@@ -113,6 +113,58 @@ function CheckUpdate() {
   }, [getToken]);
 
   return null;
+}
+
+function AuthenticatedApp() {
+  const license = useLicense();
+
+  if (license.isLoading) {
+    return null;
+  }
+
+  // If trial expired and no active license key, lock application to Activation screen
+  if (!license.unlocked) {
+    return (
+      <Activation
+        initialMessage={license.message}
+        onUnlock={() => license.refreshLicense()}
+      />
+    );
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="students" element={<Students />} />
+        <Route path="students/:id" element={<StudentDetails />} />
+        <Route path="courses" element={<Courses />} />
+        <Route path="payments" element={<AdminRouteGuard><MonthlySubscriptions /></AdminRouteGuard>} />
+        
+        <Route path="groups" element={<Groups />} />
+        <Route path="groups/:id" element={<GroupDetails />} />
+        <Route path="attendance" element={<Attendance />} />
+        <Route path="schedule" element={<Schedule />} />
+        <Route path="assessments" element={<Assessments />} />
+        <Route path="courseProducts" element={<CourseProducts />} />
+        
+        <Route path="sessionPayments" element={<AdminRouteGuard><SessionPayments /></AdminRouteGuard>} />
+        <Route path="ledgers" element={<AdminRouteGuard><Ledgers /></AdminRouteGuard>} />
+        <Route path="dues" element={<Dues />} />
+        <Route path="booking" element={<Navigate to="/" replace />} />
+        
+        <Route path="inventory" element={<Inventory />} />
+        <Route path="reports" element={<AdminRouteGuard><Reports /></AdminRouteGuard>} />
+        
+        <Route path="users" element={<AdminRouteGuard><Users /></AdminRouteGuard>} />
+        <Route path="messaging" element={<Navigate to="/students" replace />} />
+        <Route path="settings" element={<AdminRouteGuard><Settings /></AdminRouteGuard>} />
+        <Route path="qrcards" element={<QrCards />} />
+        <Route path="activation" element={<Activation onUnlock={() => license.refreshLicense()} />} />
+        <Route path="upgrade" element={<Navigate to="/activation" replace />} />
+      </Route>
+    </Routes>
+  );
 }
 
 function AuthGate() {
@@ -215,47 +267,16 @@ function AuthGate() {
   // 4. Authenticated -> Render Full Application Routes guarded by HydrationGate!
   return (
     <ErrorBoundary>
-      <SubscriptionProvider>
-        <ProfileProvider>
-          <TourProvider>
-            <HydrationGate>
-              <CheckUpdate />
-              <TourOverlay />
-              <ProfileSelectorModal />
-              <Routes>
-                <Route path="/" element={<Layout />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="students" element={<Students />} />
-                  <Route path="students/:id" element={<StudentDetails />} />
-                  <Route path="courses" element={<Courses />} />
-                  <Route path="payments" element={<AdminRouteGuard><MonthlySubscriptions /></AdminRouteGuard>} />
-                  
-                  <Route path="groups" element={<Groups />} />
-                  <Route path="groups/:id" element={<GroupDetails />} />
-                  <Route path="attendance" element={<Attendance />} />
-                  <Route path="schedule" element={<Schedule />} />
-                  <Route path="assessments" element={<Assessments />} />
-                  <Route path="courseProducts" element={<CourseProducts />} />
-                  
-                  <Route path="sessionPayments" element={<AdminRouteGuard><SessionPayments /></AdminRouteGuard>} />
-                  <Route path="ledgers" element={<AdminRouteGuard><Ledgers /></AdminRouteGuard>} />
-                  <Route path="dues" element={<Dues />} />
-                  <Route path="booking" element={<Navigate to="/" replace />} />
-                  
-                  <Route path="inventory" element={<Inventory />} />
-                  <Route path="reports" element={<AdminRouteGuard><Reports /></AdminRouteGuard>} />
-                  
-                  <Route path="users" element={<AdminRouteGuard><Users /></AdminRouteGuard>} />
-                  <Route path="messaging" element={<Navigate to="/students" replace />} />
-                  <Route path="settings" element={<AdminRouteGuard><Settings /></AdminRouteGuard>} />
-                  <Route path="qrcards" element={<QrCards />} />
-                  <Route path="upgrade" element={<Upgrade />} />
-                </Route>
-              </Routes>
-            </HydrationGate>
-          </TourProvider>
-        </ProfileProvider>
-      </SubscriptionProvider>
+      <ProfileProvider>
+        <TourProvider>
+          <HydrationGate>
+            <CheckUpdate />
+            <TourOverlay />
+            <ProfileSelectorModal />
+            <AuthenticatedApp />
+          </HydrationGate>
+        </TourProvider>
+      </ProfileProvider>
     </ErrorBoundary>
   );
 }
@@ -272,15 +293,17 @@ export default function App() {
       <ToastProvider>
         <ConfirmProvider>
           <QueryClientProvider client={queryClient}>
-            <BrowserRouter>
-               <Routes>
-                 <Route path={`${STUDENT_LOOKUP_PATH_PREFIX}:code`} element={<Navigate to="/" replace />} />
-                 <Route path="/lookup/:code" element={<Navigate to="/" replace />} />
-                 <Route path="/s/:code" element={<Navigate to="/" replace />} />
-                 <Route path="/book" element={<Navigate to="/" replace />} />
-                 <Route path="*" element={<AuthGate />} />
-               </Routes>
-            </BrowserRouter>
+            <LicenseProvider>
+              <BrowserRouter>
+                 <Routes>
+                   <Route path={`${STUDENT_LOOKUP_PATH_PREFIX}:code`} element={<Navigate to="/" replace />} />
+                   <Route path="/lookup/:code" element={<Navigate to="/" replace />} />
+                   <Route path="/s/:code" element={<Navigate to="/" replace />} />
+                   <Route path="/book" element={<Navigate to="/" replace />} />
+                   <Route path="*" element={<AuthGate />} />
+                 </Routes>
+              </BrowserRouter>
+            </LicenseProvider>
           </QueryClientProvider>
         </ConfirmProvider>
       </ToastProvider>

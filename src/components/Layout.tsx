@@ -7,28 +7,29 @@ import {
   UserCheck, Calendar, FileText, Library, Wallet, 
   FileSpreadsheet, Package, 
   BarChart3, UserCog, MessageSquare, QrCode, LogOut,
-  Search, Sun, Moon, Plus, Keyboard, RefreshCw, CheckCircle2, WifiOff, Menu, X, ArrowUpCircle, AlertCircle,
-  PanelLeftClose, PanelLeftOpen
+  Search, Sun, Moon, Plus, Keyboard, RefreshCw, CheckCircle2, WifiOff, Menu, X, AlertCircle,
+  PanelLeftClose, PanelLeftOpen, CloudUpload, Key
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '../context/ThemeContext';
-import { useSubscription } from '../context/SubscriptionContext';
 import { useProfile } from '../context/ProfileContext';
 import { CommandPalette } from './CommandPalette';
 import { QuickNewModal } from './QuickNewModal';
 import { ShortcutsHelpModal } from './ShortcutsHelpModal';
 import { useToast } from '../context/ToastContext';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { MasarLogo } from './MasarLogo';
-import { getSyncState, triggerManualSync, processSyncQueue } from '../services/syncService';
+import { processSyncQueue } from '../services/syncService';
 import { formatTime12 } from '../utils/time';
+import { TrialBanner } from './TrialBanner';
+import { Activation } from '../screens/Activation';
+import { useLicense } from '../license/LicenseContext';
 
-// Base navigation groups (filtered by limits and profile role)
-const getNavigationGroups = (limits: any, isAssistant: boolean = false) => {
+// Base navigation groups (filtered by profile role)
+const getNavigationGroups = (isAssistant: boolean = false) => {
   if (isAssistant) {
-    // Assistances will see academic modules and inventory/products/sales (while hiding general ledger, finance, users and settings)
+    // Assistants will see academic modules and inventory/products/sales (while hiding general ledger, finance, users and settings)
     return [
       {
         title: 'رئيسي',
@@ -55,12 +56,12 @@ const getNavigationGroups = (limits: any, isAssistant: boolean = false) => {
           { name: 'المستحقات', href: '/dues', icon: FileSpreadsheet },
         ]
       },
-      ...(limits?.inventory_sales !== false ? [{
+      {
         title: 'المخزون',
         items: [
           { name: 'المنتجات والمبيعات', href: '/inventory', icon: Package },
         ]
-      }] : [])
+      }
     ];
   }
 
@@ -93,12 +94,12 @@ const getNavigationGroups = (limits: any, isAssistant: boolean = false) => {
         { name: 'المستحقات', href: '/dues', icon: FileSpreadsheet },
       ]
     },
-    ...(limits?.inventory_sales !== false ? [{
+    {
       title: 'المخزون',
       items: [
         { name: 'المنتجات والمبيعات', href: '/inventory', icon: Package },
       ]
-    }] : []),
+    },
     {
       title: 'التقارير',
       items: [
@@ -110,7 +111,7 @@ const getNavigationGroups = (limits: any, isAssistant: boolean = false) => {
       items: [
         { name: 'المستخدمين', href: '/users', icon: UserCog },
         { name: 'الإعدادات', href: '/settings', icon: Settings },
-        { name: 'ترقية الباقة', href: '/upgrade', icon: ArrowUpCircle },
+        { name: 'ترخيص المنصة', href: '/activation', icon: Key },
       ]
     }
   ];
@@ -190,6 +191,7 @@ export function Layout() {
   const clerk = useClerk();
   const { theme, toggleTheme } = useTheme();
   const toast = useToast();
+  const license = useLicense();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isQuickNewOpen, setIsQuickNewOpen] = useState(false);
@@ -205,11 +207,9 @@ export function Layout() {
   });
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [hideTrialBanner, setHideTrialBanner] = useState(false);
-  const { subscription, isBlocked } = useSubscription();
   const { currentProfile } = useProfile();
   const isAssistant = currentProfile === 'assistant';
-  const navigationGroups = getNavigationGroups(subscription?.limits, isAssistant);
+  const navigationGroups = getNavigationGroups(isAssistant);
 
   const showNav = true;
 
@@ -238,27 +238,6 @@ export function Layout() {
     };
   }, [toast]);
 
-  // Sync state & outbox listener
-  const pendingQueueCount = useLiveQuery(async () => {
-    try {
-      return await db.syncQueue.count();
-    } catch {
-      return 0;
-    }
-  }, []);
-
-  const [syncState, setSyncState] = useState(getSyncState());
-  useEffect(() => {
-    console.log('[PILL] initial state on mount', getSyncState());
-    const handleSyncChange = (e: any) => {
-      const detail = e?.detail;
-      console.log('[PILL] status event received', detail?.status);
-      setSyncState(getSyncState());
-    };
-    window.addEventListener('masar_sync_status_change', handleSyncChange);
-    return () => window.removeEventListener('masar_sync_status_change', handleSyncChange);
-  }, []);
-
   // Retrigger sync on tab wake / visibility change
   useEffect(() => {
     const onRetry = () => {
@@ -269,34 +248,6 @@ export function Layout() {
     window.addEventListener('masar_sync_retry', onRetry);
     return () => window.removeEventListener('masar_sync_retry', onRetry);
   }, [getToken]);
-
-  const handleManualSyncClick = async () => {
-    if (!navigator.onLine) {
-      toast.warning('الجهاز غير متصل بالإنترنت حالياً.');
-      return;
-    }
-    toast.info('جاري مزامنة البيانات مع الخادم...');
-    let ceilingHit = false;
-    const ceiling = setTimeout(() => {
-      ceilingHit = true;
-      toast.warning('المزامنة استغرقت وقتاً طويلاً — إلغاء الانتظار.');
-      setSyncState(getSyncState());
-    }, 65_000);
-    try {
-      await Promise.race([
-        triggerManualSync(getToken),
-        new Promise<void>((resolve) => setTimeout(resolve, 65_000)),
-      ]);
-      if (!ceilingHit) {
-        toast.success('تمت المزامنة بنجاح!');
-      }
-    } catch (e: any) {
-      toast.error('فشلت المزامنة: ' + (e.message || 'خطأ غير معروف'));
-    } finally {
-      clearTimeout(ceiling);
-      setSyncState(getSyncState());
-    }
-  };
 
   // Periodic automatic attendance session starter
   useEffect(() => {
@@ -352,13 +303,7 @@ export function Layout() {
     <>
       <nav className={cn("flex-1 py-4 overflow-y-auto space-y-6 scrollbar-thin", isCollapsed ? "px-2" : "px-4")}>
         {navigationGroups.map((group) => {
-          // If blocked, only show groups that have 'upgrade' or 'settings' related items
-          // or just filter the items inside
-          const filteredItems = isBlocked 
-            ? group.items.filter(item => item.href === '/upgrade' || item.href === '/settings')
-            : group.items;
-
-          if (filteredItems.length === 0) return null;
+          if (group.items.length === 0) return null;
 
           return (
             <div key={group.title}>
@@ -370,7 +315,7 @@ export function Layout() {
                 <div className="h-px bg-slate-200 dark:bg-slate-800 my-2 mx-1" />
               )}
               <div className="space-y-1">
-                {filteredItems.map((item) => {
+                {group.items.map((item) => {
                   const isActive =
                     location.pathname === item.href ||
                     (item.href !== '/' && location.pathname.startsWith(item.href));
@@ -547,70 +492,21 @@ export function Layout() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Sync Status Pill */}
+            {/* Trial Banner */}
+            <TrialBanner onActivateClick={license.openActivationModal} />
+
+            {/* Backup Pill (non-functional for now) */}
             <button
               id="tour-header-sync"
               data-tour="tour-header-sync"
-              onClick={handleManualSyncClick}
-              disabled={syncState.isSyncing}
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer shadow-xs active:scale-95 select-none whitespace-nowrap focus:outline-hidden focus:ring-2 focus:ring-blue-500/20",
-                syncState.breakerOpen || syncState.syncPillStatus === 'paused'
-                  ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 dark:hover:bg-rose-900/60"
-                  : !isOnline
-                  ? "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700/80"
-                  : syncState.isSyncing
-                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
-                  : (pendingQueueCount || 0) > 0 || syncState.syncPillStatus === 'pending'
-                  ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 dark:hover:bg-amber-900/60"
-                  : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 dark:hover:bg-emerald-900/60"
-              )}
-              title={
-                syncState.breakerOpen || syncState.syncPillStatus === 'paused'
-                  ? 'المزامنة متوقفة مؤقتاً بعد عدة محاولات — انقر للمحاولة الآن'
-                  : !isOnline
-                  ? 'أنت تعمل محلياً دون اتصال'
-                  : syncState.isSyncing
-                  ? 'جاري مزامنة البيانات...'
-                  : (pendingQueueCount || 0) > 0
-                  ? `يوجد ${pendingQueueCount} تعديل محلي بانتظار المزامنة`
-                  : 'جميع البيانات متزامنة ومحفوظة محلياً'
-              }
+              type="button"
+              onClick={() => toast.info('ميزة النسخ الاحتياطي السحابي (Backup) قيد التجهيز وستتوفر قريباً')}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all duration-150 cursor-pointer shadow-xs active:scale-95 select-none whitespace-nowrap focus:outline-hidden focus:ring-2 focus:ring-blue-500/20"
+              title="النسخ الاحتياطي (Backup) — قريباً"
             >
-              {syncState.breakerOpen || syncState.syncPillStatus === 'paused' ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
-                  <span className="hidden md:inline">المزامنة متوقفة (انقر للإعادة)</span>
-                  <span className="md:hidden">متوقفة</span>
-                </>
-              ) : !isOnline ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                  <WifiOff className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-                  <span className="hidden md:inline">غير متصل (محلي)</span>
-                  <span className="md:hidden">محلي</span>
-                </>
-              ) : syncState.isSyncing ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
-                  <span className="hidden md:inline">جاري المزامنة...</span>
-                  <span className="md:hidden">مزامنة...</span>
-                </>
-              ) : (pendingQueueCount || 0) > 0 ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                  <RefreshCw className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <span className="hidden md:inline">بانتظار المزامنة ({pendingQueueCount})</span>
-                  <span className="md:hidden">({pendingQueueCount})</span>
-                </>
-              ) : (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>متزامن</span>
-                </>
-              )}
+              <CloudUpload className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span>نسخ احتياطي</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal px-1 py-0.5 bg-slate-200/60 dark:bg-slate-700/60 rounded">قريباً</span>
             </button>
 
             {/* Mobile search button */}
@@ -630,45 +526,6 @@ export function Layout() {
             </div>
           </div>
         </header>
-        
-        {/* Trial Countdown Banner */}
-        {!hideTrialBanner && subscription?.status === 'trialing' && (
-          <div className={cn(
-            "shrink-0 flex items-center justify-between px-4 py-2 border-b",
-            subscription.days_remaining <= 3 
-              ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
-              : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400"
-          )}>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium">
-                {subscription.days_remaining === 1
-                  ? 'باقي يوم واحد فقط على انتهاء فترتك التجريبية'
-                  : subscription.days_remaining === 2
-                  ? 'باقي يومان فقط على انتهاء فترتك التجريبية'
-                  : subscription.days_remaining <= 10
-                  ? `باقي ${subscription.days_remaining} أيام فقط على انتهاء فترتك التجريبية`
-                  : `باقي ${subscription.days_remaining} يوماً في فترتك التجريبية`}
-              </span>
-              <Link
-                to="/upgrade"
-                className={cn(
-                  "text-xs font-bold px-3 py-1 rounded-full transition-colors",
-                  subscription.days_remaining <= 3 
-                    ? "bg-red-600 hover:bg-red-700 text-white" 
-                    : "bg-amber-600 hover:bg-amber-700 text-white"
-                )}
-              >
-                الترقية الآن
-              </Link>
-            </div>
-            <button 
-              onClick={() => setHideTrialBanner(true)}
-              className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
         
         {/* Page Content Container (Extra responsive for tablets) */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-5 lg:p-6 bg-slate-50 dark:bg-slate-950 transition-colors duration-150 scrollbar-thin">
@@ -696,6 +553,18 @@ export function Layout() {
         isOpen={isShortcutsHelpOpen}
         onClose={() => setIsShortcutsHelpOpen(false)}
       />
+
+      {/* License Activation Modal */}
+      {license.isActivationModalOpen && (
+        <Activation
+          isModal={true}
+          onClose={license.closeActivationModal}
+          onUnlock={() => {
+            license.refreshLicense();
+            license.closeActivationModal();
+          }}
+        />
+      )}
     </div>
   );
 }

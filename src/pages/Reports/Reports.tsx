@@ -3,12 +3,10 @@ import { useApiQuery } from '../../config/queryHooks';
 import { Download, Users, BookOpen, Package, DollarSign, TrendingUp, BarChart3, PieChart } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { toMajorUnits } from '../../utils/currency';
-import { useSubscription } from '../../context/SubscriptionContext';
 import { Student, Course, LedgerEntry, Product } from '../../types';
 
 export function Reports() {
   const [activeTab, setActiveTab] = useState<'financials' | 'students' | 'courses' | 'products' | 'advanced'>('financials');
-  const { subscription } = useSubscription();
 
   const { data: allStudents = [] } = useApiQuery<Student>('students', 60 * 1000);
   const students = allStudents.filter(s => !s.deleted_at);
@@ -123,8 +121,8 @@ export function Reports() {
             { id: 'financials', label: 'الأداء المالي والتدفقات' },
             { id: 'students', label: 'الطلاب ومصادر التسجيل' },
             { id: 'courses', label: 'الكورسات والاشتراكات' },
-            ...(subscription?.limits?.inventory_sales !== false ? [{ id: 'products', label: 'المخزون والمبيعات' }] : []),
-            ...(subscription?.limits?.advanced_analytics ? [{ id: 'advanced', label: 'تحليلات متقدمة' }] : []),
+            { id: 'products', label: 'المخزون والمبيعات' },
+            { id: 'advanced', label: 'تحليلات متقدمة' },
           ].map((tab: any) => (
             <button 
               key={tab.id}

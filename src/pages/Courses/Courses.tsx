@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Plus, X, Trash2, BookOpen, Edit2 } from 'lucide-react';
 import { Course } from '../../types';
 import { useToast } from '../../context/ToastContext';
-import { useSubscription } from '../../context/SubscriptionContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { toMajorUnits, toMinorUnits } from '../../utils/currency';
 import { useApiQuery, useApiMutation } from '../../config/queryHooks';
@@ -134,7 +133,6 @@ export function Courses() {
 }
 
 function CourseFormModal({ onClose, initialData }: { onClose: () => void, initialData?: Course | null }) {
-  const { subscription } = useSubscription();
   const toast = useToast();
   const [formData, setFormData] = useState({
     name: initialData?.name || '', 
@@ -238,7 +236,7 @@ function CourseFormModal({ onClose, initialData }: { onClose: () => void, initia
                   disabled={isPending}
                 >
                   <option value="monthly">شهري (تجديد كل شهر)</option>
-                  {subscription?.limits?.combined_packages !== false && <option value="package">باقة كاملة (ترم أو كورس كامل)</option>}
+                  <option value="package">باقة كاملة (ترم أو كورس كامل)</option>
                 </select>
               </div>
             </div>
