@@ -138,10 +138,22 @@ export function useApiMutation<T extends { id?: string }>(resource: string) {
         // 1c. Encrypt record outside of Dexie transaction
         const envelope = await encryptRecord(record);
 
-        // Store encrypted envelope in Dexie table
+        // Extract indexable fields from the payload
+        const { 
+          studentId, courseId, groupId, sessionId, phone, status 
+        } = record;
+
+        // Store encrypted envelope and indexable fields in Dexie table
         await table.put({
           id,
           envelope,
+          // Write plaintext fields for Dexie .where() indexing
+          studentId,
+          courseId,
+          groupId,
+          sessionId,
+          phone,
+          status,
           updated_at: now,
           updatedAt: now,
           deleted_at: null,
@@ -209,9 +221,20 @@ export function useApiMutation<T extends { id?: string }>(resource: string) {
         // 1c. Encrypt record outside transaction
         const envelope = await encryptRecord(updated);
 
+        // Extract indexable fields from the payload
+        const { 
+          studentId, courseId, groupId, sessionId, phone, status 
+        } = updated;
+
         await table.put({
           id: params.id,
           envelope,
+          studentId,
+          courseId,
+          groupId,
+          sessionId,
+          phone,
+          status,
           updated_at: now,
           updatedAt: now,
           deleted_at: null,
@@ -279,9 +302,20 @@ export function useApiMutation<T extends { id?: string }>(resource: string) {
 
         const envelope = await encryptRecord(softDeleted);
 
+        // Extract indexable fields from the payload
+        const { 
+          studentId, courseId, groupId, sessionId, phone, status 
+        } = softDeleted;
+
         await table.put({
           id,
           envelope,
+          studentId,
+          courseId,
+          groupId,
+          sessionId,
+          phone,
+          status,
           updated_at: now,
           updatedAt: now,
           deleted_at: now,

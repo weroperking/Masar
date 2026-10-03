@@ -370,17 +370,18 @@ export async function performHandshake(getToken: () => Promise<string | null>): 
     return;
   }
 
-  const keypair = await ensureDeviceKeypair();
   const token = await getToken();
 
   if (!token) {
-    throw new Error('handshake: no auth token available');
+    console.log('[Sync] Handshake deferred: waiting for active Clerk session...');
+    return;
   }
 
   if (!navigator.onLine) {
     throw new Error('handshake: browser is offline');
   }
 
+  const keypair = await ensureDeviceKeypair();
   const pubKeyStr = await exportPublicKey(keypair);
   const res = await fetchWithAuth('/api/sync/handshake', token, {
     method: 'POST',
@@ -471,6 +472,21 @@ export async function processSyncQueue(getToken: () => Promise<string | null>) {
 
 async function executeSyncLoop(getToken: () => Promise<string | null>) {
   trace('executeSyncLoop entry');
+
+  let token: string | null = null;
+  try {
+    token = await withTimeout(getToken(), 8_000, 'getToken');
+  } catch {
+    token = null;
+  }
+
+  // Gracefully pause without incrementing consecutiveFailures
+  if (!token) {
+    console.log('[Sync] Waiting for active Clerk session...');
+    updateSyncStatus('pending');
+    return;
+  }
+
   lastActivityAt = Date.now();
   syncStartedAt = Date.now();
   isSyncing = true;
@@ -489,13 +505,6 @@ async function executeSyncLoop(getToken: () => Promise<string | null>) {
   }, 60_000);
 
   try {
-    let token: string | null = null;
-    try {
-      token = await withTimeout(getToken(), 8_000, 'getToken');
-    } catch {
-      token = null;
-    }
-
     await withTimeout(performHandshake(getToken), 25_000, 'handshake');
 
     const queue = await db.syncQueue.orderBy('createdAt').toArray();
@@ -720,12 +729,32 @@ async function applyDeltas(data: any): Promise<number> {
       const prepared = await Promise.all(
         records.map(async (record: any) => {
           let envelope = record.envelope;
-          if (!envelope) {
+          let plain: any = record;
+          if (envelope) {
+            try {
+              plain = await decryptRecord(envelope);
+            } catch {
+              plain = record;
+            }
+          } else {
             envelope = await encryptRecord(record);
           }
+
+          // Extract indexable fields from the payload
+          const { 
+            studentId, courseId, groupId, sessionId, phone, status 
+          } = plain || {};
+
           return {
             id: record.id,
             envelope,
+            // Write plaintext fields for Dexie .where() indexing
+            studentId,
+            courseId,
+            groupId,
+            sessionId,
+            phone,
+            status,
             updatedAt: record.updatedAt || record.updated_at || Date.now(),
             updated_at: record.updated_at || record.updatedAt || Date.now(),
             deletedAt: record.deletedAt || record.deleted_at || null,

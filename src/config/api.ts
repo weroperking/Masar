@@ -25,6 +25,9 @@ export function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promis
 }
 
 export async function fetchWithAuth(url: string, token: string | null, options: RequestInit = {}) {
+  const isSyncRoute = url.startsWith('/api/sync/') || url.startsWith('/api/sync');
+  const targetUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+
   const headers = new Headers(options.headers || {});
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
@@ -33,13 +36,38 @@ export async function fetchWithAuth(url: string, token: string | null, options: 
     headers.set('Content-Type', 'application/json');
   }
 
-  if (url.startsWith('/api/sync') && !headers.has('X-Sync-Encrypted')) {
+  if (isSyncRoute && !headers.has('X-Sync-Encrypted')) {
     headers.set('X-Sync-Encrypted', 'true');
   }
 
   console.log('[SYNC REQUEST]', url, options.method || 'GET', JSON.stringify([...headers.entries()]));
 
-  // First attempt the local/current application backend (where /api/sync endpoints are implemented on server.ts)
+  // FORCE Cloudflare Worker for sync and PIN routes
+  if (isSyncRoute || url.startsWith('/api/pin-configs')) {
+    const upstreamCtrl = new AbortController();
+    const upstreamTimeout = setTimeout(() => upstreamCtrl.abort(), 15000);
+    const upstreamRes = await withTimeout(
+      fetch(targetUrl, {
+        ...options,
+        headers,
+        signal: options.signal || upstreamCtrl.signal,
+      }),
+      20_000,
+      'sync fetch'
+    );
+    clearTimeout(upstreamTimeout);
+
+    console.log('[SYNC RESPONSE upstream]', upstreamRes.status, upstreamRes.headers.get('content-type'));
+
+    if (!upstreamRes.ok) {
+      const errorText = await upstreamRes.text();
+      throw new Error(`Upstream API Error: ${upstreamRes.status} - ${errorText}`);
+    }
+
+    return await upstreamRes.json();
+  }
+
+  // First attempt the local/current application backend (for other non-sync routes)
   try {
     const localCtrl = new AbortController();
     const localTimeout = setTimeout(() => localCtrl.abort(), 6000);
@@ -50,14 +78,13 @@ export async function fetchWithAuth(url: string, token: string | null, options: 
     });
     clearTimeout(localTimeout);
     if (localRes.ok) {
-      console.log('[SYNC RESPONSE local]', localRes.status, localRes.headers.get('content-type'));
+      console.log('[RESPONSE local]', localRes.status, localRes.headers.get('content-type'));
       return await localRes.json();
     }
   } catch (localErr) {
-    console.warn('[SYNC REQUEST local failed, trying upstream]', localErr);
+    console.warn('[REQUEST local failed, trying upstream]', localErr);
   }
 
-  const targetUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
   const upstreamCtrl = new AbortController();
   const upstreamTimeout = setTimeout(() => upstreamCtrl.abort(), 10000);
   const response = await withTimeout(
@@ -67,7 +94,7 @@ export async function fetchWithAuth(url: string, token: string | null, options: 
       signal: options.signal || upstreamCtrl.signal,
     }),
     20_000,
-    'sync fetch'
+    'upstream fetch'
   );
   clearTimeout(upstreamTimeout);
 
